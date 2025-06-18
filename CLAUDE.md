@@ -25,6 +25,16 @@ Always refer to IMPLEMENTATION.md when:
 - Adding new functionality
 - Troubleshooting implementation issues
 
+## 🚀 Current Implementation Status
+
+### ✅ Completed Components (Phase 1)
+- **Core Models** (`src/second_opinion/core/models.py`) - Comprehensive Pydantic V2 models with validation
+- **Configuration System** (`src/second_opinion/config/`) - Environment variables, YAML configs, security
+- **Test Infrastructure** - 90%+ coverage with security-focused testing
+
+### 🔄 Next: Security Utils & Base Client
+See IMPLEMENTATION.md for detailed next steps and current progress.
+
 ## Development Commands
 
 ### Setup and Installation
@@ -250,3 +260,45 @@ Required environment variables (see `.env.example`):
 - `LMStudio_BASE_URL`: LM Studio server URL (optional)
 - `DATABASE_ENCRYPTION_KEY`: Local database encryption key
 - `DEFAULT_COST_LIMIT`: Default per-request cost limit
+
+## 🔧 Development Patterns & Learnings
+
+### Configuration Management
+- **Use pydantic-settings**: Don't reinvent environment variable handling
+- **YAML for structure**: Use YAML configs for complex nested settings
+- **Security pattern**: `repr=False` on sensitive fields to prevent logging secrets
+- **Environment nesting**: Use `__` delimiter for nested configs (e.g., `DATABASE__ENCRYPTION_ENABLED=true`)
+
+### Pydantic V2 Best Practices
+```python
+# ✅ Modern validation patterns
+@field_validator('field_name')
+@classmethod
+def validate_field(cls, v):
+    return v
+
+@model_validator(mode='after')
+def validate_model(self):
+    return self
+
+# ✅ Computed properties for derived data
+@property
+def computed_field(self) -> type:
+    return self.field_a + self.field_b
+```
+
+### Testing Isolation
+```python
+# ✅ Global state management for tests
+@pytest.fixture(autouse=True)
+def reset_global_state():
+    global_manager.reset()
+    yield
+    global_manager.reset()
+```
+
+### Security-First Development
+- Validate all inputs with Pydantic models
+- Separate validation levels (development vs production)
+- Use `repr=False` for sensitive fields
+- Test with malicious inputs using `pytest -m security`
