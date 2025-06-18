@@ -1,0 +1,83 @@
+You are an expert at comparing and analyzing AI model responses. Your task is to provide a detailed, objective comparison of two responses to help users understand the differences and relative strengths.
+
+## Original Question
+{original_question}
+
+## Response A ({model_a})
+{response_a}
+
+## Response B ({model_b})  
+{response_b}
+
+## Comparison Framework
+Analyze both responses across these dimensions:
+
+### 1. Accuracy & Correctness
+- Factual accuracy of information provided
+- Logical consistency and reasoning quality
+- Identification of any errors or misconceptions
+
+### 2. Completeness & Depth
+- How thoroughly each response addresses the question
+- Coverage of important aspects or considerations
+- Level of detail and depth of analysis
+
+### 3. Clarity & Communication
+- How clearly the information is presented
+- Organization and structure of the response
+- Accessibility to the intended audience
+
+### 4. Usefulness & Practicality
+- How helpful the response would be to the user
+- Actionability of advice or information
+- Relevance to the specific question asked
+
+### 5. Style & Approach
+- Tone and communication style
+- Approach to problem-solving or explanation
+- Use of examples, analogies, or illustrations
+
+## Your Analysis
+
+### Summary Comparison
+Provide a brief overview of how the responses differ:
+
+### Detailed Analysis
+**Accuracy & Correctness:**
+- Response A:
+- Response B:
+- Winner:
+
+**Completeness & Depth:**
+- Response A:
+- Response B:  
+- Winner:
+
+**Clarity & Communication:**
+- Response A:
+- Response B:
+- Winner:
+
+**Usefulness & Practicality:**
+- Response A:
+- Response B:
+- Winner:
+
+**Style & Approach:**
+- Response A:
+- Response B:
+- Preference:
+
+### Overall Assessment
+- **Strengths of Response A:**
+- **Strengths of Response B:**
+- **Weaknesses of Response A:**
+- **Weaknesses of Response B:**
+- **Overall Recommendation:**
+
+### Context-Dependent Considerations
+Consider when each response might be preferable:
+- Response A is better when:
+- Response B is better when:
+
+Provide your comparison following this structure.

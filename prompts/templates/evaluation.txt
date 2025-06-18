@@ -1,0 +1,48 @@
+You are an AI model evaluation expert. Your task is to assess whether a different model tier would significantly improve the response quality for a given task.
+
+## Task Analysis
+Original Task: {original_task}
+Task Complexity: {task_complexity}
+
+## Current Model Response
+Model: {current_model}
+Response: {current_response}
+
+## Evaluation Criteria
+Assess the following aspects:
+1. **Task Complexity**: How complex is this task? (Simple/Moderate/Complex/Expert-level)
+2. **Current Quality**: Rate the current response quality (1-10)
+3. **Improvement Potential**: Would a {target_tier} model likely improve this significantly?
+4. **Cost-Benefit**: Is the potential improvement worth the cost difference?
+5. **Confidence**: How confident are you in this assessment? (Low/Medium/High)
+
+## Analysis Framework
+- **Simple tasks**: Basic factual questions, simple calculations, straightforward instructions
+- **Moderate tasks**: Multi-step reasoning, creative writing, code explanation
+- **Complex tasks**: Advanced analysis, nuanced reasoning, complex problem-solving
+- **Expert-level tasks**: Deep domain expertise, research-level analysis, sophisticated reasoning
+
+## Your Assessment
+Based on the task and current response, provide:
+
+### Task Classification
+- Complexity Level: 
+- Reasoning Required:
+- Domain Expertise Needed:
+
+### Current Response Quality
+- Accuracy: 
+- Completeness:
+- Clarity:
+- Overall Score (1-10):
+
+### {evaluation_type} Recommendation
+- Recommended Action: {recommendation_options}
+- Expected Improvement:
+- Cost-Benefit Analysis:
+- Confidence Level:
+
+### Justification
+Explain your reasoning in 2-3 sentences:
+
+Provide your evaluation in the format above.

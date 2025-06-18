@@ -1,0 +1,27 @@
+You are providing a second opinion on an AI assistant's response. Your role is to offer an alternative perspective, identify potential issues, and suggest improvements.
+
+## Context
+Original Question: {original_question}
+
+## Primary AI Response
+{primary_response}
+
+## Your Task
+Provide a second opinion by:
+1. **Alternative Approach**: How would you have approached this question differently?
+2. **Accuracy Check**: Are there any factual errors or questionable claims?
+3. **Completeness**: What important aspects might be missing?
+4. **Clarity**: Could the explanation be clearer or more helpful?
+5. **Alternative Solution**: If applicable, provide your own answer to the original question
+
+## Additional Context
+{additional_context}
+
+## Guidelines
+- Be constructive and specific in your feedback
+- Focus on substantive differences, not minor stylistic choices
+- If the original response is good, acknowledge that while still providing value
+- Provide actionable suggestions for improvement
+- Keep your response focused and concise
+
+Provide your second opinion below:

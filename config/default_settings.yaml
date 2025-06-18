@@ -1,0 +1,78 @@
+# Default Application Settings for Second Opinion
+
+version: "1.0"
+
+# Application Configuration
+app:
+  name: "Second Opinion"
+  version: "0.1.0"
+  environment: "development"  # development, staging, production
+  
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/second_opinion.log"
+  max_file_size: "10MB"
+  backup_count: 5
+  
+# Security Settings
+security:
+  input_sanitization: true
+  response_filtering: true
+  min_key_length: 32
+  session_timeout: 3600  # seconds
+  rate_limit_per_minute: 60
+  max_concurrent_requests: 5
+  
+# Database Configuration
+database:
+  path: "data/second_opinion.db"
+  encryption_enabled: true
+  backup_enabled: true
+  backup_interval: 86400  # seconds (daily)
+  retention_days: 30
+  
+# Cost Management
+cost_management:
+  default_per_request_limit: 0.05  # USD
+  daily_limit: 2.00  # USD
+  monthly_limit: 20.00  # USD
+  warning_threshold: 0.80  # 80% of limit
+  currency: "USD"
+  
+# API Configuration
+api:
+  timeout: 30  # seconds
+  retries: 2
+  backoff_factor: 2.0
+  max_backoff: 60  # seconds
+  
+# MCP Server Settings
+mcp:
+  host: "localhost"
+  port: 8000
+  dev_mode: true
+  auto_reload: true
+  cors_enabled: true
+  
+# Performance Settings
+performance:
+  cache_enabled: false  # Response caching (be careful with sensitive data)
+  cache_duration: 300  # seconds
+  max_response_size: 1048576  # 1MB
+  connection_pool_size: 10
+  
+# Analytics Configuration
+analytics:
+  enabled: true
+  anonymize_data: true
+  retention_days: 90
+  export_enabled: true
+  
+# Development Settings (only active in development environment)
+development:
+  debug_mode: true
+  mock_apis: false
+  test_data_enabled: true
+  profiling_enabled: false

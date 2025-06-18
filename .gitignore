@@ -1,0 +1,84 @@
+# Environment files (contains sensitive API keys)
+.env
+.env.local
+.env.*.local
+
+# Local data directory (contains encrypted user data)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+env/
+ENV/
+
+# Testing
+.tox/
+.nox/
+.coverage
+.pytest_cache/
+cover/
+htmlcov/
+.hypothesis/
+
+# mypy
+.mypy_cache/
+.dmyp.json
+dmypy.json
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# API keys and secrets (additional security)
+secrets.txt
+keys.txt
+*.key
+*.pem
+*.crt
+
+# User-specific configuration
+config/local_*
+config/user_*
+
+# Cache directories
+.cache/
+*.cache
+
+# Security: Never commit these files
+*.secret
+*.private
+.secrets/
+private/
