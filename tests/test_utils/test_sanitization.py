@@ -334,6 +334,92 @@ class TestGlobalFunctions:
         assert result == Decimal("5.00")
 
 
+class TestSanitizerInternals:
+    """Test internal sanitizer methods."""
+    
+    def setup_method(self):
+        self.sanitizer = InputSanitizer()
+    
+    def test_contains_api_key_pattern(self):
+        """Test API key pattern detection."""
+        assert self.sanitizer._contains_api_key_pattern("sk-1234567890abcdef1234567890abcdef")
+        assert self.sanitizer._contains_api_key_pattern("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")
+        assert not self.sanitizer._contains_api_key_pattern("regular text")
+        assert not self.sanitizer._contains_api_key_pattern("short-key")
+    
+    def test_contains_injection_pattern_contexts(self):
+        """Test injection pattern detection across contexts."""
+        from src.second_opinion.core.models import SecurityContext
+        
+        # Script tags should be detected in all contexts
+        script_text = "<script>alert('test')</script>"
+        assert self.sanitizer._contains_injection_pattern(script_text, SecurityContext.USER_PROMPT)
+        assert self.sanitizer._contains_injection_pattern(script_text, SecurityContext.SYSTEM_PROMPT)
+        assert self.sanitizer._contains_injection_pattern(script_text, SecurityContext.CONFIGURATION)
+        
+        # Backticks allowed in system prompts but not others
+        backtick_text = "`rm -rf /`"
+        assert self.sanitizer._contains_injection_pattern(backtick_text, SecurityContext.USER_PROMPT)
+        assert not self.sanitizer._contains_injection_pattern(backtick_text, SecurityContext.SYSTEM_PROMPT)
+        assert self.sanitizer._contains_injection_pattern(backtick_text, SecurityContext.CONFIGURATION)
+    
+    def test_normalize_whitespace_edge_cases(self):
+        """Test whitespace normalization edge cases."""
+        # Multiple types of whitespace
+        assert self.sanitizer._normalize_whitespace("  hello  world  ") == "hello world"
+        assert self.sanitizer._normalize_whitespace("\t\n  test  \r\n") == "test"
+        
+        # Control characters
+        assert self.sanitizer._normalize_whitespace("hello\x00world") == "helloworld"
+        assert self.sanitizer._normalize_whitespace("test\x08\x1f") == "test"
+        
+        # Preserve normal newlines in specific cases
+        text_with_newlines = "line1\nline2\nline3"
+        normalized = self.sanitizer._normalize_whitespace(text_with_newlines)
+        assert "line1" in normalized and "line3" in normalized
+    
+    def test_get_max_length_for_context(self):
+        """Test context-specific length limits."""
+        from src.second_opinion.core.models import SecurityContext
+        
+        assert self.sanitizer._get_max_length_for_context(SecurityContext.USER_PROMPT) == 50000
+        assert self.sanitizer._get_max_length_for_context(SecurityContext.SYSTEM_PROMPT) == 10000
+        assert self.sanitizer._get_max_length_for_context(SecurityContext.CONFIGURATION) == 1000
+        assert self.sanitizer._get_max_length_for_context(SecurityContext.API_REQUEST) == 50000
+    
+    def test_sanitize_system_prompt_patterns(self):
+        """Test system prompt specific sanitization."""
+        original = "You are helpful. `dangerous command` and $(eval code)"
+        result = self.sanitizer._sanitize_system_prompt(original)
+        
+        assert "[REMOVED]" in result  # Should replace dangerous patterns
+        assert "You are helpful" in result  # Should preserve safe content
+        assert "`dangerous command`" not in result
+        assert "$(eval code)" not in result
+    
+    def test_sanitize_api_request_patterns(self):
+        """Test API request specific sanitization."""
+        malicious_request = "Content-Type: application/json\nX-API-Key: secret\nWhat is AI?"
+        result = self.sanitizer._sanitize_api_request(malicious_request)
+        
+        assert "Content-Type:" not in result
+        assert "X-API-Key:" not in result
+        assert "What is AI?" in result
+    
+    def test_sanitize_string_value_edge_cases(self):
+        """Test string value sanitization edge cases."""
+        # Non-string input
+        assert self.sanitizer._sanitize_string_value(123) == ""
+        assert self.sanitizer._sanitize_string_value(None) == ""
+        
+        # Empty/whitespace strings
+        assert self.sanitizer._sanitize_string_value("") == ""
+        assert self.sanitizer._sanitize_string_value("   ") == ""
+        
+        # Valid strings
+        assert self.sanitizer._sanitize_string_value("  hello world  ") == "hello world"
+
+
 class TestSecurityScenarios:
     """Test comprehensive security scenarios."""
     

@@ -518,7 +518,7 @@ def get_cost_guard() -> CostGuard:
     return _cost_guard
 
 
-def set_cost_guard(cost_guard: CostGuard) -> None:
+def set_cost_guard(cost_guard: Optional[CostGuard]) -> None:
     """Set global cost guard instance."""
     global _cost_guard
     _cost_guard = cost_guard

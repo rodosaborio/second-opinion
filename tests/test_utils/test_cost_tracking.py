@@ -450,6 +450,39 @@ class TestGlobalFunctions:
         
         assert cost_analysis.estimated_cost == Decimal('0.03')
         assert cost_analysis.actual_cost == Decimal('0.025')
+    
+    def test_get_cost_guard_creates_default(self):
+        """Test that get_cost_guard creates default instance."""
+        # Reset global state
+        set_cost_guard(None)
+        
+        # Getting cost guard should create default
+        guard = get_cost_guard()
+        assert isinstance(guard, CostGuard)
+        assert guard.per_request_limit == Decimal('0.10')  # Default value
+    
+    def test_set_cost_guard_none(self):
+        """Test setting cost guard to None."""
+        # Set to None
+        set_cost_guard(None)
+        
+        # Getting should create new default
+        guard = get_cost_guard()
+        assert isinstance(guard, CostGuard)
+    
+    def test_global_state_persistence(self):
+        """Test that global cost guard state persists."""
+        # Create custom guard
+        custom_guard = CostGuard(per_request_limit=Decimal('0.50'))
+        set_cost_guard(custom_guard)
+        
+        # Verify it persists across multiple calls
+        guard1 = get_cost_guard()
+        guard2 = get_cost_guard()
+        
+        assert guard1 is custom_guard
+        assert guard2 is custom_guard
+        assert guard1 is guard2
 
 
 class TestEdgeCases:

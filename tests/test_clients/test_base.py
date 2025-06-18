@@ -356,6 +356,64 @@ class TestBaseClient:
         repr_str = repr(self.client)
         assert "MockClient" in repr_str
         assert "mock-provider" in repr_str
+    
+    def test_calculate_token_cost(self):
+        """Test internal token cost calculation method."""
+        model_info = ModelInfo("gpt-4", "openai", Decimal("0.03"), Decimal("0.06"))
+        
+        cost = self.client._calculate_token_cost(1000, 500, model_info)
+        expected_input = Decimal("1000") * Decimal("0.03") / 1000  # $0.03
+        expected_output = Decimal("500") * Decimal("0.06") / 1000   # $0.03  
+        expected_total = expected_input + expected_output
+        
+        assert cost == expected_total
+        assert cost == Decimal("0.06")
+    
+    def test_estimate_tokens(self):
+        """Test internal token estimation method."""
+        # Test various text lengths
+        assert self.client._estimate_tokens("") == 1  # Minimum 1 token
+        assert self.client._estimate_tokens("Hello") == 1  # 5 chars = 1 token
+        assert self.client._estimate_tokens("Hello world") == 2  # 11 chars = 2 tokens  
+        assert self.client._estimate_tokens("A" * 100) == 25  # 100 chars = 25 tokens
+    
+    def test_create_error_response(self):
+        """Test error response creation method."""
+        request = ModelRequest(
+            model="gpt-4",
+            messages=[Message(role="user", content="test message")]
+        )
+        error = Exception("Test error occurred")
+        
+        response = self.client._create_error_response(error, request)
+        
+        assert response.model == "gpt-4"
+        assert response.provider == "mock-provider"
+        assert "Error: Test error occurred" in response.content
+        assert response.cost_estimate == Decimal('0')
+        assert response.usage.total_tokens == 0
+        assert response.metadata["error"] is True
+        assert response.metadata["error_type"] == "Exception"
+    
+    @pytest.mark.asyncio
+    async def test_get_cached_models_empty(self):
+        """Test cached models when cache is empty."""
+        cached = await self.client._get_cached_models()
+        assert cached is None
+    
+    @pytest.mark.asyncio
+    async def test_cache_models(self):
+        """Test model caching functionality."""
+        models = [ModelInfo("gpt-4", "openai", Decimal("0.03"), Decimal("0.06"))]
+        
+        # Cache the models
+        await self.client._cache_models(models)
+        
+        # Verify cache
+        cached = await self.client._get_cached_models() 
+        assert cached is not None
+        assert len(cached) == 1
+        assert cached[0].name == "gpt-4"
 
 
 class TestClientIntegration:
