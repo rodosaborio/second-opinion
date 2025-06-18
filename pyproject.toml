@@ -107,3 +107,14 @@ warn_unused_ignores = true
 warn_return_any = true
 strict_equality = true
 strict_concatenate = true
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "mypy>=1.16.1",
+    "pre-commit>=4.2.0",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.2.1",
+    "ruff>=0.12.0",
+]
