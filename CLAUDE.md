@@ -6,6 +6,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Second Opinion is an AI tool that provides "second opinion" functionality for AI responses via MCP (Model Context Protocol). It helps users optimize their AI model usage by comparing responses across different models, suggesting cost-effective alternatives, and tracking usage patterns.
 
+## Implementation Guide
+
+For detailed implementation specifications, design decisions, and development patterns, see **[IMPLEMENTATION.md](IMPLEMENTATION.md)**. This comprehensive guide contains:
+
+- **Architecture deep-dive** with real-world implementation challenges
+- **Phase-by-phase implementation plan** with detailed specifications
+- **Component specifications** and interface definitions
+- **Security implementation** patterns and best practices
+- **Common solutions** and reusable code patterns
+- **API design patterns** for consistent development
+- **Testing strategies** including security and performance testing
+
+Always refer to IMPLEMENTATION.md when:
+- Starting work on a new component
+- Making architectural decisions
+- Implementing security features
+- Adding new functionality
+- Troubleshooting implementation issues
+
 ## Development Commands
 
 ### Setup and Installation
