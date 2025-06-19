@@ -14,6 +14,25 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+class EvaluationError(Exception):
+    """Raised when model evaluation fails."""
+    
+    def __init__(self, message: str, model: str | None = None, cause: Exception | None = None):
+        self.message = message
+        self.model = model
+        self.cause = cause
+        super().__init__(message)
+
+
+class ClientCreationError(Exception):
+    """Raised when client creation fails for a model."""
+    
+    def __init__(self, message: str, provider: str | None = None):
+        self.message = message
+        self.provider = provider
+        super().__init__(message)
+
+
 class SecurityContext(str, Enum):
     """Security context for input validation."""
     USER_PROMPT = "user_prompt"
@@ -189,6 +208,7 @@ class ComparisonResult(BaseModel):
     winner: str = Field(..., description="Which response is better (primary/comparison/tie)")
     reasoning: str = Field(..., description="Explanation of the comparison results")
     cost_analysis: CostAnalysis = Field(..., description="Cost analysis for the comparison")
+    recommendations: list[str] = Field(default_factory=list, description="Generated recommendations based on comparison")
 
     @field_validator('winner')
     @classmethod

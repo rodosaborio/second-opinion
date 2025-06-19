@@ -18,11 +18,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from second_opinion.clients import create_client
+from second_opinion.clients import get_client_for_model
 from second_opinion.config.model_configs import model_config_manager
 from second_opinion.config.settings import get_settings
 from second_opinion.core.evaluator import TaskComplexity, get_evaluator
-from second_opinion.core.models import Message, ModelRequest
+from second_opinion.core.models import EvaluationCriteria, Message, ModelRequest
 from second_opinion.utils.cost_tracking import get_cost_guard
 from second_opinion.utils.sanitization import SecurityContext, sanitize_prompt
 
@@ -271,16 +271,6 @@ class ComparisonModelSelector:
         )
 
 
-def get_client_for_model(model: str):
-    """Determine the appropriate client for a given model."""
-    selector = ComparisonModelSelector()
-
-    if selector._is_local_model_name(model):
-        # Local model - use LM Studio
-        return create_client("lmstudio")
-    else:
-        # Cloud model - use OpenRouter
-        return create_client("openrouter")
 
 
 def run_async(coro):
@@ -332,6 +322,7 @@ async def execute_second_opinion(
     cost_limit: float,
     context: str | None = None,
     existing_response: str | None = None,
+    evaluator_model: str | None = None,
 ) -> dict:
     """Execute the second opinion operation."""
 
@@ -435,17 +426,21 @@ async def execute_second_opinion(
 
         # Evaluate responses
         evaluations = []
+        evaluation_criteria = EvaluationCriteria(
+            accuracy_weight=0.3,
+            completeness_weight=0.3,
+            clarity_weight=0.2,
+            usefulness_weight=0.2,
+        )
+        
         for comp_response in comparison_responses:
             try:
                 evaluation = await evaluator.compare_responses(
                     primary_response,
                     comp_response,
-                    {
-                        "accuracy": 0.3,
-                        "completeness": 0.3,
-                        "clarity": 0.2,
-                        "usefulness": 0.2,
-                    },
+                    original_task=prompt,
+                    criteria=evaluation_criteria,
+                    evaluator_model=evaluator_model,
                 )
                 evaluations.append(evaluation)
             except Exception as e:
@@ -509,6 +504,9 @@ def second_opinion_command(
     existing_response: str | None = typer.Option(
         None, "--existing-response", help="Provide existing primary model response to save API calls"
     ),
+    evaluator_model: str | None = typer.Option(
+        None, "--evaluator-model", help="Model to use for evaluation (defaults to primary model)"
+    ),
 ):
     """Get a second opinion on a prompt using multiple models."""
 
@@ -534,6 +532,17 @@ def second_opinion_command(
         task_complexity=None,  # Will be detected in async function
         max_models=max_comparisons,
     )
+    
+    # Get evaluator model from config if not specified
+    if evaluator_model is None:
+        try:
+            from second_opinion.config.model_configs import model_config_manager
+            config_evaluator = model_config_manager.get_tool_config("second_opinion").evaluator_model
+            if config_evaluator:
+                evaluator_model = config_evaluator
+        except Exception:
+            # Config not available or no evaluator specified, will use primary model
+            pass
 
     # Show model selection
     if comparison_model:
@@ -555,6 +564,7 @@ def second_opinion_command(
                 cost_limit=cost_limit,
                 context=context,
                 existing_response=existing_response,
+                evaluator_model=evaluator_model,
             )
         )
 
@@ -590,8 +600,9 @@ def display_results(result: dict, verbose: bool = False):
     if evaluations:
         console.print("\n[bold]Recommendations:[/bold]")
         for evaluation in evaluations:
-            if hasattr(evaluation, "recommendation") and evaluation.recommendation:
-                console.print(f"• {evaluation.recommendation}")
+            if hasattr(evaluation, "recommendations") and evaluation.recommendations:
+                for recommendation in evaluation.recommendations:
+                    console.print(f"• {recommendation}")
 
 
 def _display_summary_results(result: dict):

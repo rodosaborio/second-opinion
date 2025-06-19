@@ -1304,6 +1304,187 @@ second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
 - **Smart Model Selection**: Task complexity-aware selection with user transparency and priority hierarchy
 - **Production Evaluation**: Real API-based evaluation with robust fallback strategies and structured response parsing
 
+### ✅ Phase 7: Evaluator Model Configuration & Bug Fixes - COMPLETED
+
+**What's Working:**
+- **Configurable Evaluator Model** (`src/second_opinion/core/evaluator.py`) - Evaluator model now defaults to primary model with optional override
+- **CLI Evaluator Option** (`src/second_opinion/cli/main.py`) - Added `--evaluator-model` flag for explicit evaluator model specification
+- **Provider Detection Integration** (`src/second_opinion/clients/__init__.py`) - Enhanced client factory with `get_client_for_model()` and `detect_model_provider()`
+- **Cost Tracking Bug Fix** - Fixed reservation ID mismatch that was causing "Reservation evaluation not found" errors
+- **Recommendation System** (`src/second_opinion/core/models.py`) - Added recommendations field to ComparisonResult with intelligent generation
+- **Error Handling Enhancement** - Removed unreliable simulation fallback, added proper EvaluationError exceptions
+
+**Key Implementation Achievements:**
+1. **Intelligent Evaluator Model Selection**: When no evaluator model specified, uses primary model for evaluation (perfect for LM Studio setups)
+2. **Provider-Aware Evaluation**: Local models (qwen3-4b-mlx) use LM Studio client, cloud models use OpenRouter for evaluation
+3. **Configuration Hierarchy**: CLI flag → Config file → Primary model (most specific wins)
+4. **Cost Tracking Fix**: Proper reservation ID handling prevents "Reservation not found" errors
+5. **Enhanced Recommendations**: Intelligent recommendations based on quality comparison and cost analysis
+6. **Robust Error Handling**: Removed simulation fallback, added proper exception handling with EvaluationError
+
+**Usage Examples:**
+```bash
+# Default behavior - uses primary model for evaluation (LM Studio for local models)
+uv run second-opinion --primary-model "qwen3-4b-mlx" --comparison-model "qwen3-0.6b-mlx" "What is the capital of France?"
+# Evaluator: qwen3-4b-mlx (LM Studio)
+
+# Explicit cloud evaluator for mixed setup
+uv run second-opinion --primary-model "qwen3-4b-mlx" --comparison-model "qwen3-0.6b-mlx" --evaluator-model "anthropic/claude-3-5-sonnet" "Complex analysis"
+# Primary: qwen3-4b-mlx (LM Studio), Evaluator: anthropic/claude-3-5-sonnet (OpenRouter)
+
+# Existing response with evaluation
+uv run second-opinion --primary-model "qwen3-4b-mlx" --comparison-model "qwen3-0.6b-mlx" "What is the capital of France?" --existing-response "Paris" -v
+# No API call for primary, evaluation uses qwen3-4b-mlx via LM Studio
+```
+
+**Technical Implementation Highlights:**
+```python
+# Intelligent evaluator model defaulting
+if evaluator_model is None:
+    evaluator_model = primary_response.model
+    logger.info(f"Using primary model '{evaluator_model}' as evaluator")
+
+# Provider detection for consistent client usage
+def detect_model_provider(model: str) -> str:
+    local_patterns = ["mlx", "qwen", "llama", "mistral", "codestral", "devstral"]
+    if "/" in model and len(model.split("/")) == 2:
+        return "openrouter"  # Cloud model with provider prefix
+    if any(pattern in model.lower() for pattern in local_patterns):
+        return "lmstudio"    # Local model patterns
+    return "openrouter"     # Default to OpenRouter
+
+# Fixed cost tracking with proper reservation IDs
+budget_check = await self.cost_guard.check_and_reserve_budget(estimated_cost, "evaluation", evaluator_model)
+response = await client.complete(request)
+await self.cost_guard.record_actual_cost(
+    reservation_id=budget_check.reservation_id,  # Use actual reservation ID
+    actual_cost=response.cost_estimate, model=evaluator_model, operation_type="evaluation"
+)
+
+# Enhanced recommendations generation
+def _generate_recommendations(self, primary_response, comparison_response, evaluation_result):
+    winner = evaluation_result.get("winner", "tie")
+    if winner == "comparison" and comparison_cost < primary_cost:
+        return [f"Consider using {comparison_response.model} instead - better quality at ${savings:.4f} lower cost"]
+    # ... intelligent recommendation logic based on quality and cost
+```
+
+**Bug Fixes Completed:**
+- **✅ Reservation ID Mismatch**: Fixed cost tracking to use actual reservation IDs instead of hardcoded strings
+- **✅ API Key Error**: Local models now use LM Studio client instead of trying OpenRouter without API key
+- **✅ Missing Recommendations**: Proper recommendation generation and display in CLI
+- **✅ Simulation Fallback Removed**: Eliminated unreliable simulation, added proper error handling
+- **✅ Parameter Type Issues**: Fixed CLI to pass proper EvaluationCriteria objects instead of dictionaries
+
+**Enhanced Error Handling:**
+```python
+class EvaluationError(Exception):
+    """Raised when model evaluation fails."""
+    def __init__(self, message: str, model: str | None = None, cause: Exception | None = None):
+        self.message, self.model, self.cause = message, model, cause
+
+# Clean error handling without simulation fallback
+try:
+    evaluation_result = await self._evaluate_with_model(...)
+except EvaluationError:
+    raise  # Re-raise evaluation errors as-is
+except Exception as e:
+    raise EvaluationError(f"Unexpected error during evaluation: {str(e)}", model=evaluator_model, cause=e)
+```
+
+**Configuration Integration:**
+```python
+# Check config file for evaluator model if not specified
+if evaluator_model is None:
+    try:
+        config_evaluator = model_config_manager.get_tool_config("second_opinion").evaluator_model
+        if config_evaluator:
+            evaluator_model = config_evaluator
+    except Exception:
+        pass  # Will use primary model as evaluator
+```
+
+**Testing & Quality Assurance:**
+- **All 377 Tests Pass**: No regressions, comprehensive test coverage maintained
+- **Provider Detection Validated**: Local and cloud models correctly routed to appropriate clients
+- **Cost Tracking Fixed**: Reservation system working correctly with proper ID matching
+- **Error Handling Tested**: EvaluationError exceptions properly raised and handled
+- **Recommendation Generation**: Intelligent recommendations based on quality and cost comparison
+
+### 🔄 Future Improvements & Enhancement Areas
+
+**Identified Issues & Enhancement Opportunities:**
+
+**1. Evaluation Quality & Intelligence**
+- **Current Issue**: Basic evaluation may not catch subtle quality differences (as seen with "Paris" vs "Nice" example)
+- **Enhancement Needed**: More sophisticated evaluation prompts and criteria
+- **Potential Solutions**:
+  - Enhanced evaluation templates with specific accuracy checking
+  - Fact-verification capabilities for objective questions
+  - Multi-round evaluation for complex comparisons
+  - Integration with specialized evaluation models
+
+**2. Evaluation Prompt Engineering**
+- **Current State**: Generic comparison template for all types of questions
+- **Enhancement Potential**: Task-specific evaluation templates
+- **Improvements Needed**:
+  - Factual accuracy templates for objective questions
+  - Creativity evaluation for creative tasks
+  - Technical accuracy for programming/analytical tasks
+  - Reasoning evaluation for complex problem-solving
+
+**3. Local Model Evaluation Capabilities**
+- **Current Limitation**: Local models may not be optimal evaluators for all tasks
+- **Enhancement Options**:
+  - Hybrid evaluation: local for simple tasks, cloud for complex evaluation
+  - Evaluation model recommendation based on task type
+  - Multiple evaluator consensus for important decisions
+
+**4. Response Quality Metrics**
+- **Current Approach**: Single overall score with basic criteria
+- **Enhancement Potential**:
+  - Task-specific quality metrics
+  - Confidence scores for evaluations
+  - Uncertainty quantification when models disagree
+  - Historical accuracy tracking for evaluator models
+
+**5. Cost-Effectiveness Analysis**
+- **Current State**: Basic cost comparison with simple recommendations
+- **Enhancement Areas**:
+  - Quality-per-dollar optimization
+  - Task complexity vs model capability matching
+  - Learning from user feedback on recommendations
+  - Dynamic model routing based on performance history
+
+**Example Enhancement - Factual Accuracy Template:**
+```python
+# Future enhancement: specialized evaluation templates
+factual_accuracy_template = """
+Evaluate these responses for FACTUAL ACCURACY only.
+
+Question: {original_question}
+Response A ({model_a}): {response_a}
+Response B ({model_b}): {response_b}
+
+For factual questions, focus on:
+1. Correctness of specific facts
+2. Absence of misinformation
+3. Completeness of factual information
+
+If this is an objective question with a clear correct answer, 
+identify which response is factually accurate.
+
+ACCURACY WINNER: [A/B/TIE]
+REASONING: [Brief explanation focusing on factual correctness]
+"""
+```
+
+**Implementation Priority for Future Enhancements:**
+1. **High Priority**: Enhanced evaluation templates for different task types
+2. **Medium Priority**: Hybrid local/cloud evaluation strategies
+3. **Medium Priority**: Quality metrics and confidence scoring
+4. **Low Priority**: Learning from user feedback and historical optimization
+
 ### 🔄 Next Phase: MCP Integration
 
 **Ready to Implement with Complete Foundation:**

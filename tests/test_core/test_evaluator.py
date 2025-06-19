@@ -3,6 +3,7 @@ Tests for response evaluation and comparison engine.
 """
 
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -152,14 +153,29 @@ class TestResponseEvaluator:
         assert long_complexity in [TaskComplexity.MODERATE, TaskComplexity.COMPLEX, TaskComplexity.EXPERT]
 
     @pytest.mark.asyncio
+    @patch("second_opinion.core.evaluator.get_client_for_model")
     async def test_compare_responses_basic(
         self,
+        mock_get_client_for_model,
         evaluator,
         sample_response_primary,
         sample_response_comparison,
         sample_evaluation_criteria
     ):
         """Test basic response comparison."""
+        # Mock the evaluator client
+        mock_client = AsyncMock()
+        mock_client.estimate_cost.return_value = Decimal("0.01")
+        mock_client.complete.return_value = MagicMock(
+            content="Analysis: Response A wins in accuracy. Response B wins in clarity. Overall: Response A is better.",
+            cost_estimate=Decimal("0.01")
+        )
+        mock_get_client_for_model.return_value = mock_client
+        
+        # Mock the cost guard to avoid reservation issues
+        evaluator.cost_guard.check_and_reserve_budget = AsyncMock()
+        evaluator.cost_guard.record_actual_cost = AsyncMock()
+        
         original_task = "Explain the benefits of exercise"
 
         result = await evaluator.compare_responses(
@@ -182,13 +198,28 @@ class TestResponseEvaluator:
         assert result.cost_analysis is not None
 
     @pytest.mark.asyncio
+    @patch("second_opinion.core.evaluator.get_client_for_model")
     async def test_compare_responses_default_criteria(
         self,
+        mock_get_client_for_model,
         evaluator,
         sample_response_primary,
         sample_response_comparison
     ):
         """Test response comparison with default criteria."""
+        # Mock the evaluator client
+        mock_client = AsyncMock()
+        mock_client.estimate_cost.return_value = Decimal("0.01")
+        mock_client.complete.return_value = MagicMock(
+            content="Analysis: Response A wins in accuracy. Response B wins in clarity. Overall: Response A is better.",
+            cost_estimate=Decimal("0.01")
+        )
+        mock_get_client_for_model.return_value = mock_client
+        
+        # Mock the cost guard to avoid reservation issues
+        evaluator.cost_guard.check_and_reserve_budget = AsyncMock()
+        evaluator.cost_guard.record_actual_cost = AsyncMock()
+        
         original_task = "What is machine learning?"
 
         result = await evaluator.compare_responses(
@@ -369,32 +400,6 @@ class TestResponseEvaluator:
         impact = await evaluator._calculate_cost_impact("gpt-4o", "gpt-3.5-turbo")
         assert impact < 0  # Downgrade should cost less
 
-    @pytest.mark.asyncio
-    async def test_simulate_evaluation_tie(self, evaluator):
-        """Test simulated evaluation that results in a tie."""
-        # Create two very similar responses
-        response1 = ModelResponse(
-            content="This is a response.",
-            model="gpt-4o",
-            usage=TokenUsage(input_tokens=100, output_tokens=100, total_tokens=200),
-            cost_estimate=Decimal("0.005"),
-            provider="openai"
-        )
-
-        response2 = ModelResponse(
-            content="This is also a response.",
-            model="gpt-3.5-turbo",
-            usage=TokenUsage(input_tokens=100, output_tokens=100, total_tokens=200),
-            cost_estimate=Decimal("0.005"),
-            provider="openai"
-        )
-
-        criteria = EvaluationCriteria()
-        result = await evaluator._simulate_evaluation(response1, response2, criteria)
-
-        assert result["winner"] in ["primary", "comparison", "tie"]
-        assert 0.0 <= result["overall_score"] <= 10.0
-        assert len(result["reasoning"]) > 0
 
 
 class TestGlobalEvaluator:

@@ -11,13 +11,14 @@ import re
 from decimal import Decimal
 from typing import Any
 
-from ..clients import create_client
+from ..clients import get_client_for_model
 from ..prompts.manager import render_template
 from ..utils.cost_tracking import CostGuard
 from .models import (
     ComparisonResult,
     CostAnalysis,
     EvaluationCriteria,
+    EvaluationError,
     Message,
     ModelRequest,
     ModelResponse,
@@ -87,7 +88,7 @@ class ResponseEvaluator:
         comparison_response: ModelResponse,
         original_task: str,
         criteria: EvaluationCriteria | None = None,
-        evaluator_model: str = "gpt-4o-mini"
+        evaluator_model: str | None = None
     ) -> ComparisonResult:
         """
         Compare two model responses across multiple evaluation criteria.
@@ -97,7 +98,7 @@ class ResponseEvaluator:
             comparison_response: Response from the comparison model
             original_task: The original task/question
             criteria: Evaluation criteria (uses defaults if not provided)
-            evaluator_model: Model to use for evaluation
+            evaluator_model: Model to use for evaluation (defaults to primary model if None)
             
         Returns:
             Detailed comparison results
@@ -109,7 +110,12 @@ class ResponseEvaluator:
         if not criteria:
             criteria = self.default_criteria
 
-        logger.info(f"Comparing responses: {primary_response.model} vs {comparison_response.model}")
+        # Use primary model as evaluator if none specified
+        if evaluator_model is None:
+            evaluator_model = primary_response.model
+            logger.info(f"Using primary model '{evaluator_model}' as evaluator")
+
+        logger.info(f"Comparing responses: {primary_response.model} vs {comparison_response.model} (evaluator: {evaluator_model})")
 
         # Prepare evaluation prompt (match template parameter names)
         evaluation_params = {
@@ -137,12 +143,16 @@ class ResponseEvaluator:
             evaluation_result = await self._evaluate_with_model(
                 evaluation_prompt, primary_response, comparison_response, criteria, evaluator_model
             )
+        except EvaluationError:
+            # Re-raise evaluation errors as-is
+            raise
         except Exception as e:
-            logger.warning(f"Evaluation API call failed: {e}. Falling back to simulation.")
-            # Fallback to simulation if API call fails
-            evaluation_result = await self._simulate_evaluation(
-                primary_response, comparison_response, criteria
-            )
+            # Convert other exceptions to EvaluationError with context
+            raise EvaluationError(
+                f"Unexpected error during evaluation: {str(e)}",
+                model=evaluator_model,
+                cause=e
+            ) from e
 
         # Calculate cost analysis with real budget data
         total_cost = primary_response.cost_estimate + comparison_response.cost_estimate
@@ -163,6 +173,11 @@ class ResponseEvaluator:
             budget_remaining=budget_remaining
         )
 
+        # Generate recommendations based on evaluation results
+        recommendations = self._generate_recommendations(
+            primary_response, comparison_response, evaluation_result
+        )
+        
         # Create comparison result
         result = ComparisonResult(
             primary_response=primary_response.content,
@@ -176,7 +191,8 @@ class ResponseEvaluator:
             overall_score=evaluation_result["overall_score"],
             winner=evaluation_result["winner"],
             reasoning=evaluation_result["reasoning"],
-            cost_analysis=cost_analysis
+            cost_analysis=cost_analysis,
+            recommendations=recommendations
         )
 
         logger.info(f"Comparison complete. Winner: {result.winner}, Score: {result.overall_score:.2f}")
@@ -368,76 +384,6 @@ class ResponseEvaluator:
             "most_expensive": analyses[-1] if analyses else None
         }
 
-    async def _simulate_evaluation(
-        self,
-        primary_response: ModelResponse,
-        comparison_response: ModelResponse,
-        criteria: EvaluationCriteria
-    ) -> dict[str, Any]:
-        """
-        Simulate evaluation for testing purposes.
-        
-        In production, this would make an actual API call to an evaluator model.
-        """
-        # Simple heuristics for simulation
-        primary_length = len(primary_response.content)
-        comparison_length = len(comparison_response.content)
-
-        # Accuracy score (higher cost models assumed more accurate)
-        accuracy_primary = 7.0 + (float(primary_response.cost_estimate) * 10)
-        accuracy_comparison = 7.0 + (float(comparison_response.cost_estimate) * 10)
-
-        # Completeness score (longer responses assumed more complete, to a point)
-        completeness_primary = min(9.0, primary_length / 100 + 5.0)
-        completeness_comparison = min(9.0, comparison_length / 100 + 5.0)
-
-        # Clarity score (moderate length preferred)
-        clarity_primary = 10.0 - abs(primary_length - 500) / 100
-        clarity_comparison = 10.0 - abs(comparison_length - 500) / 100
-
-        # Usefulness score (combination of above)
-        usefulness_primary = (accuracy_primary + completeness_primary + clarity_primary) / 3
-        usefulness_comparison = (accuracy_comparison + completeness_comparison + clarity_comparison) / 3
-
-        # Calculate weighted overall scores
-        primary_overall = (
-            accuracy_primary * criteria.accuracy_weight +
-            completeness_primary * criteria.completeness_weight +
-            clarity_primary * criteria.clarity_weight +
-            usefulness_primary * criteria.usefulness_weight
-        )
-
-        comparison_overall = (
-            accuracy_comparison * criteria.accuracy_weight +
-            completeness_comparison * criteria.completeness_weight +
-            clarity_comparison * criteria.clarity_weight +
-            usefulness_comparison * criteria.usefulness_weight
-        )
-
-        # Determine winner
-        if abs(primary_overall - comparison_overall) < 0.5:
-            winner = "tie"
-        elif primary_overall > comparison_overall:
-            winner = "primary"
-        else:
-            winner = "comparison"
-
-        reasoning = f"Primary model scored {primary_overall:.2f}, comparison model scored {comparison_overall:.2f}. "
-        if winner == "tie":
-            reasoning += "The responses are very similar in quality."
-        else:
-            better_model = "primary" if winner == "primary" else "comparison"
-            reasoning += f"The {better_model} model provided a superior response."
-
-        return {
-            "accuracy_score": max(accuracy_primary, accuracy_comparison),
-            "completeness_score": max(completeness_primary, completeness_comparison),
-            "clarity_score": max(clarity_primary, clarity_comparison),
-            "usefulness_score": max(usefulness_primary, usefulness_comparison),
-            "overall_score": max(primary_overall, comparison_overall),
-            "winner": winner,
-            "reasoning": reasoning
-        }
 
     async def _evaluate_response_quality(
         self,
@@ -472,6 +418,81 @@ class ResponseEvaluator:
         base_score += overlap * 2.0
 
         return min(10.0, max(1.0, base_score))
+
+    def _generate_recommendations(
+        self,
+        primary_response: ModelResponse,
+        comparison_response: ModelResponse,
+        evaluation_result: dict[str, Any]
+    ) -> list[str]:
+        """
+        Generate recommendations based on comparison results.
+        
+        Args:
+            primary_response: Primary model response
+            comparison_response: Comparison model response  
+            evaluation_result: Evaluation results with scores and winner
+            
+        Returns:
+            List of recommendation strings
+        """
+        recommendations = []
+        
+        winner = evaluation_result.get("winner", "tie")
+        primary_cost = float(primary_response.cost_estimate)
+        comparison_cost = float(comparison_response.cost_estimate)
+        
+        if winner == "comparison":
+            # Comparison model won
+            if comparison_cost < primary_cost:
+                savings = primary_cost - comparison_cost
+                recommendations.append(
+                    f"Consider using {comparison_response.model} instead - it provides better quality "
+                    f"at ${savings:.4f} lower cost per request"
+                )
+            elif comparison_cost > primary_cost:
+                cost_increase = comparison_cost - primary_cost
+                recommendations.append(
+                    f"Consider upgrading to {comparison_response.model} for better quality "
+                    f"(${cost_increase:.4f} more per request)"
+                )
+            else:
+                recommendations.append(
+                    f"Consider switching to {comparison_response.model} for better quality at similar cost"
+                )
+        elif winner == "primary":
+            # Primary model won
+            if primary_cost > comparison_cost:
+                cost_difference = primary_cost - comparison_cost
+                recommendations.append(
+                    f"Your primary model ({primary_response.model}) provides better quality, "
+                    f"justifying the ${cost_difference:.4f} higher cost"
+                )
+            else:
+                recommendations.append(
+                    f"Your primary model ({primary_response.model}) provides the best value - "
+                    f"good quality at competitive cost"
+                )
+        else:
+            # Tie
+            if primary_cost > comparison_cost:
+                savings = primary_cost - comparison_cost
+                recommendations.append(
+                    f"Both models provide similar quality. Consider {comparison_response.model} "
+                    f"to save ${savings:.4f} per request"
+                )
+            elif comparison_cost > primary_cost:
+                recommendations.append(
+                    f"Both models provide similar quality. Your current model ({primary_response.model}) "
+                    f"is more cost-effective"
+                )
+            else:
+                recommendations.append(
+                    "Both models provide similar quality and cost. Choose based on other factors "
+                    "like response time or specific capabilities"
+                )
+        
+        return recommendations
 
     def _get_model_tier(self, model: str) -> str:
         """Get the tier classification for a model."""
@@ -575,8 +596,15 @@ class ResponseEvaluator:
         Returns:
             Evaluation result dictionary with scores and reasoning
         """
-        # Create client for the evaluator model
-        client = create_client("openrouter")
+        # Create client for the evaluator model (detect provider automatically)
+        try:
+            client = get_client_for_model(evaluator_model)
+        except Exception as e:
+            raise EvaluationError(
+                f"Failed to create client for evaluator model '{evaluator_model}': {str(e)}",
+                model=evaluator_model,
+                cause=e
+            ) from e
         
         # Prepare the request
         messages = [Message(role="user", content=evaluation_prompt)]
@@ -589,16 +617,16 @@ class ResponseEvaluator:
         
         # Check cost and make API call
         estimated_cost = await client.estimate_cost(request)
-        await self.cost_guard.check_and_reserve_budget(
+        budget_check = await self.cost_guard.check_and_reserve_budget(
             estimated_cost, "evaluation", evaluator_model
         )
         
         # Make the evaluation request
         response = await client.complete(request)
         
-        # Record actual cost
+        # Record actual cost using the reservation ID from the budget check
         await self.cost_guard.record_actual_cost(
-            reservation_id="evaluation",  # Simplified for now
+            reservation_id=budget_check.reservation_id,
             actual_cost=response.cost_estimate,
             model=evaluator_model,
             operation_type="evaluation"

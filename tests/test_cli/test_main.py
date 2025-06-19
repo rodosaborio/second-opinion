@@ -328,10 +328,10 @@ class TestAsyncExecution:
     @patch("second_opinion.cli.main.sanitize_prompt")
     @patch("second_opinion.cli.main.get_cost_guard")
     @patch("second_opinion.cli.main.get_evaluator")
-    @patch("second_opinion.cli.main.create_client")
+    @patch("second_opinion.cli.main.get_client_for_model")
     async def test_execute_second_opinion_success(
         self,
-        mock_create_client,
+        mock_get_client_for_model,
         mock_get_evaluator,
         mock_get_cost_guard,
         mock_sanitize_prompt,
@@ -359,7 +359,7 @@ class TestAsyncExecution:
         mock_client = AsyncMock()
         mock_client.estimate_cost.return_value = Decimal("0.025")
         mock_client.complete.return_value = mock_model_response
-        mock_create_client.return_value = mock_client
+        mock_get_client_for_model.return_value = mock_client
 
         # Execute
         result = await execute_second_opinion(
@@ -380,9 +380,9 @@ class TestAsyncExecution:
 
     @patch("second_opinion.cli.main.sanitize_prompt")
     @patch("second_opinion.cli.main.get_cost_guard")
-    @patch("second_opinion.cli.main.create_client")
+    @patch("second_opinion.cli.main.get_client_for_model")
     async def test_execute_second_opinion_cost_limit_exceeded(
-        self, mock_create_client, mock_get_cost_guard, mock_sanitize_prompt
+        self, mock_get_client_for_model, mock_get_cost_guard, mock_sanitize_prompt
     ):
         """Test cost limit exceeded error."""
         from second_opinion.cli.main import execute_second_opinion
@@ -392,7 +392,7 @@ class TestAsyncExecution:
 
         mock_client = AsyncMock()
         mock_client.estimate_cost.return_value = Decimal("0.15")  # Exceeds limit
-        mock_create_client.return_value = mock_client
+        mock_get_client_for_model.return_value = mock_client
 
         # Execute and verify error
         with pytest.raises(CLIError) as exc_info:
@@ -407,9 +407,9 @@ class TestAsyncExecution:
 
     @patch("second_opinion.cli.main.sanitize_prompt")
     @patch("second_opinion.cli.main.get_cost_guard")
-    @patch("second_opinion.cli.main.create_client")
+    @patch("second_opinion.cli.main.get_client_for_model")
     async def test_execute_second_opinion_client_error(
-        self, mock_create_client, mock_get_cost_guard, mock_sanitize_prompt
+        self, mock_get_client_for_model, mock_get_cost_guard, mock_sanitize_prompt
     ):
         """Test client error handling."""
         from second_opinion.cli.main import execute_second_opinion
@@ -419,7 +419,7 @@ class TestAsyncExecution:
 
         mock_client = AsyncMock()
         mock_client.estimate_cost.side_effect = Exception("API Error")
-        mock_create_client.return_value = mock_client
+        mock_get_client_for_model.return_value = mock_client
 
         # Execute and verify error
         with pytest.raises(CLIError) as exc_info:
