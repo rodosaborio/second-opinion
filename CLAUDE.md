@@ -105,18 +105,27 @@ uv run pytest -v --setup-show
 
 ### Code Quality
 ```bash
-# Format code
+# AUTOMATED: Pre-commit hooks handle this automatically!
+# Install hooks once: pre-commit install
+
+# Manual formatting (if needed)
 uv run black .
 
-# Lint code
+# Manual linting (if needed)
 uv run ruff check .
 uv run ruff check . --fix
 
-# Type checking
+# Manual type checking (if needed)  
 uv run mypy src/
 
-# Run all quality checks
-uv run black . && uv run ruff check . && uv run mypy src/
+# Run ALL quality checks manually
+uv run black . && uv run ruff check . --fix && uv run mypy src/
+
+# Update pre-commit hooks
+pre-commit autoupdate
+
+# Run pre-commit on all files (manual trigger)
+pre-commit run --all-files
 ```
 
 ### Running the Application

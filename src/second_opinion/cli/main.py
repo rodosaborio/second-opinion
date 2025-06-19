@@ -246,16 +246,18 @@ def get_client_for_model(model: str):
 def run_async(coro):
     """Run async coroutine in sync context."""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
+        # Check if there's a running event loop
+        try:
+            asyncio.get_running_loop()
             # If we're already in an async context, create a new loop
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(asyncio.run, coro)
                 return future.result()
-        else:
-            return loop.run_until_complete(coro)
+        except RuntimeError:
+            # No running loop, use asyncio.run
+            return asyncio.run(coro)
     except RuntimeError:
         # No loop exists, create one
         return asyncio.run(coro)
