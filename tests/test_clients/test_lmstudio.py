@@ -18,7 +18,7 @@ from second_opinion.clients.base import (
     RetryableError,
 )
 from second_opinion.clients.lmstudio import LMStudioClient
-from second_opinion.core.models import Message, ModelRequest, ModelResponse, TokenUsage
+from second_opinion.core.models import Message, ModelRequest, ModelResponse
 
 
 class TestLMStudioClient:
@@ -62,7 +62,7 @@ class TestLMStudioClient:
                 },
                 {
                     "id": "qwen3-0.6b-mlx",
-                    "object": "model", 
+                    "object": "model",
                     "created": 1640995200,
                     "owned_by": "local",
                     "context_length": 4096
@@ -386,7 +386,7 @@ class TestLMStudioClient:
         """Test successful completion request."""
         with patch.object(client, '_check_server_health', return_value=True), \
              patch.object(client, '_http_client') as mock_http:
-            
+
             mock_response = Mock()
             mock_response.json.return_value = mock_completion_response
             mock_response.is_success = True
@@ -414,7 +414,7 @@ class TestLMStudioClient:
         """Test completion with timeout error."""
         with patch.object(client, '_check_server_health', return_value=True), \
              patch.object(client, 'retry_with_backoff') as mock_retry:
-            
+
             mock_retry.side_effect = RetryableError(
                 "Request timed out",
                 provider="lmstudio"
@@ -428,7 +428,7 @@ class TestLMStudioClient:
         """Test completion with connection error."""
         with patch.object(client, '_check_server_health', return_value=True), \
              patch.object(client, 'retry_with_backoff') as mock_retry:
-            
+
             mock_retry.side_effect = ClientError(
                 "Cannot connect to LM Studio server",
                 provider="lmstudio"
@@ -493,14 +493,14 @@ class TestLMStudioClientIntegration:
     async def test_real_server_connection(self):
         """Test connection to real LM Studio server (if available)."""
         client = LMStudioClient()
-        
+
         try:
             # Try to get models - this will work if LM Studio is running
             models = await client.get_available_models()
-            
+
             # If we got here, LM Studio is running
             assert isinstance(models, list)
-            
+
             # If models are loaded, try a completion
             if models:
                 request = ModelRequest(
@@ -508,12 +508,12 @@ class TestLMStudioClientIntegration:
                     messages=[Message(role="user", content="Say 'Hello World'")],
                     max_tokens=10
                 )
-                
+
                 response = await client.complete(request)
                 assert isinstance(response, ModelResponse)
                 assert response.cost_estimate == Decimal('0.00')
                 assert len(response.content) > 0
-                
+
         except ClientError:
             # LM Studio is not running, skip test
             pytest.skip("LM Studio server not available for integration test")
@@ -523,9 +523,9 @@ class TestLMStudioClientIntegration:
 async def test_lmstudio_client_factory_integration():
     """Test creating LM Studio client through factory."""
     from second_opinion.utils.client_factory import create_lmstudio_client
-    
+
     client = create_lmstudio_client()
-    
+
     assert isinstance(client, LMStudioClient)
     assert client.base_url == "http://localhost:1234"
 
@@ -534,9 +534,9 @@ async def test_lmstudio_client_factory_integration():
 async def test_lmstudio_client_factory_custom_url():
     """Test creating LM Studio client with custom URL."""
     from second_opinion.utils.client_factory import create_lmstudio_client
-    
+
     custom_url = "http://192.168.1.100:8080"
     client = create_lmstudio_client(base_url=custom_url)
-    
+
     assert isinstance(client, LMStudioClient)
     assert client.base_url == custom_url

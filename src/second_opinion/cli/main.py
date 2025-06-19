@@ -408,9 +408,9 @@ async def execute_second_opinion(
         raise
 
 
-@app.command()
+@app.command("second-opinion")
 @handle_cli_error
-def main(
+def second_opinion_command(
     prompt: str = typer.Argument(..., help="The prompt to get a second opinion on"),
     primary_model: str = typer.Option(
         ..., "--primary-model", "-p", help="Primary model to get second opinion for"

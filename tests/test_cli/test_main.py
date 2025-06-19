@@ -114,6 +114,8 @@ class TestComparisonModelSelector:
     ):
         """Test smart selection for budget tier models."""
         mock_model_config_manager.config = mock_model_config
+        # Ensure get_comparison_models returns empty to fall through to smart select
+        mock_model_config_manager.get_comparison_models.return_value = []
         selector = ComparisonModelSelector()
 
         result = selector.select_models(
@@ -179,7 +181,6 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
-                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "What is 2+2?",
@@ -206,7 +207,6 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
-                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "--comparison-model",
@@ -237,7 +237,6 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
-                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "--comparison-model",
@@ -256,12 +255,14 @@ class TestCLICommands:
 
     def test_second_opinion_missing_primary_model(self, cli_runner):
         """Test error when primary model is not specified."""
-        result = cli_runner.invoke(app, ["second-opinion", "What is 2+2?"])
+        result = cli_runner.invoke(app, ["What is 2+2?"])
 
         assert result.exit_code != 0
+        # Error message appears in stderr for typer
+        error_output = (result.stdout + result.stderr).lower()
         assert (
-            "primary-model" in result.stdout.lower()
-            or "missing" in result.stdout.lower()
+            "primary-model" in error_output
+            or "missing" in error_output
         )
 
     @patch("second_opinion.cli.main.execute_second_opinion")
@@ -280,7 +281,6 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
-                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "--context",
@@ -308,7 +308,6 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
-                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "--cost-limit",
@@ -502,7 +501,6 @@ class TestErrorHandling:
             result = cli_runner.invoke(
                 app,
                 [
-                    "second-opinion",
                     "--primary-model",
                     "anthropic/claude-3-5-sonnet",
                     "Test prompt",
@@ -520,7 +518,6 @@ class TestErrorHandling:
             result = cli_runner.invoke(
                 app,
                 [
-                    "second-opinion",
                     "--primary-model",
                     "anthropic/claude-3-5-sonnet",
                     "Test prompt",

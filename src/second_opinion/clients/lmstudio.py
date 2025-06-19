@@ -15,12 +15,9 @@ import httpx
 from ..core.models import ModelRequest, ModelResponse, TokenUsage
 from ..utils.sanitization import SecurityError
 from .base import (
-    AuthenticationError,
     BaseClient,
     ClientError,
-    CostLimitExceededError,
     ModelInfo,
-    RateLimitError,
     RetryableError,
 )
 
