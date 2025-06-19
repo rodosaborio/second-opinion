@@ -8,13 +8,11 @@ following the pattern: CLI args > env vars > user config > defaults.
 import os
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from ..core.models import ModelTier, SecurityContext
 
 
 class DatabaseConfig(BaseModel):
@@ -43,7 +41,7 @@ class CostManagementConfig(BaseModel):
     monthly_limit: Decimal = Field(default=Decimal("20.00"), ge=0, description="Monthly spending limit")
     warning_threshold: float = Field(default=0.80, ge=0.0, le=1.0, description="Warning threshold as fraction of limit")
     currency: str = Field(default="USD", description="Currency for cost calculations")
-    
+
     @field_validator('currency')
     @classmethod
     def validate_currency(cls, v):
@@ -67,7 +65,7 @@ class MCPConfig(BaseModel):
     port: int = Field(default=8000, ge=1024, le=65535, description="MCP server port")
     dev_mode: bool = Field(default=True, description="Development mode (auto-reload)")
     cors_enabled: bool = Field(default=True, description="Enable CORS")
-    
+
     @field_validator('host')
     @classmethod
     def validate_host(cls, v):
@@ -100,7 +98,7 @@ class PricingConfig(BaseModel):
     fetch_timeout: float = Field(default=30.0, ge=5.0, le=300.0, description="HTTP fetch timeout in seconds")
     auto_update_on_startup: bool = Field(default=True, description="Automatically update pricing on startup")
     fallback_conservative: bool = Field(default=True, description="Use conservative estimates for unknown models")
-    backup_file_path: Optional[str] = Field(default=None, description="Custom backup pricing file path")
+    backup_file_path: str | None = Field(default=None, description="Custom backup pricing file path")
 
 
 class DevelopmentConfig(BaseModel):
@@ -113,31 +111,31 @@ class DevelopmentConfig(BaseModel):
 
 class AppSettings(BaseSettings):
     """Main application settings using environment variables."""
-    
+
     # Application info
     app_name: str = Field(default="Second Opinion", description="Application name")
     app_version: str = Field(default="0.1.0", description="Application version")
     environment: str = Field(default="development", description="Environment (development/staging/production)")
-    
+
     # API Keys
-    openrouter_api_key: Optional[str] = Field(default=None, description="OpenRouter API key", repr=False)
-    anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key", repr=False)
-    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key", repr=False)
-    google_api_key: Optional[str] = Field(default=None, description="Google AI API key", repr=False)
-    lmstudio_base_url: Optional[str] = Field(default=None, description="LM Studio base URL")
-    
+    openrouter_api_key: str | None = Field(default=None, description="OpenRouter API key", repr=False)
+    anthropic_api_key: str | None = Field(default=None, description="Anthropic API key", repr=False)
+    openai_api_key: str | None = Field(default=None, description="OpenAI API key", repr=False)
+    google_api_key: str | None = Field(default=None, description="Google AI API key", repr=False)
+    lmstudio_base_url: str | None = Field(default=None, description="LM Studio base URL")
+
     # Security
-    database_encryption_key: Optional[str] = Field(default=None, description="Database encryption key", repr=False)
-    session_encryption_key: Optional[str] = Field(default=None, description="Session encryption key", repr=False)
-    
+    database_encryption_key: str | None = Field(default=None, description="Database encryption key", repr=False)
+    session_encryption_key: str | None = Field(default=None, description="Session encryption key", repr=False)
+
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
-    
+
     # Directories
     data_dir: str = Field(default="./data", description="Data directory")
     config_dir: str = Field(default="./config", description="Configuration directory")
     prompts_dir: str = Field(default="./prompts", description="Prompts directory")
-    
+
     # Configuration sections
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
@@ -148,7 +146,7 @@ class AppSettings(BaseSettings):
     analytics: AnalyticsConfig = Field(default_factory=AnalyticsConfig)
     pricing: PricingConfig = Field(default_factory=PricingConfig)
     development: DevelopmentConfig = Field(default_factory=DevelopmentConfig)
-    
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -156,7 +154,7 @@ class AppSettings(BaseSettings):
         case_sensitive=False,
         extra="forbid"
     )
-        
+
     @field_validator('environment')
     @classmethod
     def validate_environment(cls, v):
@@ -164,7 +162,7 @@ class AppSettings(BaseSettings):
         if v not in valid_environments:
             raise ValueError(f"Environment must be one of {valid_environments}")
         return v
-    
+
     @field_validator('log_level')
     @classmethod
     def validate_log_level(cls, v):
@@ -172,7 +170,7 @@ class AppSettings(BaseSettings):
         if v.upper() not in valid_levels:
             raise ValueError(f"Log level must be one of {valid_levels}")
         return v.upper()
-    
+
     @model_validator(mode='after')
     def validate_api_keys(self):
         """Validate that at least one API key is configured."""
@@ -182,23 +180,23 @@ class AppSettings(BaseSettings):
             self.openai_api_key,
             self.google_api_key
         ]
-        
+
         if not any(api_keys) and self.environment != 'development':
             raise ValueError("At least one API key must be configured in non-development environments")
-        
+
         return self
-    
+
     @model_validator(mode='after')
     def validate_encryption_keys(self):
         """Validate encryption keys are present when encryption is enabled."""
-        if (self.database.encryption_enabled and 
-            not self.database_encryption_key and 
+        if (self.database.encryption_enabled and
+            not self.database_encryption_key and
             self.environment == 'production'):
             raise ValueError("Database encryption key is required when encryption is enabled in production")
-        
+
         return self
-    
-    def get_api_key(self, provider: str) -> Optional[str]:
+
+    def get_api_key(self, provider: str) -> str | None:
         """Get API key for a specific provider."""
         provider_map = {
             'openrouter': self.openrouter_api_key,
@@ -207,19 +205,19 @@ class AppSettings(BaseSettings):
             'google': self.google_api_key
         }
         return provider_map.get(provider.lower())
-    
+
     def has_api_key(self, provider: str) -> bool:
         """Check if API key is configured for provider."""
         return self.get_api_key(provider) is not None
-    
+
     def get_data_path(self, filename: str) -> Path:
         """Get full path for a data file."""
         return Path(self.data_dir) / filename
-    
+
     def get_config_path(self, filename: str) -> Path:
         """Get full path for a config file."""
         return Path(self.config_dir) / filename
-    
+
     def get_prompts_path(self, filename: str) -> Path:
         """Get full path for a prompts file."""
         return Path(self.prompts_dir) / filename
@@ -227,15 +225,15 @@ class AppSettings(BaseSettings):
 
 class ConfigurationManager:
     """Manages hierarchical configuration loading and validation."""
-    
+
     def __init__(self):
-        self._settings: Optional[AppSettings] = None
-        self._user_config: Dict[str, Any] = {}
-    
+        self._settings: AppSettings | None = None
+        self._user_config: dict[str, Any] = {}
+
     def load_configuration(
-        self, 
-        config_path: Optional[Path] = None,
-        override_env: Optional[Dict[str, str]] = None
+        self,
+        config_path: Path | None = None,
+        override_env: dict[str, str] | None = None
     ) -> AppSettings:
         """
         Load configuration with hierarchy: CLI/override > env vars > user config > defaults.
@@ -250,28 +248,28 @@ class ConfigurationManager:
         # Load user configuration from YAML file
         if config_path and config_path.exists():
             self._user_config = self._load_yaml_config(config_path)
-        
+
         # Override environment if provided (for CLI args)
         if override_env:
             for key, value in override_env.items():
                 os.environ[key] = value
-        
+
         # Create settings with YAML config as base, env vars will override via pydantic-settings
         init_kwargs = {}
         if self._user_config:
             init_kwargs.update(self._user_config)
-        
+
         self._settings = AppSettings(**init_kwargs)
-        
+
         # Validate configuration
         self._validate_configuration()
-        
+
         return self._settings
-    
-    def _load_yaml_config(self, config_path: Path) -> Dict[str, Any]:
+
+    def _load_yaml_config(self, config_path: Path) -> dict[str, Any]:
         """Load configuration from YAML file."""
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
+            with open(config_path, encoding='utf-8') as f:
                 config = yaml.safe_load(f)
                 return config or {}
         except yaml.YAMLError as e:
@@ -280,20 +278,20 @@ class ConfigurationManager:
             return {}
         except Exception as e:
             raise ValueError(f"Failed to load configuration: {e}")
-    
+
     def _validate_configuration(self):
         """Perform additional configuration validation."""
         if not self._settings:
             raise ValueError("Configuration not loaded")
-        
+
         # Validate directories exist or can be created
         self._ensure_directory(self._settings.data_dir)
         self._ensure_directory(self._settings.config_dir)
         self._ensure_directory(self._settings.prompts_dir)
-        
+
         # Validate API key formats
         self._validate_api_key_formats()
-    
+
     def _ensure_directory(self, dir_path: str):
         """Ensure directory exists, create if necessary."""
         path = Path(dir_path)
@@ -301,53 +299,53 @@ class ConfigurationManager:
             path.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             raise ValueError(f"Cannot create directory {dir_path}: {e}")
-    
+
     def _validate_api_key_formats(self):
         """Validate API key formats for security."""
         if not self._settings:
             return
-        
+
         key_patterns = {
             'openrouter': r'^sk-or-.*',
             'anthropic': r'^sk-ant-.*',
             'openai': r'^sk-.*',
             'google': r'^.*'  # Google keys have various formats
         }
-        
+
         for provider, pattern in key_patterns.items():
             key = self._settings.get_api_key(provider)
             if key:
                 import re
                 if not re.match(pattern, key):
                     print(f"Warning: API key for {provider} may have invalid format")
-    
+
     @property
     def settings(self) -> AppSettings:
         """Get current settings (load default if not loaded)."""
         if self._settings is None:
             self._settings = self.load_configuration()
         return self._settings
-    
+
     def reset(self):
         """Reset the configuration manager (useful for testing)."""
         self._settings = None
         self._user_config = {}
-    
+
     def update_setting(self, path: str, value: Any):
         """Update a specific setting using dot notation (e.g., 'cost_management.daily_limit')."""
         if not self._settings:
             raise ValueError("Configuration not loaded")
-        
+
         parts = path.split('.')
         obj = self._settings
-        
+
         # Navigate to the parent object
         for part in parts[:-1]:
             obj = getattr(obj, part)
-        
+
         # Set the final value
         setattr(obj, parts[-1], value)
-    
+
     def export_config_template(self, output_path: Path):
         """Export a configuration template file."""
         template = {
@@ -387,7 +385,7 @@ class ConfigurationManager:
                 'retention_days': 90
             }
         }
-        
+
         with open(output_path, 'w', encoding='utf-8') as f:
             yaml.dump(template, f, default_flow_style=False, indent=2)
 
@@ -401,6 +399,6 @@ def get_settings() -> AppSettings:
     return config_manager.settings
 
 
-def load_config(config_path: Optional[Path] = None) -> AppSettings:
+def load_config(config_path: Path | None = None) -> AppSettings:
     """Load configuration from file and environment."""
     return config_manager.load_configuration(config_path)

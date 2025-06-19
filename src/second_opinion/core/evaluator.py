@@ -8,18 +8,20 @@ for model upgrades or downgrades.
 
 import logging
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple, Union
-from datetime import datetime, timezone
+from typing import Any
 
-from .models import (
-    ModelRequest, ModelResponse, ComparisonResult, RecommendationResult,
-    EvaluationCriteria, TaskComplexity, RecommendationType, CostAnalysis,
-    Message, SecurityContext
-)
 from ..prompts.manager import render_template
 from ..utils.cost_tracking import CostGuard
-from ..clients.base import BaseClient
-
+from .models import (
+    ComparisonResult,
+    CostAnalysis,
+    EvaluationCriteria,
+    ModelResponse,
+    RecommendationResult,
+    RecommendationType,
+    SecurityContext,
+    TaskComplexity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +36,8 @@ class ResponseEvaluator:
     - Making model tier recommendations
     - Task complexity assessment
     """
-    
-    def __init__(self, cost_guard: Optional[CostGuard] = None):
+
+    def __init__(self, cost_guard: CostGuard | None = None):
         """
         Initialize the response evaluator.
         
@@ -43,10 +45,10 @@ class ResponseEvaluator:
             cost_guard: Cost tracking and budget management instance
         """
         self.cost_guard = cost_guard or CostGuard()
-        
+
         # Default evaluation criteria weights
         self.default_criteria = EvaluationCriteria()
-        
+
         # Model tier mappings (can be configured)
         self.model_tiers = {
             "budget": ["gpt-3.5-turbo", "claude-3-haiku"],
@@ -54,7 +56,7 @@ class ResponseEvaluator:
             "premium": ["gpt-4o", "claude-3.5-sonnet"],
             "reasoning": ["o1-preview", "o1-mini", "claude-3-opus"]
         }
-        
+
         # Task complexity indicators
         self.complexity_indicators = {
             "simple": [
@@ -74,13 +76,13 @@ class ResponseEvaluator:
                 "advanced", "sophisticated", "comprehensive analysis", "mathematical"
             ]
         }
-    
+
     async def compare_responses(
         self,
         primary_response: ModelResponse,
         comparison_response: ModelResponse,
         original_task: str,
-        criteria: Optional[EvaluationCriteria] = None,
+        criteria: EvaluationCriteria | None = None,
         evaluator_model: str = "gpt-4o-mini"
     ) -> ComparisonResult:
         """
@@ -102,9 +104,9 @@ class ResponseEvaluator:
         """
         if not criteria:
             criteria = self.default_criteria
-        
+
         logger.info(f"Comparing responses: {primary_response.model} vs {comparison_response.model}")
-        
+
         # Prepare evaluation prompt (match template parameter names)
         evaluation_params = {
             "original_question": original_task,
@@ -117,7 +119,7 @@ class ResponseEvaluator:
             "clarity_weight": criteria.clarity_weight,
             "usefulness_weight": criteria.usefulness_weight
         }
-        
+
         # Render evaluation prompt
         evaluation_prompt = await render_template(
             "comparison",
@@ -125,13 +127,13 @@ class ResponseEvaluator:
             model=evaluator_model,
             security_context=SecurityContext.SYSTEM_PROMPT
         )
-        
+
         # TODO: Make actual API call to evaluator model
         # For now, simulate evaluation with basic heuristics
         evaluation_result = await self._simulate_evaluation(
             primary_response, comparison_response, criteria
         )
-        
+
         # Calculate cost analysis
         total_cost = primary_response.cost_estimate + comparison_response.cost_estimate
         cost_analysis = CostAnalysis(
@@ -140,7 +142,7 @@ class ResponseEvaluator:
             cost_per_token=total_cost / max(1, primary_response.usage.total_tokens + comparison_response.usage.total_tokens),
             budget_remaining=Decimal("100.00")  # TODO: Get from cost_guard
         )
-        
+
         # Create comparison result
         result = ComparisonResult(
             primary_response=primary_response.content,
@@ -156,16 +158,16 @@ class ResponseEvaluator:
             reasoning=evaluation_result["reasoning"],
             cost_analysis=cost_analysis
         )
-        
+
         logger.info(f"Comparison complete. Winner: {result.winner}, Score: {result.overall_score:.2f}")
         return result
-    
+
     async def recommend_model_tier(
         self,
         task: str,
         current_model: str,
-        current_response: Optional[str] = None,
-        max_cost_increase: Optional[Decimal] = None,
+        current_response: str | None = None,
+        max_cost_increase: Decimal | None = None,
         evaluator_model: str = "gpt-4o-mini"
     ) -> RecommendationResult:
         """
@@ -182,30 +184,30 @@ class ResponseEvaluator:
             Model recommendation with reasoning
         """
         logger.info(f"Analyzing model recommendation for {current_model}")
-        
+
         # Assess task complexity
         task_complexity = await self.classify_task_complexity(task)
-        
+
         # Get current model tier
         current_tier = self._get_model_tier(current_model)
-        
+
         # Evaluate current response quality if provided
         current_quality_score = 7.0  # Default assumption
         if current_response:
             current_quality_score = await self._evaluate_response_quality(
                 task, current_response, evaluator_model
             )
-        
+
         # Determine recommendation based on complexity and current quality
         recommendation = await self._determine_recommendation(
             task_complexity, current_tier, current_quality_score, max_cost_increase
         )
-        
+
         # Calculate cost impact
         cost_impact = await self._calculate_cost_impact(
             current_model, recommendation.get("recommended_model")
         )
-        
+
         # Create cost analysis
         cost_analysis = CostAnalysis(
             estimated_cost=Decimal("0.05"),  # Simplified
@@ -213,7 +215,7 @@ class ResponseEvaluator:
             cost_per_token=Decimal("0.0001"),
             budget_remaining=Decimal("100.00")
         )
-        
+
         # Create recommendation result
         result = RecommendationResult(
             current_model=current_model,
@@ -227,10 +229,10 @@ class ResponseEvaluator:
             reasoning=recommendation["reasoning"],
             cost_analysis=cost_analysis
         )
-        
+
         logger.info(f"Recommendation: {result.recommended_action} (confidence: {result.confidence:.2f})")
         return result
-    
+
     async def classify_task_complexity(self, task: str) -> TaskComplexity:
         """
         Classify the complexity of a given task.
@@ -243,9 +245,9 @@ class ResponseEvaluator:
         """
         if not task or not task.strip():
             return TaskComplexity.MODERATE
-            
+
         task_lower = task.lower()
-        
+
         # Count indicators for each complexity level with weighted scoring
         complexity_scores = {
             TaskComplexity.SIMPLE: 0,
@@ -253,7 +255,7 @@ class ResponseEvaluator:
             TaskComplexity.COMPLEX: 0,
             TaskComplexity.EXPERT: 0
         }
-        
+
         # Score based on keyword indicators with word boundaries
         import re
         for complexity, indicators in self.complexity_indicators.items():
@@ -267,46 +269,46 @@ class ResponseEvaluator:
                     if indicator in task_lower:
                         weight = len(indicator.split())
                         complexity_scores[TaskComplexity(complexity)] += weight
-        
+
         # Additional heuristics with lighter weighting
         if len(task) < 20:  # Only very short tasks get simple bonus
             complexity_scores[TaskComplexity.SIMPLE] += 1
         elif len(task) > 300:  # Only very long tasks get complex bonus
             complexity_scores[TaskComplexity.COMPLEX] += 1
-        
+
         # Count questions (multiple questions = more complex)
         question_count = task.count('?')
         if question_count > 1:
             complexity_scores[TaskComplexity.COMPLEX] += question_count
-        
+
         # Technical terms indicate higher complexity, but not for simple questions
         simple_question_patterns = ["what is", "define", "when was", "where is", "who is"]
         is_simple_question = any(pattern in task_lower for pattern in simple_question_patterns)
-        
+
         if not is_simple_question:
             technical_terms = ["algorithm", "system", "architecture", "framework", "optimization", "neural", "machine learning"]
             for term in technical_terms:
                 if term in task_lower:
                     complexity_scores[TaskComplexity.COMPLEX] += 2
-        
+
         # Determine highest scoring complexity
         max_score = max(complexity_scores.values())
         if max_score == 0:
             return TaskComplexity.MODERATE  # Default
-        
+
         # Find the highest complexity level with the max score
         for complexity in [TaskComplexity.EXPERT, TaskComplexity.COMPLEX, TaskComplexity.MODERATE, TaskComplexity.SIMPLE]:
             if complexity_scores[complexity] == max_score:
                 logger.debug(f"Task classified as {complexity.value} (score: {max_score}): {task[:100]}...")
                 return complexity
-        
+
         return TaskComplexity.MODERATE
-    
+
     async def evaluate_cost_effectiveness(
         self,
-        responses: List[ModelResponse],
+        responses: list[ModelResponse],
         task_complexity: TaskComplexity
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Evaluate cost-effectiveness of different model responses.
         
@@ -319,14 +321,14 @@ class ResponseEvaluator:
         """
         if not responses:
             return {"error": "No responses to evaluate"}
-        
+
         analyses = []
         for response in responses:
             # Simple quality heuristic (would be replaced with actual evaluation)
             quality_score = min(10.0, len(response.content) / 100)  # Simplified
-            
+
             cost_per_quality = float(response.cost_estimate) / max(0.1, quality_score)
-            
+
             analyses.append({
                 "model": response.model,
                 "cost": float(response.cost_estimate),
@@ -335,23 +337,23 @@ class ResponseEvaluator:
                 "tokens": response.usage.total_tokens,
                 "cost_per_token": float(response.cost_estimate) / max(1, response.usage.total_tokens)
             })
-        
+
         # Sort by cost-effectiveness (lower cost_per_quality is better)
         analyses.sort(key=lambda x: x["cost_per_quality"])
-        
+
         return {
             "task_complexity": task_complexity.value,
             "analyses": analyses,
             "most_cost_effective": analyses[0] if analyses else None,
             "most_expensive": analyses[-1] if analyses else None
         }
-    
+
     async def _simulate_evaluation(
         self,
         primary_response: ModelResponse,
         comparison_response: ModelResponse,
         criteria: EvaluationCriteria
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Simulate evaluation for testing purposes.
         
@@ -360,23 +362,23 @@ class ResponseEvaluator:
         # Simple heuristics for simulation
         primary_length = len(primary_response.content)
         comparison_length = len(comparison_response.content)
-        
+
         # Accuracy score (higher cost models assumed more accurate)
         accuracy_primary = 7.0 + (float(primary_response.cost_estimate) * 10)
         accuracy_comparison = 7.0 + (float(comparison_response.cost_estimate) * 10)
-        
+
         # Completeness score (longer responses assumed more complete, to a point)
         completeness_primary = min(9.0, primary_length / 100 + 5.0)
         completeness_comparison = min(9.0, comparison_length / 100 + 5.0)
-        
+
         # Clarity score (moderate length preferred)
         clarity_primary = 10.0 - abs(primary_length - 500) / 100
         clarity_comparison = 10.0 - abs(comparison_length - 500) / 100
-        
+
         # Usefulness score (combination of above)
         usefulness_primary = (accuracy_primary + completeness_primary + clarity_primary) / 3
         usefulness_comparison = (accuracy_comparison + completeness_comparison + clarity_comparison) / 3
-        
+
         # Calculate weighted overall scores
         primary_overall = (
             accuracy_primary * criteria.accuracy_weight +
@@ -384,14 +386,14 @@ class ResponseEvaluator:
             clarity_primary * criteria.clarity_weight +
             usefulness_primary * criteria.usefulness_weight
         )
-        
+
         comparison_overall = (
             accuracy_comparison * criteria.accuracy_weight +
             completeness_comparison * criteria.completeness_weight +
             clarity_comparison * criteria.clarity_weight +
             usefulness_comparison * criteria.usefulness_weight
         )
-        
+
         # Determine winner
         if abs(primary_overall - comparison_overall) < 0.5:
             winner = "tie"
@@ -399,14 +401,14 @@ class ResponseEvaluator:
             winner = "primary"
         else:
             winner = "comparison"
-        
+
         reasoning = f"Primary model scored {primary_overall:.2f}, comparison model scored {comparison_overall:.2f}. "
         if winner == "tie":
             reasoning += "The responses are very similar in quality."
         else:
             better_model = "primary" if winner == "primary" else "comparison"
             reasoning += f"The {better_model} model provided a superior response."
-        
+
         return {
             "accuracy_score": max(accuracy_primary, accuracy_comparison),
             "completeness_score": max(completeness_primary, completeness_comparison),
@@ -416,7 +418,7 @@ class ResponseEvaluator:
             "winner": winner,
             "reasoning": reasoning
         }
-    
+
     async def _evaluate_response_quality(
         self,
         task: str,
@@ -436,35 +438,35 @@ class ResponseEvaluator:
         """
         # Simple heuristic for now (would use actual evaluation in production)
         base_score = 5.0
-        
+
         # Length heuristic
         if 100 <= len(response) <= 1000:
             base_score += 1.0
         elif len(response) < 50:
             base_score -= 1.0
-        
+
         # Relevance heuristic (check if response contains task keywords)
         task_words = set(task.lower().split())
         response_words = set(response.lower().split())
         overlap = len(task_words.intersection(response_words)) / max(1, len(task_words))
         base_score += overlap * 2.0
-        
+
         return min(10.0, max(1.0, base_score))
-    
+
     def _get_model_tier(self, model: str) -> str:
         """Get the tier classification for a model."""
         for tier, models in self.model_tiers.items():
             if any(model_name in model for model_name in models):
                 return tier
         return "mid_range"  # Default
-    
+
     async def _determine_recommendation(
         self,
         task_complexity: TaskComplexity,
         current_tier: str,
         current_quality: float,
-        max_cost_increase: Optional[Decimal]
-    ) -> Dict[str, Any]:
+        max_cost_increase: Decimal | None
+    ) -> dict[str, Any]:
         """
         Determine model recommendation based on task complexity and current performance.
         """
@@ -477,7 +479,7 @@ class ResponseEvaluator:
                 "expected_improvement": 1.5,
                 "reasoning": "Current response quality is below acceptable threshold"
             }
-        
+
         # Quality is acceptable, now consider task complexity and current tier
         if task_complexity == TaskComplexity.SIMPLE and current_tier not in ["budget"] and current_quality >= 7.0:
             return {
@@ -508,16 +510,16 @@ class ResponseEvaluator:
                 "confidence": 0.8,
                 "reasoning": "Current model is appropriate for this task complexity and quality level"
             }
-    
+
     async def _calculate_cost_impact(
         self,
         current_model: str,
-        recommended_model: Optional[str]
+        recommended_model: str | None
     ) -> Decimal:
         """Calculate the cost impact of switching models."""
         if not recommended_model:
             return Decimal("0")
-        
+
         # Simplified cost calculation (would use actual pricing in production)
         model_costs = {
             "gpt-3.5-turbo": Decimal("0.001"),
@@ -526,15 +528,15 @@ class ResponseEvaluator:
             "claude-3-haiku": Decimal("0.002"),
             "claude-3.5-sonnet": Decimal("0.008")
         }
-        
+
         current_cost = model_costs.get(current_model, Decimal("0.005"))
         recommended_cost = model_costs.get(recommended_model, Decimal("0.005"))
-        
+
         return recommended_cost - current_cost
 
 
 # Global evaluator instance
-_global_evaluator: Optional[ResponseEvaluator] = None
+_global_evaluator: ResponseEvaluator | None = None
 
 
 def get_evaluator() -> ResponseEvaluator:

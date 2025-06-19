@@ -2,18 +2,23 @@
 Tests for response evaluation and comparison engine.
 """
 
-import pytest
 from decimal import Decimal
-from datetime import datetime, timezone
+
+import pytest
 
 from second_opinion.core.evaluator import (
     ResponseEvaluator,
     get_evaluator,
-    set_evaluator
+    set_evaluator,
 )
 from second_opinion.core.models import (
-    ModelResponse, TokenUsage, TaskComplexity, RecommendationType,
-    EvaluationCriteria, ComparisonResult, RecommendationResult
+    ComparisonResult,
+    EvaluationCriteria,
+    ModelResponse,
+    RecommendationResult,
+    RecommendationType,
+    TaskComplexity,
+    TokenUsage,
 )
 
 
@@ -65,7 +70,7 @@ class TestResponseEvaluator:
         assert evaluator.default_criteria is not None
         assert isinstance(evaluator.model_tiers, dict)
         assert isinstance(evaluator.complexity_indicators, dict)
-    
+
     def test_model_tier_classification(self, evaluator):
         """Test model tier classification."""
         assert evaluator._get_model_tier("gpt-3.5-turbo") == "budget"
@@ -73,7 +78,7 @@ class TestResponseEvaluator:
         assert evaluator._get_model_tier("claude-3-haiku") == "budget"
         assert evaluator._get_model_tier("claude-3.5-sonnet") == "premium"
         assert evaluator._get_model_tier("unknown-model") == "mid_range"  # Default
-    
+
     @pytest.mark.asyncio
     async def test_classify_task_complexity_simple(self, evaluator):
         """Test classification of simple tasks."""
@@ -83,11 +88,11 @@ class TestResponseEvaluator:
             "List the benefits of exercise",
             "When was Python created?"
         ]
-        
+
         for task in simple_tasks:
             complexity = await evaluator.classify_task_complexity(task)
             assert complexity in [TaskComplexity.SIMPLE, TaskComplexity.MODERATE]
-    
+
     @pytest.mark.asyncio
     async def test_classify_task_complexity_moderate(self, evaluator):
         """Test classification of moderate tasks."""
@@ -97,11 +102,11 @@ class TestResponseEvaluator:
             "Explain how neural networks work",
             "Summarize the main points of this article"
         ]
-        
+
         for task in moderate_tasks:
             complexity = await evaluator.classify_task_complexity(task)
             assert complexity in [TaskComplexity.MODERATE, TaskComplexity.COMPLEX]
-    
+
     @pytest.mark.asyncio
     async def test_classify_task_complexity_complex(self, evaluator):
         """Test classification of complex tasks."""
@@ -111,11 +116,11 @@ class TestResponseEvaluator:
             "Create a comprehensive marketing strategy for a new product",
             "Solve this optimization problem with multiple constraints"
         ]
-        
+
         for task in complex_tasks:
             complexity = await evaluator.classify_task_complexity(task)
             assert complexity in [TaskComplexity.COMPLEX, TaskComplexity.EXPERT]
-    
+
     @pytest.mark.asyncio
     async def test_classify_task_complexity_expert(self, evaluator):
         """Test classification of expert-level tasks."""
@@ -125,45 +130,45 @@ class TestResponseEvaluator:
             "Formulate a comprehensive theory of economic behavior",
             "Develop sophisticated machine learning algorithms"
         ]
-        
+
         for task in expert_tasks:
             complexity = await evaluator.classify_task_complexity(task)
             assert complexity in [TaskComplexity.COMPLEX, TaskComplexity.EXPERT]
-    
+
     @pytest.mark.asyncio
     async def test_classify_task_complexity_length_heuristics(self, evaluator):
         """Test that task length affects complexity classification."""
         short_task = "Hi"
         medium_task = "Please explain the concept of machine learning and its applications in modern technology."
         long_task = "Please provide a comprehensive analysis of the socioeconomic implications of artificial intelligence adoption across various industries, considering both positive and negative effects, potential regulatory frameworks, and long-term societal impacts. Include specific examples and cite relevant research studies."
-        
+
         short_complexity = await evaluator.classify_task_complexity(short_task)
         medium_complexity = await evaluator.classify_task_complexity(medium_task)
         long_complexity = await evaluator.classify_task_complexity(long_task)
-        
+
         # Short tasks should trend toward simple
         assert short_complexity in [TaskComplexity.SIMPLE, TaskComplexity.MODERATE]
         # Long tasks should trend toward complex
         assert long_complexity in [TaskComplexity.MODERATE, TaskComplexity.COMPLEX, TaskComplexity.EXPERT]
-    
+
     @pytest.mark.asyncio
     async def test_compare_responses_basic(
-        self, 
-        evaluator, 
-        sample_response_primary, 
+        self,
+        evaluator,
+        sample_response_primary,
         sample_response_comparison,
         sample_evaluation_criteria
     ):
         """Test basic response comparison."""
         original_task = "Explain the benefits of exercise"
-        
+
         result = await evaluator.compare_responses(
             sample_response_primary,
             sample_response_comparison,
             original_task,
             sample_evaluation_criteria
         )
-        
+
         assert isinstance(result, ComparisonResult)
         assert result.primary_model == "gpt-4o"
         assert result.comparison_model == "gpt-3.5-turbo"
@@ -175,7 +180,7 @@ class TestResponseEvaluator:
         assert result.winner in ["primary", "comparison", "tie"]
         assert len(result.reasoning) > 0
         assert result.cost_analysis is not None
-    
+
     @pytest.mark.asyncio
     async def test_compare_responses_default_criteria(
         self,
@@ -185,39 +190,39 @@ class TestResponseEvaluator:
     ):
         """Test response comparison with default criteria."""
         original_task = "What is machine learning?"
-        
+
         result = await evaluator.compare_responses(
             sample_response_primary,
             sample_response_comparison,
             original_task
         )
-        
+
         assert isinstance(result, ComparisonResult)
         assert result.cost_analysis.estimated_cost > 0
-    
+
     @pytest.mark.asyncio
     async def test_recommend_model_tier_simple_task(self, evaluator):
         """Test model recommendation for simple tasks."""
         task = "What is 2 + 2?"
         current_model = "gpt-4o"
-        
+
         result = await evaluator.recommend_model_tier(task, current_model)
-        
+
         assert isinstance(result, RecommendationResult)
         assert result.current_model == current_model
         assert result.task_complexity == TaskComplexity.SIMPLE
         assert result.recommended_action == RecommendationType.DOWNGRADE
         assert 0.0 <= result.confidence <= 1.0
         assert result.reasoning is not None
-    
+
     @pytest.mark.asyncio
     async def test_recommend_model_tier_complex_task(self, evaluator):
         """Test model recommendation for complex tasks."""
         task = "Design a comprehensive distributed system architecture for a global social media platform"
         current_model = "gpt-3.5-turbo"
-        
+
         result = await evaluator.recommend_model_tier(task, current_model)
-        
+
         assert isinstance(result, RecommendationResult)
         assert result.current_model == current_model
         assert result.task_complexity in [TaskComplexity.COMPLEX, TaskComplexity.EXPERT]
@@ -225,71 +230,71 @@ class TestResponseEvaluator:
         assert result.recommended_model is not None
         assert result.expected_improvement is not None
         assert result.expected_improvement > 0
-    
+
     @pytest.mark.asyncio
     async def test_recommend_model_tier_with_response(self, evaluator):
         """Test model recommendation when current response is provided."""
         task = "Explain photosynthesis"
         current_model = "gpt-4o"
         current_response = "Photosynthesis is the process by which plants convert sunlight into energy."
-        
+
         result = await evaluator.recommend_model_tier(
-            task, 
-            current_model, 
+            task,
+            current_model,
             current_response
         )
-        
+
         assert isinstance(result, RecommendationResult)
         assert result.current_quality_score > 0
-    
+
     @pytest.mark.asyncio
     async def test_recommend_model_tier_cost_constraint(self, evaluator):
         """Test model recommendation with cost constraints."""
         task = "Complex analysis task"
         current_model = "gpt-3.5-turbo"
         max_cost_increase = Decimal("0.001")  # Very small increase
-        
+
         result = await evaluator.recommend_model_tier(
-            task, 
-            current_model, 
+            task,
+            current_model,
             max_cost_increase=max_cost_increase
         )
-        
+
         assert isinstance(result, RecommendationResult)
         # Should consider cost constraints in recommendation
         assert result.cost_impact <= max_cost_increase or result.recommended_action == RecommendationType.MAINTAIN
-    
+
     @pytest.mark.asyncio
     async def test_evaluate_cost_effectiveness_empty_list(self, evaluator):
         """Test cost-effectiveness evaluation with empty response list."""
         result = await evaluator.evaluate_cost_effectiveness([], TaskComplexity.MODERATE)
-        
+
         assert "error" in result
         assert result["error"] == "No responses to evaluate"
-    
+
     @pytest.mark.asyncio
     async def test_evaluate_cost_effectiveness_single_response(
-        self, 
-        evaluator, 
+        self,
+        evaluator,
         sample_response_primary
     ):
         """Test cost-effectiveness evaluation with single response."""
         result = await evaluator.evaluate_cost_effectiveness(
-            [sample_response_primary], 
+            [sample_response_primary],
             TaskComplexity.MODERATE
         )
-        
+
         assert result["task_complexity"] == "moderate"
         assert len(result["analyses"]) == 1
         assert result["most_cost_effective"] is not None
         assert result["most_expensive"] is not None
-        
+
         analysis = result["analyses"][0]
         assert analysis["model"] == "gpt-4o"
         assert analysis["cost"] == float(sample_response_primary.cost_estimate)
         assert analysis["quality_score"] > 0
         assert analysis["cost_per_quality"] > 0
-    
+
     @pytest.mark.asyncio
     async def test_evaluate_cost_effectiveness_multiple_responses(
         self,
@@ -299,71 +304,71 @@ class TestResponseEvaluator:
     ):
         """Test cost-effectiveness evaluation with multiple responses."""
         responses = [sample_response_primary, sample_response_comparison]
-        
+
         result = await evaluator.evaluate_cost_effectiveness(
             responses,
             TaskComplexity.COMPLEX
         )
-        
+
         assert result["task_complexity"] == "complex"
         assert len(result["analyses"]) == 2
         assert result["most_cost_effective"] is not None
         assert result["most_expensive"] is not None
-        
+
         # Should be sorted by cost-effectiveness
         analyses = result["analyses"]
         assert analyses[0]["cost_per_quality"] <= analyses[1]["cost_per_quality"]
-    
+
     @pytest.mark.asyncio
     async def test_evaluate_response_quality_basic(self, evaluator):
         """Test basic response quality evaluation."""
         task = "Explain machine learning"
         response = "Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed."
-        
+
         quality = await evaluator._evaluate_response_quality(task, response, "gpt-4o-mini")
-        
+
         assert 1.0 <= quality <= 10.0
-    
+
     @pytest.mark.asyncio
     async def test_evaluate_response_quality_short_response(self, evaluator):
         """Test quality evaluation of short response."""
         task = "What is AI?"
         response = "AI is artificial intelligence."
-        
+
         quality = await evaluator._evaluate_response_quality(task, response, "gpt-4o-mini")
-        
+
         # Short responses should get lower scores
         assert quality < 7.0
-    
+
     @pytest.mark.asyncio
     async def test_evaluate_response_quality_relevant_response(self, evaluator):
         """Test quality evaluation of relevant response."""
         task = "Explain machine learning algorithms"
         response = "Machine learning algorithms are computational methods that allow systems to learn patterns from data. Common algorithms include neural networks, decision trees, and support vector machines."
-        
+
         quality = await evaluator._evaluate_response_quality(task, response, "gpt-4o-mini")
-        
+
         # Relevant responses should get higher scores
         assert quality > 5.0
-    
+
     @pytest.mark.asyncio
     async def test_calculate_cost_impact_no_recommendation(self, evaluator):
         """Test cost impact calculation with no recommendation."""
         impact = await evaluator._calculate_cost_impact("gpt-4o", None)
         assert impact == Decimal("0")
-    
+
     @pytest.mark.asyncio
     async def test_calculate_cost_impact_upgrade(self, evaluator):
         """Test cost impact calculation for upgrade."""
         impact = await evaluator._calculate_cost_impact("gpt-3.5-turbo", "gpt-4o")
         assert impact > 0  # Upgrade should cost more
-    
+
     @pytest.mark.asyncio
     async def test_calculate_cost_impact_downgrade(self, evaluator):
         """Test cost impact calculation for downgrade."""
         impact = await evaluator._calculate_cost_impact("gpt-4o", "gpt-3.5-turbo")
         assert impact < 0  # Downgrade should cost less
-    
+
     @pytest.mark.asyncio
     async def test_simulate_evaluation_tie(self, evaluator):
         """Test simulated evaluation that results in a tie."""
@@ -375,7 +380,7 @@ class TestResponseEvaluator:
             cost_estimate=Decimal("0.005"),
             provider="openai"
         )
-        
+
         response2 = ModelResponse(
             content="This is also a response.",
             model="gpt-3.5-turbo",
@@ -383,10 +388,10 @@ class TestResponseEvaluator:
             cost_estimate=Decimal("0.005"),
             provider="openai"
         )
-        
+
         criteria = EvaluationCriteria()
         result = await evaluator._simulate_evaluation(response1, response2, criteria)
-        
+
         assert result["winner"] in ["primary", "comparison", "tie"]
         assert 0.0 <= result["overall_score"] <= 10.0
         assert len(result["reasoning"]) > 0
@@ -397,14 +402,14 @@ class TestGlobalEvaluator:
         """Test that global evaluator maintains singleton behavior."""
         evaluator1 = get_evaluator()
         evaluator2 = get_evaluator()
-        
+
         assert evaluator1 is evaluator2
-    
+
     def test_set_global_evaluator(self):
         """Test setting a custom global evaluator."""
         custom_evaluator = ResponseEvaluator()
         set_evaluator(custom_evaluator)
-        
+
         retrieved_evaluator = get_evaluator()
         assert retrieved_evaluator is custom_evaluator
 
@@ -419,7 +424,7 @@ class TestEvaluationCriteria:
             clarity_weight=0.1,
             usefulness_weight=0.1
         )
-        
+
         # The comparison should work with custom criteria
         # (actual behavior depends on the simulation logic)
         assert custom_criteria.accuracy_weight == 0.7
@@ -437,36 +442,36 @@ class TestEdgeCases:
         """Test task complexity classification with empty task."""
         complexity = await evaluator.classify_task_complexity("")
         assert complexity == TaskComplexity.MODERATE  # Default
-    
+
     @pytest.mark.asyncio
     async def test_very_long_task_complexity(self, evaluator):
         """Test task complexity classification with very long task."""
         long_task = "This is a very long task description. " * 50
         complexity = await evaluator.classify_task_complexity(long_task)
         assert complexity in [TaskComplexity.COMPLEX, TaskComplexity.EXPERT, TaskComplexity.MODERATE]
-    
+
     @pytest.mark.asyncio
     async def test_multiple_questions_complexity(self, evaluator):
         """Test that multiple questions increase complexity."""
         multi_question_task = "What is AI? How does it work? What are the applications? What are the risks?"
         complexity = await evaluator.classify_task_complexity(multi_question_task)
-        
+
         # Multiple questions should trend toward higher complexity
         assert complexity in [TaskComplexity.MODERATE, TaskComplexity.COMPLEX, TaskComplexity.EXPERT]
-    
+
     @pytest.mark.asyncio
     async def test_recommend_with_poor_quality_response(self, evaluator):
         """Test recommendation when current response quality is poor."""
         task = "Simple question"
         current_model = "gpt-4o"
         poor_response = "Umm, I don't know."
-        
+
         result = await evaluator.recommend_model_tier(
             task,
             current_model,
             poor_response
         )
-        
+
         # Should recommend upgrade due to poor quality
         assert result.recommended_action in [RecommendationType.UPGRADE, RecommendationType.MAINTAIN]
 

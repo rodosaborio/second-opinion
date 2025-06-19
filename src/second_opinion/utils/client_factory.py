@@ -6,11 +6,10 @@ application configuration with proper validation and error handling.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any
 
-from ..clients import create_client, BaseClient, get_supported_providers
+from ..clients import BaseClient, create_client, get_supported_providers
 from ..config.settings import get_settings
-
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ class ClientFactoryError(Exception):
 
 def create_client_from_config(
     provider: str,
-    config_overrides: Optional[Dict[str, Any]] = None
+    config_overrides: dict[str, Any] | None = None
 ) -> BaseClient:
     """
     Create a client using application configuration.
@@ -43,30 +42,30 @@ def create_client_from_config(
     """
     try:
         settings = get_settings()
-        
+
         # Validate provider is supported
         if provider not in get_supported_providers():
             raise ClientFactoryError(f"Unsupported provider: {provider}")
-        
+
         # Get provider-specific configuration
         client_config = _get_provider_config(provider, settings)
-        
+
         # Apply any overrides
         if config_overrides:
             client_config.update(config_overrides)
-        
+
         # Create and return client
         client = create_client(provider, **client_config)
-        
+
         logger.info(f"Created {provider} client successfully")
         return client
-        
+
     except Exception as e:
         logger.error(f"Failed to create {provider} client: {e}")
         raise ClientFactoryError(f"Failed to create {provider} client: {e}") from e
 
 
-def _get_provider_config(provider: str, settings) -> Dict[str, Any]:
+def _get_provider_config(provider: str, settings) -> dict[str, Any]:
     """Get configuration for a specific provider."""
     if provider == "openrouter":
         api_key = settings.get_api_key("openrouter")
@@ -75,7 +74,7 @@ def _get_provider_config(provider: str, settings) -> Dict[str, Any]:
                 "OpenRouter API key not configured. "
                 "Set OPENROUTER_API_KEY environment variable."
             )
-        
+
         return {
             "api_key": api_key,
             "timeout": settings.api.timeout,
@@ -83,7 +82,7 @@ def _get_provider_config(provider: str, settings) -> Dict[str, Any]:
             "base_delay": 1.0,
             "max_delay": settings.api.max_backoff,
         }
-    
+
     elif provider == "lmstudio":
         base_url = settings.lmstudio_base_url
         if not base_url:
@@ -91,18 +90,18 @@ def _get_provider_config(provider: str, settings) -> Dict[str, Any]:
                 "LM Studio base URL not configured. "
                 "Set LMSTUDIO_BASE_URL environment variable."
             )
-        
+
         return {
             "base_url": base_url,
             "timeout": settings.api.timeout,
         }
-    
+
     else:
         raise ClientFactoryError(f"Unknown provider configuration: {provider}")
 
 
 def create_openrouter_client(
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     **kwargs
 ) -> BaseClient:
     """
@@ -119,7 +118,7 @@ def create_openrouter_client(
     if api_key:
         config_overrides["api_key"] = api_key
     config_overrides.update(kwargs)
-    
+
     return create_client_from_config("openrouter", config_overrides)
 
 
@@ -143,9 +142,9 @@ def validate_provider_config(provider: str) -> bool:
 def get_configured_providers() -> list[str]:
     """Get list of providers that are properly configured."""
     configured = []
-    
+
     for provider in get_supported_providers():
         if validate_provider_config(provider):
             configured.append(provider)
-    
+
     return configured

@@ -8,11 +8,9 @@ test utilities to ensure proper test isolation and prevent hanging tests.
 import asyncio
 import logging
 import os
-import threading
 import warnings
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
-from typing import Any, Dict, Optional
 
 import pytest
 
@@ -39,14 +37,14 @@ def reset_global_state():
     """
     # Reset before test
     _reset_all_global_state()
-    
+
     yield
-    
+
     # Reset after test
     _reset_all_global_state()
 
 
-@pytest.fixture(autouse=True, scope="function") 
+@pytest.fixture(autouse=True, scope="function")
 def ensure_async_cleanup():
     """
     Ensure proper cleanup of async resources.
@@ -55,7 +53,7 @@ def ensure_async_cleanup():
     are properly closed and event loops are cleaned up.
     """
     yield
-    
+
     # Force cleanup of any remaining async tasks
     try:
         loop = asyncio.get_running_loop()
@@ -64,7 +62,7 @@ def ensure_async_cleanup():
         for task in pending:
             if not task.done():
                 task.cancel()
-        
+
         # Wait briefly for cancellation
         if pending:
             loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
@@ -89,17 +87,17 @@ def isolated_temp_dir(tmp_path):
         "PROMPTS_DIR": str(tmp_path / "prompts"),
         "DATABASE__PATH": str(tmp_path / "data" / "test.db"),
     }
-    
+
     for key, value in temp_env_vars.items():
         original_env[key] = os.environ.get(key)
         os.environ[key] = value
-    
+
     # Create directories
     for path in temp_env_vars.values():
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-    
+
     yield tmp_path
-    
+
     # Restore original environment
     for key, original_value in original_env.items():
         if original_value is None:
@@ -117,7 +115,7 @@ def mock_http_client():
     ensures consistent, fast test execution.
     """
     mock_client = AsyncMock()
-    
+
     # Default successful response
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -136,12 +134,12 @@ def mock_http_client():
         }
     }
     mock_response.raise_for_status.return_value = None
-    
+
     mock_client.post.return_value = mock_response
     mock_client.get.return_value = mock_response
     mock_client.__aenter__.return_value = mock_client
     mock_client.__aexit__.return_value = None
-    
+
     return mock_client
 
 
@@ -153,15 +151,14 @@ def mock_asyncio_sleep():
     This prevents retry logic from causing real delays that slow down tests
     and can cause timeouts in CI environments.
     """
-    import asyncio
     from unittest.mock import patch
-    
+
     # Mock asyncio.sleep to return immediately
     with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
         async def instant_sleep(delay):
             # Log the intended delay for debugging but return immediately
             pass
-        
+
         mock_sleep.side_effect = instant_sleep
         yield mock_sleep
 
@@ -175,27 +172,29 @@ def limit_retries_in_tests(request):
     but skips the patch for tests that are specifically testing retry logic.
     """
     from unittest.mock import patch
-    
+
     # Skip patching for tests that specifically test retry behavior
     if "retry_with_backoff" in request.node.name or "test_retry" in request.node.name:
         # Let these tests use the real retry logic (but we'll still have asyncio.sleep mocked)
         yield None
         return
-    
+
     # Patch retry_with_backoff to have test-friendly behavior for integration tests
     with patch('src.second_opinion.clients.base.BaseClient.retry_with_backoff') as mock_retry:
         async def test_retry_with_backoff(operation, *args, **kwargs):
             """Test-friendly retry with minimal attempts."""
             last_exception = None
             max_retries = 1  # Only try once for integration tests
-            
+
             for attempt in range(max_retries + 1):
                 try:
                     return await operation(*args, **kwargs)
                 except Exception as e:
                     # Import the exception types we need
-                    from src.second_opinion.clients.base import RetryableError, ClientError
-                    
+                    from src.second_opinion.clients.base import (
+                        RetryableError,
+                    )
+
                     if isinstance(e, RetryableError):
                         last_exception = e
                         if attempt == max_retries:
@@ -205,13 +204,13 @@ def limit_retries_in_tests(request):
                     else:
                         # Non-retryable errors, re-raise immediately
                         raise
-            
+
             # All retries exhausted, raise the last exception
             if last_exception:
                 raise last_exception
             else:
                 raise Exception("Unexpected retry logic state")
-        
+
         mock_retry.side_effect = test_retry_with_backoff
         yield mock_retry
 
@@ -225,7 +224,7 @@ def test_settings():
     won't interfere with production configurations.
     """
     from src.second_opinion.config.settings import AppSettings
-    
+
     # Test environment variables
     test_env = {
         "ENVIRONMENT": "test",
@@ -239,13 +238,13 @@ def test_settings():
         "COST_MANAGEMENT__DAILY_LIMIT": "100.00",  # High limits for testing
         "COST_MANAGEMENT__MONTHLY_LIMIT": "1000.00",
     }
-    
+
     # Set test environment temporarily
     original_env = {}
     for key, value in test_env.items():
         original_env[key] = os.environ.get(key)
         os.environ[key] = value
-    
+
     try:
         settings = AppSettings()
         yield settings
@@ -266,13 +265,17 @@ def mock_pricing_manager():
     This prevents tests from making network calls to fetch pricing
     data and provides predictable cost estimates.
     """
-    from src.second_opinion.utils.pricing import PricingManager, ModelPricingInfo, set_pricing_manager
     from decimal import Decimal
-    from datetime import datetime, timezone
-    
+
+    from src.second_opinion.utils.pricing import (
+        ModelPricingInfo,
+        PricingManager,
+        set_pricing_manager,
+    )
+
     # Create mock with test data
     mock_manager = MagicMock(spec=PricingManager)
-    
+
     # Default pricing for common test models
     test_pricing = {
         "gpt-3.5-turbo": ModelPricingInfo(
@@ -297,10 +300,10 @@ def mock_pricing_manager():
             provider="anthropic"
         )
     }
-    
+
     def mock_get_model_pricing(model_name: str):
         return test_pricing.get(model_name)
-    
+
     def mock_estimate_cost(model_name: str, input_tokens: int, output_tokens: int = 0):
         pricing = test_pricing.get(model_name)
         if pricing:
@@ -308,7 +311,7 @@ def mock_pricing_manager():
             output_cost = (Decimal(output_tokens) * pricing.output_cost_per_1k_tokens) / 1000
             return input_cost + output_cost, "mock_pricing"
         return Decimal("0.05"), "mock_fallback"
-    
+
     mock_manager.get_model_pricing = mock_get_model_pricing
     mock_manager.estimate_cost = mock_estimate_cost
     mock_manager.get_cache_info.return_value = {
@@ -317,12 +320,12 @@ def mock_pricing_manager():
         "source": "mock",
         "is_expired": False
     }
-    
+
     # Set as global manager
     set_pricing_manager(mock_manager)
-    
+
     yield mock_manager
-    
+
     # Clean up
     set_pricing_manager(None)
 
@@ -335,9 +338,10 @@ def clean_cost_guard():
     Creates a new cost guard with test-friendly limits and
     ensures it's reset between tests.
     """
-    from src.second_opinion.utils.cost_tracking import CostGuard, set_cost_guard
     from decimal import Decimal
-    
+
+    from src.second_opinion.utils.cost_tracking import CostGuard, set_cost_guard
+
     # Create test cost guard with high limits
     test_guard = CostGuard(
         per_request_limit=Decimal("10.00"),  # High limit for testing
@@ -347,46 +351,46 @@ def clean_cost_guard():
         warning_threshold=0.8,
         reservation_timeout=300
     )
-    
+
     set_cost_guard(test_guard)
-    
+
     yield test_guard
-    
+
     # Clean up
     set_cost_guard(None)
 
 
 def _reset_all_global_state():
     """Reset all global state across the application."""
-    
+
     # Reset configuration manager
     try:
         from src.second_opinion.config.settings import config_manager
         config_manager.reset()
     except ImportError:
         pass
-    
+
     # Reset pricing manager
     try:
         from src.second_opinion.utils.pricing import set_pricing_manager
         set_pricing_manager(None)
     except ImportError:
         pass
-    
+
     # Reset cost guard
     try:
         from src.second_opinion.utils.cost_tracking import set_cost_guard
         set_cost_guard(None)
     except ImportError:
         pass
-    
+
     # Clear any module-level caches
     _clear_module_caches()
 
 
 def _clear_module_caches():
     """Clear any module-level caches that might persist between tests."""
-    
+
     # Clear any function caches
     try:
         import functools
@@ -394,7 +398,7 @@ def _clear_module_caches():
         # This is a generic approach - specific caches can be added as needed
     except ImportError:
         pass
-    
+
     # Clear any global variables that might cache instances
     import sys
     for module_name, module in sys.modules.items():
@@ -441,11 +445,11 @@ def pytest_collection_modifyitems(config, items):
         if asyncio.iscoroutinefunction(item.function):
             # Add timeout to prevent hanging async tests
             item.add_marker(pytest.mark.timeout(30))  # 30 second timeout
-        
+
         # Mark integration tests
         if "integration" in item.nodeid:
             item.add_marker(pytest.mark.integration)
-        
+
         # Mark security tests
         if "security" in item.nodeid:
             item.add_marker(pytest.mark.security)
@@ -453,15 +457,13 @@ def pytest_collection_modifyitems(config, items):
 
 def pytest_runtest_setup(item):
     """Setup hook to run before each test."""
-    # Ensure clean state before each test
-    _reset_all_global_state()
+    # State reset is handled by the reset_global_state fixture
+    pass
 
 
 def pytest_runtest_teardown(item, nextitem):
     """Teardown hook to run after each test."""
-    # Ensure clean state after each test
-    _reset_all_global_state()
-    
+    # State reset is handled by the reset_global_state fixture
     # Force garbage collection to help with resource cleanup
     import gc
     gc.collect()
@@ -471,14 +473,14 @@ def pytest_runtest_teardown(item, nextitem):
 @pytest.fixture(scope="session", autouse=True)
 def optimize_test_performance():
     """Optimize performance for test runs."""
-    
+
     # Reduce logging overhead
     logging.getLogger().setLevel(logging.ERROR)
-    
+
     # Disable networking where possible
     os.environ.setdefault("HTTPX_DISABLE_POOL", "1")
-    
+
     yield
-    
+
     # Cleanup after all tests
     _reset_all_global_state()

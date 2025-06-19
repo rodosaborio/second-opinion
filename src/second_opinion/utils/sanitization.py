@@ -6,8 +6,8 @@ secure handling of user prompts, API requests, and configuration data.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Union
 from decimal import Decimal
+from typing import Any
 
 from ..core.models import SecurityContext
 
@@ -24,12 +24,12 @@ class ValidationError(Exception):
 
 class InputSanitizer:
     """Multi-layer input validation and sanitization."""
-    
+
     # Maximum lengths for different input types
     MAX_PROMPT_LENGTH = 50000
     MAX_MODEL_NAME_LENGTH = 100
     MAX_SYSTEM_PROMPT_LENGTH = 10000
-    
+
     # Patterns for detecting potential security issues
     API_KEY_PATTERNS = [
         r'sk-[a-zA-Z0-9-_]{20,}',           # OpenAI/Anthropic style
@@ -39,7 +39,7 @@ class InputSanitizer:
         r'Bearer\s+[a-zA-Z0-9\-_=]{20,}',   # Bearer tokens
         r'api[_-]?key["\']?\s*[:=]\s*["\']?[a-zA-Z0-9\-_]{20,}',  # API key assignments
     ]
-    
+
     # Patterns for potentially malicious content
     INJECTION_PATTERNS = [
         r'<script[^>]*>',                    # Script tags (opening)
@@ -56,11 +56,11 @@ class InputSanitizer:
         r'`[^`]*`',                         # Backtick commands
         r'\$\([^)]*\)',                     # Command substitution
     ]
-    
+
     def __init__(self):
         self._api_key_regex = re.compile('|'.join(self.API_KEY_PATTERNS), re.IGNORECASE)
         self._injection_regex = re.compile('|'.join(self.INJECTION_PATTERNS), re.IGNORECASE)
-    
+
     def sanitize_prompt(self, prompt: str, context: SecurityContext = SecurityContext.USER_PROMPT) -> str:
         """
         Sanitize user prompts for safe API consumption.
@@ -78,31 +78,31 @@ class InputSanitizer:
         """
         if not isinstance(prompt, str):
             raise ValidationError("Prompt must be a string")
-        
+
         # Check for potential API keys
         if self._contains_api_key_pattern(prompt):
             raise SecurityError("Potential API key or sensitive token detected in prompt")
-        
+
         # Check for injection attempts (context-aware)
         if self._contains_injection_pattern(prompt, context):
             raise SecurityError("Potential injection attempt detected in prompt")
-        
+
         # Normalize whitespace
         prompt = self._normalize_whitespace(prompt)
-        
+
         # Check size limits based on context
         max_length = self._get_max_length_for_context(context)
         if len(prompt) > max_length:
             raise ValidationError(f"Prompt exceeds maximum length of {max_length} characters")
-        
+
         # Additional sanitization based on context
         if context == SecurityContext.SYSTEM_PROMPT:
             prompt = self._sanitize_system_prompt(prompt)
         elif context == SecurityContext.API_REQUEST:
             prompt = self._sanitize_api_request(prompt)
-        
+
         return prompt
-    
+
     def validate_model_name(self, model_name: str) -> str:
         """
         Validate and normalize model names.
@@ -118,27 +118,27 @@ class InputSanitizer:
         """
         if not isinstance(model_name, str):
             raise ValidationError("Model name must be a string")
-        
+
         # Remove extra whitespace
         model_name = model_name.strip()
-        
+
         if not model_name:
             raise ValidationError("Model name cannot be empty")
-        
+
         if len(model_name) > self.MAX_MODEL_NAME_LENGTH:
             raise ValidationError(f"Model name exceeds maximum length of {self.MAX_MODEL_NAME_LENGTH}")
-        
+
         # Check for valid model name format (provider/model or just model)
         if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-_./]*[a-zA-Z0-9]$', model_name):
             raise ValidationError("Model name contains invalid characters")
-        
+
         # Prevent injection through model names
         if self._contains_injection_pattern(model_name):
             raise SecurityError("Potential injection attempt in model name")
-        
+
         return model_name
-    
-    def sanitize_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+
+    def sanitize_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
         """
         Sanitize metadata dictionary for safe storage and processing.
         
@@ -150,17 +150,17 @@ class InputSanitizer:
         """
         if not isinstance(metadata, dict):
             raise ValidationError("Metadata must be a dictionary")
-        
+
         sanitized = {}
         for key, value in metadata.items():
             # Sanitize keys
             if not isinstance(key, str):
                 continue
-            
+
             clean_key = self._sanitize_string_value(key)
             if not clean_key or len(clean_key) > 100:
                 continue
-            
+
             # Sanitize values
             if isinstance(value, str):
                 clean_value = self._sanitize_string_value(value)
@@ -170,10 +170,10 @@ class InputSanitizer:
                 sanitized[clean_key] = value
             elif isinstance(value, Decimal):
                 sanitized[clean_key] = value
-        
+
         return sanitized
-    
-    def validate_cost_limit(self, cost_limit: Union[str, float, Decimal]) -> Decimal:
+
+    def validate_cost_limit(self, cost_limit: str | float | Decimal) -> Decimal:
         """
         Validate and normalize cost limit values.
         
@@ -188,7 +188,7 @@ class InputSanitizer:
         """
         if cost_limit is None:
             raise ValidationError("Invalid cost limit format")
-            
+
         try:
             if isinstance(cost_limit, str):
                 # Remove any currency symbols or spaces
@@ -200,20 +200,20 @@ class InputSanitizer:
                 cost_decimal = Decimal(str(cost_limit))
         except (ValueError, TypeError, ArithmeticError):
             raise ValidationError("Invalid cost limit format")
-        
+
         if cost_decimal < 0:
             raise ValidationError("Cost limit cannot be negative")
-        
+
         if cost_decimal > Decimal('1000'):
             raise ValidationError("Cost limit exceeds maximum allowed value of $1000")
-        
+
         # Ensure reasonable precision (max 4 decimal places)
         return cost_decimal.quantize(Decimal('0.0001'))
-    
+
     def _contains_api_key_pattern(self, text: str) -> bool:
         """Check if text contains potential API key patterns."""
         return bool(self._api_key_regex.search(text))
-    
+
     def _contains_injection_pattern(self, text: str, context: SecurityContext = SecurityContext.USER_PROMPT) -> bool:
         """Check if text contains potential injection patterns."""
         # For system prompts, we're more lenient with command-like patterns since they'll be sanitized
@@ -228,23 +228,23 @@ class InputSanitizer:
             ]
             serious_regex = re.compile('|'.join(serious_patterns), re.IGNORECASE)
             return bool(serious_regex.search(text))
-        
+
         # For other contexts, check all patterns
         return bool(self._injection_regex.search(text))
-    
+
     def _normalize_whitespace(self, text: str) -> str:
         """Normalize whitespace in text."""
         # Remove leading/trailing whitespace
         text = text.strip()
-        
+
         # Replace multiple spaces with single space, but preserve newlines and tabs
         text = re.sub(r'[ ]+', ' ', text)
-        
+
         # Remove null bytes and control characters (except newlines and tabs)
         text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
-        
+
         return text
-    
+
     def _get_max_length_for_context(self, context: SecurityContext) -> int:
         """Get maximum length based on security context."""
         return {
@@ -253,21 +253,21 @@ class InputSanitizer:
             SecurityContext.API_REQUEST: self.MAX_PROMPT_LENGTH,
             SecurityContext.CONFIGURATION: 1000,
         }.get(context, self.MAX_PROMPT_LENGTH)
-    
+
     def _sanitize_system_prompt(self, prompt: str) -> str:
         """Additional sanitization for system prompts."""
         # Remove potential command injection attempts
         dangerous_patterns = [
-            r'`[^`]*`',          # Backtick commands  
+            r'`[^`]*`',          # Backtick commands
             r'\$\([^)]*\)',      # Command substitution
             r'>\s*[/\\]',        # File redirection
         ]
-        
+
         for pattern in dangerous_patterns:
             prompt = re.sub(pattern, '[REMOVED]', prompt, flags=re.IGNORECASE)
-        
+
         return prompt
-    
+
     def _sanitize_api_request(self, prompt: str) -> str:
         """Additional sanitization for API requests."""
         # Remove potential API manipulation attempts
@@ -277,21 +277,21 @@ class InputSanitizer:
             r'X-API-Key:\s*[^\n]*',
             r'Cookie:\s*[^\n]*',
         ]
-        
+
         for pattern in api_patterns:
             prompt = re.sub(pattern, '', prompt, flags=re.IGNORECASE)
-        
+
         return prompt
-    
+
     def _sanitize_string_value(self, value: str) -> str:
         """Basic string sanitization for metadata values."""
         if not isinstance(value, str):
             return ""
-        
+
         # Check for potential security issues
         if self._contains_api_key_pattern(value) or self._contains_injection_pattern(value, SecurityContext.CONFIGURATION):
             return ""
-        
+
         # Normalize and return
         return self._normalize_whitespace(value)
 
@@ -310,11 +310,11 @@ def validate_model_name(model_name: str) -> str:
     return _sanitizer.validate_model_name(model_name)
 
 
-def sanitize_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+def sanitize_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     """Global function to sanitize metadata."""
     return _sanitizer.sanitize_metadata(metadata)
 
 
-def validate_cost_limit(cost_limit: Union[str, float, Decimal]) -> Decimal:
+def validate_cost_limit(cost_limit: str | float | Decimal) -> Decimal:
     """Global function to validate cost limits."""
     return _sanitizer.validate_cost_limit(cost_limit)

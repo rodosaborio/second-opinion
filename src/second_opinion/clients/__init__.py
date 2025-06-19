@@ -6,13 +6,13 @@ through the BaseClient abstraction.
 """
 
 from .base import (
-    BaseClient,
-    ModelInfo,
-    ClientError,
     AuthenticationError,
-    RateLimitError,
-    ModelNotFoundError,
+    BaseClient,
+    ClientError,
     CostLimitExceededError,
+    ModelInfo,
+    ModelNotFoundError,
+    RateLimitError,
     RetryableError,
 )
 from .openrouter import OpenRouterClient
@@ -50,7 +50,7 @@ def create_client(provider: str, **kwargs) -> BaseClient:
         >>> response = await client.complete(request)
     """
     provider = provider.lower().strip()
-    
+
     if provider == "openrouter":
         return OpenRouterClient(**kwargs)
     elif provider == "lmstudio":

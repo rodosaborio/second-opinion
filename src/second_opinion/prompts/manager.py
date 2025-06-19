@@ -5,17 +5,15 @@ This module provides functionality for loading, caching, and rendering prompt te
 with parameter injection and model-specific optimizations.
 """
 
-import os
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
 import logging
-from datetime import datetime, timezone, timedelta
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 from ..core.models import SecurityContext
 from ..utils.sanitization import sanitize_prompt
-
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +23,11 @@ class PromptTemplate:
     """A loaded prompt template with metadata."""
     name: str
     content: str
-    parameters: List[str]
-    description: Optional[str] = None
-    model_optimizations: Dict[str, str] = None
-    last_modified: Optional[datetime] = None
-    
+    parameters: list[str]
+    description: str | None = None
+    model_optimizations: dict[str, str] = None
+    last_modified: datetime | None = None
+
     def __post_init__(self):
         if self.model_optimizations is None:
             self.model_optimizations = {}
@@ -45,8 +43,8 @@ class PromptManager:
     - Model-specific prompt optimizations
     - Security-aware template rendering
     """
-    
-    def __init__(self, templates_dir: Optional[Union[str, Path]] = None, cache_ttl: int = 3600):
+
+    def __init__(self, templates_dir: str | Path | None = None, cache_ttl: int = 3600):
         """
         Initialize the prompt manager.
         
@@ -59,17 +57,17 @@ class PromptManager:
             current_dir = Path(__file__).parent
             project_root = current_dir.parent.parent.parent
             templates_dir = project_root / "prompts" / "templates"
-        
+
         self.templates_dir = Path(templates_dir)
         self.cache_ttl = cache_ttl
-        self._template_cache: Dict[str, PromptTemplate] = {}
-        self._cache_timestamps: Dict[str, datetime] = {}
-        
+        self._template_cache: dict[str, PromptTemplate] = {}
+        self._cache_timestamps: dict[str, datetime] = {}
+
         # Parameter extraction pattern for {parameter_name} format
         self._param_pattern = re.compile(r'\{([^}]+)\}')
-        
+
         logger.info(f"Initialized PromptManager with templates_dir: {self.templates_dir}")
-    
+
     async def load_template(self, template_name: str) -> PromptTemplate:
         """
         Load a template by name with caching.
@@ -88,28 +86,28 @@ class PromptManager:
         cached_template = await self._get_cached_template(template_name)
         if cached_template:
             return cached_template
-        
+
         # Load from file
         template_path = self.templates_dir / f"{template_name}.txt"
         if not template_path.exists():
             raise FileNotFoundError(f"Template not found: {template_path}")
-        
+
         try:
-            with open(template_path, 'r', encoding='utf-8') as f:
+            with open(template_path, encoding='utf-8') as f:
                 content = f.read()
         except Exception as e:
             raise ValueError(f"Failed to read template {template_name}: {e}")
-        
+
         if not content.strip():
             raise ValueError(f"Template {template_name} is empty")
-        
+
         # Extract parameters from template
         parameters = self._extract_parameters(content)
-        
+
         # Get file modification time
         stat = template_path.stat()
-        last_modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
-        
+        last_modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
+
         # Create template object
         template = PromptTemplate(
             name=template_name,
@@ -117,18 +115,18 @@ class PromptManager:
             parameters=parameters,
             last_modified=last_modified
         )
-        
+
         # Cache the template
         await self._cache_template(template_name, template)
-        
+
         logger.debug(f"Loaded template '{template_name}' with parameters: {parameters}")
         return template
-    
+
     async def render_prompt(
-        self, 
-        template_name: str, 
-        parameters: Dict[str, Any],
-        model: Optional[str] = None,
+        self,
+        template_name: str,
+        parameters: dict[str, Any],
+        model: str | None = None,
         security_context: SecurityContext = SecurityContext.USER_PROMPT
     ) -> str:
         """
@@ -148,18 +146,18 @@ class PromptManager:
             ValueError: Missing required parameters or invalid template
         """
         template = await self.load_template(template_name)
-        
+
         # Check for missing required parameters
         missing_params = set(template.parameters) - set(parameters.keys())
         if missing_params:
             raise ValueError(f"Missing required parameters for template '{template_name}': {missing_params}")
-        
+
         # Use model-specific optimization if available
         content = template.content
         if model and model in template.model_optimizations:
             content = template.model_optimizations[model]
             logger.debug(f"Using model-specific optimization for {model}")
-        
+
         # Sanitize parameter values
         sanitized_params = {}
         for key, value in parameters.items():
@@ -167,7 +165,7 @@ class PromptManager:
                 sanitized_params[key] = sanitize_prompt(value, security_context)
             else:
                 sanitized_params[key] = str(value)
-        
+
         # Render template with parameters
         try:
             rendered = content.format(**sanitized_params)
@@ -175,11 +173,11 @@ class PromptManager:
             raise ValueError(f"Template '{template_name}' contains undefined parameter: {e}")
         except Exception as e:
             raise ValueError(f"Failed to render template '{template_name}': {e}")
-        
+
         logger.debug(f"Rendered template '{template_name}' for model '{model}'")
         return rendered
-    
-    async def get_template_parameters(self, template_name: str) -> List[str]:
+
+    async def get_template_parameters(self, template_name: str) -> list[str]:
         """
         Get the list of parameters required by a template.
         
@@ -191,8 +189,8 @@ class PromptManager:
         """
         template = await self.load_template(template_name)
         return template.parameters.copy()
-    
-    async def validate_parameters(self, template_name: str, parameters: Dict[str, Any]) -> bool:
+
+    async def validate_parameters(self, template_name: str, parameters: dict[str, Any]) -> bool:
         """
         Validate that all required parameters are provided.
         
@@ -207,8 +205,8 @@ class PromptManager:
         required_params = set(template.parameters)
         provided_params = set(parameters.keys())
         return required_params.issubset(provided_params)
-    
-    async def list_templates(self) -> List[str]:
+
+    async def list_templates(self) -> list[str]:
         """
         List available template names.
         
@@ -217,14 +215,14 @@ class PromptManager:
         """
         if not self.templates_dir.exists():
             return []
-        
+
         templates = []
         for file_path in self.templates_dir.glob("*.txt"):
             if file_path.is_file():
                 templates.append(file_path.stem)
-        
+
         return sorted(templates)
-    
+
     async def reload_template(self, template_name: str) -> PromptTemplate:
         """
         Force reload a template, bypassing cache.
@@ -238,48 +236,48 @@ class PromptManager:
         # Remove from cache
         self._template_cache.pop(template_name, None)
         self._cache_timestamps.pop(template_name, None)
-        
+
         # Load fresh copy
         return await self.load_template(template_name)
-    
+
     def clear_cache(self) -> None:
         """Clear the template cache."""
         self._template_cache.clear()
         self._cache_timestamps.clear()
         logger.info("Template cache cleared")
-    
-    async def _get_cached_template(self, template_name: str) -> Optional[PromptTemplate]:
+
+    async def _get_cached_template(self, template_name: str) -> PromptTemplate | None:
         """Get template from cache if valid."""
         if template_name not in self._template_cache:
             return None
-        
+
         cache_timestamp = self._cache_timestamps.get(template_name)
         if not cache_timestamp:
             return None
-        
+
         # Check if cache is still valid
-        age = (datetime.now(timezone.utc) - cache_timestamp).total_seconds()
+        age = (datetime.now(UTC) - cache_timestamp).total_seconds()
         if age > self.cache_ttl:
             # Cache expired
             self._template_cache.pop(template_name, None)
             self._cache_timestamps.pop(template_name, None)
             return None
-        
+
         return self._template_cache[template_name]
-    
+
     async def _cache_template(self, template_name: str, template: PromptTemplate) -> None:
         """Cache a template with timestamp."""
         self._template_cache[template_name] = template
-        self._cache_timestamps[template_name] = datetime.now(timezone.utc)
-    
-    def _extract_parameters(self, content: str) -> List[str]:
+        self._cache_timestamps[template_name] = datetime.now(UTC)
+
+    def _extract_parameters(self, content: str) -> list[str]:
         """Extract parameter names from template content."""
         matches = self._param_pattern.findall(content)
         return sorted(list(set(matches)))  # Remove duplicates and sort
 
 
 # Global prompt manager instance
-_global_prompt_manager: Optional[PromptManager] = None
+_global_prompt_manager: PromptManager | None = None
 
 
 def get_prompt_manager() -> PromptManager:
@@ -308,8 +306,8 @@ def set_prompt_manager(manager: PromptManager) -> None:
 
 async def render_template(
     template_name: str,
-    parameters: Dict[str, Any],
-    model: Optional[str] = None,
+    parameters: dict[str, Any],
+    model: str | None = None,
     security_context: SecurityContext = SecurityContext.USER_PROMPT
 ) -> str:
     """
@@ -328,7 +326,7 @@ async def render_template(
     return await manager.render_prompt(template_name, parameters, model, security_context)
 
 
-async def get_template_params(template_name: str) -> List[str]:
+async def get_template_params(template_name: str) -> list[str]:
     """
     Convenience function to get template parameters using the global manager.
     
