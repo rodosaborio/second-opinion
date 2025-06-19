@@ -122,7 +122,7 @@ class AppSettings(BaseSettings):
     anthropic_api_key: str | None = Field(default=None, description="Anthropic API key", repr=False)
     openai_api_key: str | None = Field(default=None, description="OpenAI API key", repr=False)
     google_api_key: str | None = Field(default=None, description="Google AI API key", repr=False)
-    lmstudio_base_url: str | None = Field(default=None, description="LM Studio base URL")
+    lmstudio_base_url: str = Field(default="http://localhost:1234", description="LM Studio base URL")
 
     # Security
     database_encryption_key: str | None = Field(default=None, description="Database encryption key", repr=False)

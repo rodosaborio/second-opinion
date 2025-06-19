@@ -15,6 +15,7 @@ from .base import (
     RateLimitError,
     RetryableError,
 )
+from .lmstudio import LMStudioClient
 from .openrouter import OpenRouterClient
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "ModelNotFoundError",
     "CostLimitExceededError",
     "RetryableError",
+    "LMStudioClient",
     "OpenRouterClient",
     "create_client",
 ]
@@ -54,12 +56,11 @@ def create_client(provider: str, **kwargs) -> BaseClient:
     if provider == "openrouter":
         return OpenRouterClient(**kwargs)
     elif provider == "lmstudio":
-        # TODO: Implement LMStudioClient
-        raise ValueError("LMStudio client not yet implemented")
+        return LMStudioClient(**kwargs)
     else:
         raise ValueError(f"Unsupported provider: {provider}")
 
 
 def get_supported_providers() -> list[str]:
     """Get list of supported provider names."""
-    return ["openrouter"]  # Will expand as we add more providers
+    return ["openrouter", "lmstudio"]

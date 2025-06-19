@@ -28,10 +28,11 @@ This document serves as the master implementation guide for the Second Opinion A
 
 **CLI Mode:**
 ```bash
-second-opinion --primary-model "anthropic/claude-3-5-sonnet" second_opinion "Question here"
+second-opinion --primary-model "anthropic/claude-3-5-sonnet" "Question here"
 ```
 - Global context set via command line argument
 - All tools use this as the reference point for comparisons
+- Support for explicit comparison model specification via `--comparison-model` flag
 
 **MCP Mode:**
 - Detect primary model from MCP client context when available
@@ -1068,12 +1069,114 @@ pricing_info = pricing_manager.get_model_pricing("claude-3-sonnet")  # Model loo
 - **Integration Testing**: End-to-end workflow validation with mocked API responses
 - **Pricing Security**: Safe JSON parsing, input validation, conservative fallbacks
 
-### 🔄 Next Phase: CLI Interface & MCP Integration
+### ✅ Phase 5: CLI Interface Implementation - COMPLETED
+
+**What's Working:**
+- **CLI Main Interface** (`src/second_opinion/cli/main.py`) - Complete Typer-based CLI with rich output formatting and comparison model flag support
+- **Comparison Model Selection System** - Intelligent model selection with priority hierarchy (explicit > config > smart auto-selection > fallback)
+- **Rich User Experience** - Beautiful terminal UI with tables, panels, progress indicators, and cost transparency
+- **Multiple Comparison Models** - Support for `--comparison-model` flag used multiple times (key requested feature)
+- **Comprehensive Testing** - 17+ test scenarios covering CLI functionality, model selection, error handling, and user experience
+
+**Key Implementation Achievements:**
+1. **Comparison Model Flag Enhancement**: Users can specify multiple comparison models via repeated `--comparison-model` / `-c` flags
+2. **Smart Model Selection**: Intelligent auto-selection based on primary model tier and task complexity when no explicit models specified
+3. **Rich Terminal UI**: Professional output with colored tables, panels, progress indicators, and cost summaries using Rich library
+4. **Cost Protection Integration**: Full integration with existing cost tracking and budget management systems
+5. **Error Handling Excellence**: User-friendly error messages with graceful degradation and informative suggestions
+6. **Async Integration**: Proper async wrapper for CLI operations with resource cleanup and timeout handling
+
+**CLI Usage Examples:**
+```bash
+# Basic usage with auto-selected comparison models
+second-opinion --primary-model "anthropic/claude-3-5-sonnet" "What's 2+2?"
+
+# Single explicit comparison model
+second-opinion --primary-model "anthropic/claude-3-5-sonnet" --comparison-model "openai/gpt-4o" "Complex task"
+
+# Multiple comparison models (key requested feature!)
+second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
+  --comparison-model "openai/gpt-4o" \
+  --comparison-model "google/gemini-pro" \
+  "Advanced analysis task"
+
+# With context and custom cost limits
+second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
+  --comparison-model "openai/gpt-4o" \
+  --context "This is for academic research" \
+  --cost-limit 0.25 \
+  "Detailed analysis needed"
+```
+
+**Comparison Model Selection Priority Hierarchy:**
+1. **Explicit CLI flags** (highest priority) - User specified models via `--comparison-model`
+2. **Tool configuration** - From model_profiles.yaml configuration file
+3. **Smart auto-selection** - Based on primary model tier and task complexity
+4. **Fallback defaults** - When all else fails, use sensible defaults
+
+**Smart Auto-Selection Logic:**
+- **Budget tier primary** → Compare against mid-range models (quality upgrade potential)
+- **Mid-range primary** → Compare against budget + premium (cost savings + quality options)  
+- **Premium primary** → Compare against mid-range + other premium models
+- **Task complexity aware** → Prefer higher-tier models for complex tasks
+
+**Rich User Experience Features:**
+- **Model Selection Feedback**: Clear indication of "user specified" vs "auto-selected" models
+- **Cost Transparency**: Upfront cost estimates, per-model breakdowns, and budget tracking
+- **Progress Indicators**: Live status updates during model requests with Rich status
+- **Quality Scores**: Response evaluation results displayed in formatted tables
+- **Recommendations**: Actionable suggestions based on response quality analysis
+
+**Technical Implementation Highlights:**
+```python
+# Comparison model flag support with multiple values
+comparison_model: list[str] | None = typer.Option(
+    None, "--comparison-model", "-c", 
+    help="Specific model(s) to compare against (can be used multiple times)"
+)
+
+# Smart model selection with priority hierarchy
+class ComparisonModelSelector:
+    def select_models(
+        self, primary_model: str, explicit_models: list[str] | None = None,
+        task_complexity: TaskComplexity | None = None, max_models: int = 2
+    ) -> list[str]:
+        # Priority 1: Explicit CLI selection
+        if explicit_models:
+            return self._validate_and_filter_models(explicit_models, primary_model)
+        
+        # Priority 2: Tool configuration, 3: Smart auto-selection, 4: Fallback
+        # ... comprehensive selection logic
+
+# Rich output formatting with tables and panels
+def display_results(result: dict):
+    table = Table(title="Second Opinion Results", show_header=True)
+    table.add_column("Model", style="cyan")
+    table.add_column("Response", style="white", ratio=3)
+    table.add_column("Cost", style="green", justify="right")
+    table.add_column("Quality", style="yellow", justify="center")
+    # ... comprehensive result display
+```
+
+**Error Handling & User Experience:**
+- **Input Validation**: Security-aware prompt sanitization integrated with existing security utils
+- **Cost Protection**: Pre-flight cost estimation with hard limits and clear error messages
+- **API Failures**: Graceful handling of provider errors with informative user feedback
+- **Keyboard Interrupts**: Clean cancellation with proper resource cleanup
+- **Model Validation**: Clear error messages for invalid model names or unavailable models
+
+**Files Created/Modified:**
+- ✅ `src/second_opinion/cli/main.py` - Complete CLI implementation (511 lines)
+- ✅ `src/second_opinion/__main__.py` - Module entry point for `python -m second_opinion`
+- ✅ `tests/test_cli/test_main.py` - Comprehensive CLI test suite (531 lines, 17+ test scenarios)
+- ✅ Enhanced pyproject.toml script entry point: `second-opinion = "second_opinion.cli.main:app"`
+
+### 🔄 Next Phase: MCP Integration
 
 **Ready to Implement:**
-- CLI interface with primary model context management using OpenRouter client and dynamic pricing
 - MCP server with tool implementations leveraging evaluation engine, OpenRouter, and accurate cost tracking
 - Tool implementations connecting evaluation logic with OpenRouter for real model comparisons
+- MCP-specific comparison model selection (adapting CLI patterns for MCP context)
 - End-to-end user experience with production-ready OpenRouter backend and comprehensive cost management
 
 ### 📚 Lessons Learned
@@ -1145,5 +1248,18 @@ pricing_info = pricing_manager.get_model_pricing("claude-3-sonnet")  # Model loo
 - **Configuration Integration**: Pricing settings integrated into main config system for unified management
 - **Performance Optimization**: Background updates, caching, and conservative estimates balance accuracy with speed
 - **Security Considerations**: Safe JSON parsing, input validation, and network timeouts prevent security issues
+
+**11. CLI Interface Implementation Patterns**
+- **Typer Function Signature Preservation**: Use `@functools.wraps(func)` in decorators to preserve function signatures for Typer argument parsing
+- **Multiple Flag Values**: Typer supports `list[str] | None` with repeated flags automatically - users can specify `--comparison-model` multiple times
+- **Rich Integration Strategy**: Rich library provides professional terminal UI with minimal configuration - tables, panels, and progress indicators enhance user experience significantly
+- **Async-Sync Bridge Pattern**: Use `asyncio.run()` wrapper for CLI commands to bridge sync CLI interface with async backend operations
+- **Priority Hierarchy Design**: Implement clear priority chains (explicit > config > smart > fallback) for user control while maintaining good defaults
+- **Error Context Translation**: Convert internal exceptions to user-friendly CLI errors with actionable messages and appropriate exit codes
+- **Cost Protection UX**: Show cost estimates upfront and provide clear budget warnings to build user trust in financial controls
+- **Model Selection Feedback**: Always inform users whether models were "user specified" or "auto-selected" to maintain transparency and control
+- **Entry Point Configuration**: Use pyproject.toml `[project.scripts]` for clean CLI installation - avoid `if __name__ == "__main__"` conflicts with entry points
+- **Progressive Enhancement**: Start with basic functionality, then add Rich formatting, progress indicators, and advanced features incrementally
+- **Testing CLI Commands**: Use `typer.testing.CliRunner` for comprehensive CLI testing including argument parsing, output formatting, and error scenarios
 
 This implementation guide will be updated throughout development with new insights, solutions, and patterns discovered during implementation.

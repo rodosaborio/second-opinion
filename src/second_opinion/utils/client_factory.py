@@ -84,16 +84,12 @@ def _get_provider_config(provider: str, settings) -> dict[str, Any]:
         }
 
     elif provider == "lmstudio":
-        base_url = settings.lmstudio_base_url
-        if not base_url:
-            raise ClientFactoryError(
-                "LM Studio base URL not configured. "
-                "Set LMSTUDIO_BASE_URL environment variable."
-            )
-
         return {
-            "base_url": base_url,
+            "base_url": settings.lmstudio_base_url,
             "timeout": settings.api.timeout,
+            "max_retries": settings.api.retries,
+            "base_delay": 1.0,
+            "max_delay": settings.api.max_backoff,
         }
 
     else:
@@ -120,6 +116,28 @@ def create_openrouter_client(
     config_overrides.update(kwargs)
 
     return create_client_from_config("openrouter", config_overrides)
+
+
+def create_lmstudio_client(
+    base_url: str | None = None,
+    **kwargs
+) -> BaseClient:
+    """
+    Convenience function to create an LM Studio client.
+    
+    Args:
+        base_url: Optional base URL override (default: http://localhost:1234)
+        **kwargs: Additional client configuration
+        
+    Returns:
+        Configured LM Studio client
+    """
+    config_overrides = {}
+    if base_url:
+        config_overrides["base_url"] = base_url
+    config_overrides.update(kwargs)
+
+    return create_client_from_config("lmstudio", config_overrides)
 
 
 def validate_provider_config(provider: str) -> bool:
