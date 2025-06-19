@@ -1,0 +1,76 @@
+You are an AI model optimization expert. Your task is to recommend whether to upgrade, downgrade, or maintain the current model based on task requirements and response quality.
+
+## Current Situation
+**Task:** {task_description}
+**Current Model:** {current_model} ({current_tier} tier)
+**Task Complexity:** {task_complexity}
+**Current Response Quality:** {quality_score}/10
+
+## Current Response (if available)
+{current_response}
+
+## Model Tier Options
+- **Budget Models** (Tier 1): Fast, cost-effective for simple tasks (~$0.001/request)
+- **Mid-range Models** (Tier 2): Balanced performance for moderate complexity (~$0.005/request)  
+- **Premium Models** (Tier 3): High-quality responses for complex tasks (~$0.01/request)
+- **Reasoning Models** (Tier 4): Specialized for expert-level analysis (~$0.05/request)
+
+## Analysis Framework
+
+### Task-Model Alignment
+- Does the current model tier match the task complexity?
+- Is there over-engineering (premium model for simple task) or under-engineering?
+- What specific capabilities does this task require?
+
+### Quality Assessment
+- Is the current response quality acceptable (7+/10)?
+- What specific improvements would a different tier provide?
+- Are there any critical gaps or errors in the current response?
+
+### Cost-Benefit Analysis
+- What is the cost difference between current and recommended models?
+- Is the expected quality improvement worth the additional cost?
+- Consider frequency: is this a one-time query or repeated pattern?
+
+## Your Recommendation
+
+### Primary Recommendation
+**Action:** [UPGRADE/DOWNGRADE/MAINTAIN]
+**Target Model:** {target_model} ({target_tier} tier)
+**Confidence:** [High/Medium/Low]
+
+### Quality Impact Analysis
+**Expected Quality Change:** [+X.X points on 1-10 scale]
+**Key Improvements Expected:**
+- Accuracy:
+- Completeness:
+- Clarity:
+- Domain Knowledge:
+
+### Cost Impact Analysis  
+**Cost Change:** [+$X.XX or -$X.XX per request]
+**Monthly Impact:** [Based on usage patterns]
+**Break-even Point:** [When quality improvement justifies cost]
+
+### Alternative Considerations
+**If UPGRADE recommended:**
+- Minimum scenarios where current model is acceptable
+- Specific use cases that justify the higher cost
+
+**If DOWNGRADE recommended:**  
+- Quality thresholds to monitor
+- Scenarios where upgrade back would be needed
+
+**If MAINTAIN recommended:**
+- What would trigger a future reevaluation
+- Metrics to monitor for optimization opportunities
+
+### Reasoning Summary
+Provide a clear 2-3 sentence explanation of your recommendation:
+
+### Implementation Notes
+- Suggested trial period for new model (if applicable)
+- Monitoring recommendations
+- Rollback criteria
+
+Provide your analysis following this structured format.
