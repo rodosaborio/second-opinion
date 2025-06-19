@@ -9,6 +9,7 @@ This module provides the main CLI application using Typer, with support for:
 """
 
 import asyncio
+import re
 from datetime import UTC
 from decimal import Decimal
 
@@ -41,6 +42,45 @@ class CLIError(Exception):
         self.message = message
         self.exit_code = exit_code
         super().__init__(message)
+
+
+def filter_think_tags(text: str) -> str:
+    """
+    Remove thinking tags from response text.
+    
+    Filters out <think>, <thinking>, and similar tags that some models use
+    for internal reasoning that shouldn't be shown to users.
+    
+    Args:
+        text: Response text potentially containing think tags
+        
+    Returns:
+        Text with think tags removed
+    """
+    if not text:
+        return text
+    
+    # Patterns for various thinking tag formats
+    think_patterns = [
+        r'<think>.*?</think>',
+        r'<thinking>.*?</thinking>',
+        r'<thought>.*?</thought>', 
+        r'<reasoning>.*?</reasoning>',
+        r'<internal>.*?</internal>',
+        # Handle unclosed tags at start/end
+        r'^<think>.*?(?=\n\n|\n[A-Z]|\Z)',
+        r'^<thinking>.*?(?=\n\n|\n[A-Z]|\Z)',
+    ]
+    
+    filtered_text = text
+    for pattern in think_patterns:
+        filtered_text = re.sub(pattern, '', filtered_text, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Clean up extra whitespace left by removed tags
+    filtered_text = re.sub(r'\n\s*\n\s*\n', '\n\n', filtered_text)  # Multiple newlines
+    filtered_text = filtered_text.strip()
+    
+    return filtered_text
 
 
 class ComparisonModelSelector:
@@ -299,6 +339,9 @@ async def execute_second_opinion(
     cost_guard = get_cost_guard()
     evaluator = get_evaluator()
 
+    # Detect task complexity for evaluation insights
+    task_complexity = await evaluator.classify_task_complexity(prompt)
+
     # Sanitize input
     sanitized_prompt = sanitize_prompt(prompt, SecurityContext.USER_PROMPT)
     sanitized_context = (
@@ -427,6 +470,7 @@ async def execute_second_opinion(
             "evaluations": evaluations,
             "total_cost": actual_cost,
             "estimated_cost": total_estimated_cost,
+            "task_complexity": task_complexity,
         }
 
     except Exception:
@@ -482,12 +526,12 @@ def second_opinion_command(
     # Initialize model selector
     selector = ComparisonModelSelector()
 
-    # Select comparison models
+    # Select comparison models (task complexity will be detected in execute_second_opinion)
     selected_models = selector.select_models(
         primary_model=primary_model,
         tool_name="second_opinion",
         explicit_models=comparison_model,
-        task_complexity=None,  # TODO: Add task complexity detection
+        task_complexity=None,  # Will be detected in async function
         max_models=max_comparisons,
     )
 
@@ -530,10 +574,13 @@ def display_results(result: dict, verbose: bool = False):
         # Summary mode: Show truncated responses in table
         _display_summary_results(result)
 
-    # Cost summary (always shown)
+    # Cost summary and task info (always shown)
+    task_complexity = result.get("task_complexity")
+    complexity_text = f"\n[dim]Task Complexity: {task_complexity.value}[/dim]" if task_complexity else ""
+    
     cost_panel = Panel.fit(
         f"[bold]Total Cost:[/bold] ${total_cost:.4f}\n"
-        f"[dim]Estimated: ${result['estimated_cost']:.4f}[/dim]",
+        f"[dim]Estimated: ${result['estimated_cost']:.4f}[/dim]{complexity_text}",
         title="Cost Summary",
         border_style="green",
     )
@@ -562,13 +609,14 @@ def _display_summary_results(result: dict):
     table.add_column("Cost", style="green", justify="right")
     table.add_column("Quality", style="yellow", justify="center")
 
-    # Add primary response
+    # Add primary response (with think tag filtering)
+    filtered_primary = filter_think_tags(primary_response.content)
     table.add_row(
         f"{primary_response.model} (primary)",
         (
-            primary_response.content[:200] + "..."
-            if len(primary_response.content) > 200
-            else primary_response.content
+            filtered_primary[:200] + "..."
+            if len(filtered_primary) > 200
+            else filtered_primary
         ),
         f"${primary_response.cost_estimate:.4f}",
         "—",
@@ -582,12 +630,15 @@ def _display_summary_results(result: dict):
             if hasattr(eval_result, "quality_score"):
                 quality_score = f"{eval_result.quality_score:.1f}/10"
 
+        # Filter think tags from comparison response
+        filtered_comparison = filter_think_tags(comp_response.content)
+        
         table.add_row(
             comp_response.model,
             (
-                comp_response.content[:200] + "..."
-                if len(comp_response.content) > 200
-                else comp_response.content
+                filtered_comparison[:200] + "..."
+                if len(filtered_comparison) > 200
+                else filtered_comparison
             ),
             f"${comp_response.cost_estimate:.4f}",
             quality_score,
@@ -602,14 +653,15 @@ def _display_verbose_results(result: dict):
     comparison_responses = result["comparison_responses"]
     evaluations = result["evaluations"]
 
-    # Display primary response
+    # Display primary response (with think tag filtering)
     console.print(Panel.fit(
         f"[bold cyan]{primary_response.model} (Primary Model)[/bold cyan]\n"
         f"[dim]Cost: ${primary_response.cost_estimate:.4f}[/dim]",
         title="Primary Response",
         border_style="blue"
     ))
-    console.print(f"\n{primary_response.content}\n")
+    filtered_primary_verbose = filter_think_tags(primary_response.content)
+    console.print(f"\n{filtered_primary_verbose}\n")
 
     # Display comparison responses
     for i, comp_response in enumerate(comparison_responses):
@@ -625,7 +677,9 @@ def _display_verbose_results(result: dict):
             title=f"Comparison Response {i + 1}",
             border_style="green"
         ))
-        console.print(f"\n{comp_response.content}\n")
+        # Filter think tags from comparison response in verbose mode
+        filtered_comparison_verbose = filter_think_tags(comp_response.content)
+        console.print(f"\n{filtered_comparison_verbose}\n")
 
 
 # Entry point is handled by pyproject.toml script configuration

@@ -7,15 +7,19 @@ for model upgrades or downgrades.
 """
 
 import logging
+import re
 from decimal import Decimal
 from typing import Any
 
+from ..clients import create_client
 from ..prompts.manager import render_template
 from ..utils.cost_tracking import CostGuard
 from .models import (
     ComparisonResult,
     CostAnalysis,
     EvaluationCriteria,
+    Message,
+    ModelRequest,
     ModelResponse,
     RecommendationResult,
     RecommendationType,
@@ -128,19 +132,35 @@ class ResponseEvaluator:
             security_context=SecurityContext.SYSTEM_PROMPT
         )
 
-        # TODO: Make actual API call to evaluator model
-        # For now, simulate evaluation with basic heuristics
-        evaluation_result = await self._simulate_evaluation(
-            primary_response, comparison_response, criteria
-        )
+        # Make actual API call to evaluator model
+        try:
+            evaluation_result = await self._evaluate_with_model(
+                evaluation_prompt, primary_response, comparison_response, criteria, evaluator_model
+            )
+        except Exception as e:
+            logger.warning(f"Evaluation API call failed: {e}. Falling back to simulation.")
+            # Fallback to simulation if API call fails
+            evaluation_result = await self._simulate_evaluation(
+                primary_response, comparison_response, criteria
+            )
 
-        # Calculate cost analysis
+        # Calculate cost analysis with real budget data
         total_cost = primary_response.cost_estimate + comparison_response.cost_estimate
+        
+        # Get real budget information from cost guard
+        try:
+            from ..utils.cost_tracking import BudgetPeriod
+            budget_usage = await self.cost_guard.get_usage_summary(BudgetPeriod.DAILY)
+            budget_remaining = budget_usage.available
+        except Exception as e:
+            logger.warning(f"Failed to get budget data: {e}. Using fallback value.")
+            budget_remaining = Decimal("100.00")  # Fallback if cost guard fails
+        
         cost_analysis = CostAnalysis(
             estimated_cost=total_cost,
             actual_cost=total_cost,  # Simplified for now
             cost_per_token=total_cost / max(1, primary_response.usage.total_tokens + comparison_response.usage.total_tokens),
-            budget_remaining=Decimal("100.00")  # TODO: Get from cost_guard
+            budget_remaining=budget_remaining
         )
 
         # Create comparison result
@@ -533,6 +553,222 @@ class ResponseEvaluator:
         recommended_cost = model_costs.get(recommended_model, Decimal("0.005"))
 
         return recommended_cost - current_cost
+
+    async def _evaluate_with_model(
+        self,
+        evaluation_prompt: str,
+        primary_response: ModelResponse,
+        comparison_response: ModelResponse,
+        criteria: EvaluationCriteria,
+        evaluator_model: str
+    ) -> dict[str, Any]:
+        """
+        Use a real model to evaluate the comparison.
+        
+        Args:
+            evaluation_prompt: The formatted evaluation prompt
+            primary_response: Primary model response
+            comparison_response: Comparison model response
+            criteria: Evaluation criteria with weights
+            evaluator_model: Model to use for evaluation
+            
+        Returns:
+            Evaluation result dictionary with scores and reasoning
+        """
+        # Create client for the evaluator model
+        client = create_client("openrouter")
+        
+        # Prepare the request
+        messages = [Message(role="user", content=evaluation_prompt)]
+        request = ModelRequest(
+            model=evaluator_model,
+            messages=messages,
+            max_tokens=1000,
+            temperature=0.1
+        )
+        
+        # Check cost and make API call
+        estimated_cost = await client.estimate_cost(request)
+        await self.cost_guard.check_and_reserve_budget(
+            estimated_cost, "evaluation", evaluator_model
+        )
+        
+        # Make the evaluation request
+        response = await client.complete(request)
+        
+        # Record actual cost
+        await self.cost_guard.record_actual_cost(
+            reservation_id="evaluation",  # Simplified for now
+            actual_cost=response.cost_estimate,
+            model=evaluator_model,
+            operation_type="evaluation"
+        )
+        
+        # Parse the evaluation response
+        return self._parse_evaluation_response(
+            response.content, primary_response, comparison_response, criteria
+        )
+
+    def _parse_evaluation_response(
+        self,
+        evaluation_text: str,
+        primary_response: ModelResponse,
+        comparison_response: ModelResponse,
+        criteria: EvaluationCriteria
+    ) -> dict[str, Any]:
+        """
+        Parse the evaluation model's response to extract scores and reasoning.
+        
+        Args:
+            evaluation_text: The evaluator model's response
+            primary_response: Primary model response
+            comparison_response: Comparison model response
+            criteria: Evaluation criteria with weights
+            
+        Returns:
+            Dictionary with scores, winner, and reasoning
+        """
+        # Initialize with default scores
+        scores = {
+            "accuracy_primary": 7.0,
+            "accuracy_comparison": 7.0,
+            "completeness_primary": 7.0,
+            "completeness_comparison": 7.0,
+            "clarity_primary": 7.0,
+            "clarity_comparison": 7.0,
+            "usefulness_primary": 7.0,
+            "usefulness_comparison": 7.0,
+        }
+        
+        # Try to extract winners from the structured response
+        response_lower = evaluation_text.lower()
+        
+        # Look for winner declarations in each section
+        accuracy_winner = self._extract_section_winner(evaluation_text, "accuracy")
+        completeness_winner = self._extract_section_winner(evaluation_text, "completeness")
+        clarity_winner = self._extract_section_winner(evaluation_text, "clarity")
+        usefulness_winner = self._extract_section_winner(evaluation_text, "usefulness")
+        
+        # Convert winners to scores (winner gets 8.5, loser gets 6.5, tie gets 7.5)
+        if accuracy_winner == "a":
+            scores["accuracy_primary"] = 8.5
+            scores["accuracy_comparison"] = 6.5
+        elif accuracy_winner == "b":
+            scores["accuracy_primary"] = 6.5
+            scores["accuracy_comparison"] = 8.5
+        else:  # tie or unclear
+            scores["accuracy_primary"] = 7.5
+            scores["accuracy_comparison"] = 7.5
+            
+        if completeness_winner == "a":
+            scores["completeness_primary"] = 8.5
+            scores["completeness_comparison"] = 6.5
+        elif completeness_winner == "b":
+            scores["completeness_primary"] = 6.5
+            scores["completeness_comparison"] = 8.5
+        else:
+            scores["completeness_primary"] = 7.5
+            scores["completeness_comparison"] = 7.5
+            
+        if clarity_winner == "a":
+            scores["clarity_primary"] = 8.5
+            scores["clarity_comparison"] = 6.5
+        elif clarity_winner == "b":
+            scores["clarity_primary"] = 6.5
+            scores["clarity_comparison"] = 8.5
+        else:
+            scores["clarity_primary"] = 7.5
+            scores["clarity_comparison"] = 7.5
+            
+        if usefulness_winner == "a":
+            scores["usefulness_primary"] = 8.5
+            scores["usefulness_comparison"] = 6.5
+        elif usefulness_winner == "b":
+            scores["usefulness_primary"] = 6.5
+            scores["usefulness_comparison"] = 8.5
+        else:
+            scores["usefulness_primary"] = 7.5
+            scores["usefulness_comparison"] = 7.5
+        
+        # Calculate weighted overall scores
+        primary_overall = (
+            scores["accuracy_primary"] * criteria.accuracy_weight +
+            scores["completeness_primary"] * criteria.completeness_weight +
+            scores["clarity_primary"] * criteria.clarity_weight +
+            scores["usefulness_primary"] * criteria.usefulness_weight
+        )
+        
+        comparison_overall = (
+            scores["accuracy_comparison"] * criteria.accuracy_weight +
+            scores["completeness_comparison"] * criteria.completeness_weight +
+            scores["clarity_comparison"] * criteria.clarity_weight +
+            scores["usefulness_comparison"] * criteria.usefulness_weight
+        )
+        
+        # Determine overall winner
+        if abs(primary_overall - comparison_overall) < 0.5:
+            winner = "tie"
+        elif primary_overall > comparison_overall:
+            winner = "primary"
+        else:
+            winner = "comparison"
+        
+        # Extract overall recommendation if present
+        reasoning = self._extract_reasoning(evaluation_text, winner, primary_overall, comparison_overall)
+        
+        return {
+            "accuracy_score": max(scores["accuracy_primary"], scores["accuracy_comparison"]),
+            "completeness_score": max(scores["completeness_primary"], scores["completeness_comparison"]),
+            "clarity_score": max(scores["clarity_primary"], scores["clarity_comparison"]),
+            "usefulness_score": max(scores["usefulness_primary"], scores["usefulness_comparison"]),
+            "overall_score": max(primary_overall, comparison_overall),
+            "winner": winner,
+            "reasoning": reasoning
+        }
+
+    def _extract_section_winner(self, text: str, section: str) -> str:
+        """Extract winner for a specific evaluation section."""
+        # Look for patterns like "Winner: Response A" or "Winner: A" in the section
+        section_patterns = [
+            rf"{section}.*?winner:?\s*(response\s*)?([ab])",
+            rf"{section}.*?:\s*response\s*([ab])",
+            rf"winner.*?{section}.*?([ab])",
+        ]
+        
+        text_lower = text.lower()
+        for pattern in section_patterns:
+            match = re.search(pattern, text_lower, re.IGNORECASE | re.DOTALL)
+            if match:
+                # Get the last group (which should be a or b)
+                winner_letter = match.groups()[-1].lower()
+                if winner_letter in ['a', 'b']:
+                    return winner_letter
+        
+        return "tie"  # Default to tie if no clear winner found
+
+    def _extract_reasoning(self, text: str, winner: str, primary_score: float, comparison_score: float) -> str:
+        """Extract or generate reasoning from the evaluation response."""
+        # Look for "Overall Recommendation" or "Overall Assessment" section
+        reasoning_patterns = [
+            r"overall\s+recommendation:?\s*(.+?)(?:\n\n|\n#|\Z)",
+            r"overall\s+assessment:?\s*(.+?)(?:\n\n|\n#|\Z)",
+            r"summary\s+comparison:?\s*(.+?)(?:\n\n|\n#|\Z)",
+        ]
+        
+        for pattern in reasoning_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                reasoning = match.group(1).strip()
+                if len(reasoning) > 20:  # Ensure we got meaningful content
+                    return reasoning
+        
+        # Fallback to generated reasoning
+        score_diff = abs(primary_score - comparison_score)
+        if winner == "tie":
+            return f"Both responses are very similar in quality (scores within {score_diff:.1f} points). The choice between them depends on specific user preferences and context."
+        else:
+            better_model = "primary" if winner == "primary" else "comparison"
+            return f"The {better_model} model provided a superior response with a {score_diff:.1f} point advantage, showing better performance across the evaluated criteria."
 
 
 # Global evaluator instance

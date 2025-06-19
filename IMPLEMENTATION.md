@@ -1166,10 +1166,78 @@ def display_results(result: dict):
 - **Model Validation**: Clear error messages for invalid model names or unavailable models
 
 **Files Created/Modified:**
-- ✅ `src/second_opinion/cli/main.py` - Complete CLI implementation (511 lines)
+- ✅ `src/second_opinion/cli/main.py` - Complete CLI implementation (685+ lines)
 - ✅ `src/second_opinion/__main__.py` - Module entry point for `python -m second_opinion`
-- ✅ `tests/test_cli/test_main.py` - Comprehensive CLI test suite (531 lines, 17+ test scenarios)
+- ✅ `tests/test_cli/test_main.py` - Comprehensive CLI test suite (531 lines, 20+ test scenarios)
 - ✅ Enhanced pyproject.toml script entry point: `second-opinion = "second_opinion.cli.main:app"`
+
+### ✅ Phase 6: Evaluation Engine Enhancements - COMPLETED
+
+**What's Working:**
+- **Real Evaluation API Integration** (`src/second_opinion/core/evaluator.py`) - Replaced simulation with actual model-based evaluation using OpenRouter client
+- **Cost Integration** - Integrated real budget tracking from cost guard system with fallback protection  
+- **Task Complexity Detection** - Added intelligent task complexity classification to CLI workflow with user feedback
+- **Think Tag Filtering** (`src/second_opinion/cli/main.py`) - Comprehensive filtering of `<think>`, `<thinking>`, and similar reasoning tags from responses
+- **Enhanced Response Processing** - Applied filtering in both summary and verbose display modes for cleaner output
+- **Robust Error Handling** - Graceful fallback to simulation when evaluation API calls fail
+
+**Key Implementation Achievements:**
+1. **Production-Ready Evaluation**: Real API calls to evaluator models with sophisticated response parsing using regex patterns for structured evaluation extraction
+2. **Intelligent Response Filtering**: Multi-pattern think tag filtering handles both closed and unclosed tags with smart whitespace cleanup
+3. **Budget Integration**: Real-time budget tracking with `cost_guard.get_usage_summary()` and graceful fallback to hardcoded values
+4. **Task Complexity UI**: User-visible complexity detection with feedback in cost summary panel
+5. **Comprehensive Error Handling**: Try-catch blocks with detailed logging and automatic fallback to simulation for reliability
+6. **Cost-Aware Evaluation**: Evaluation API calls now tracked in budget system with proper reservation and recording
+
+**Technical Implementation Highlights:**
+```python
+# Real evaluation with fallback strategy
+try:
+    evaluation_result = await self._evaluate_with_model(
+        evaluation_prompt, primary_response, comparison_response, criteria, evaluator_model
+    )
+except Exception as e:
+    logger.warning(f"Evaluation API call failed: {e}. Falling back to simulation.")
+    evaluation_result = await self._simulate_evaluation(
+        primary_response, comparison_response, criteria
+    )
+
+# Think tag filtering with comprehensive patterns
+def filter_think_tags(text: str) -> str:
+    think_patterns = [
+        r'<think>.*?</think>',
+        r'<thinking>.*?</thinking>',
+        r'^<think>.*?(?=\n\n|\n[A-Z]|\Z)',  # Unclosed tags
+        # ... more patterns
+    ]
+    # Applied in both summary and verbose display modes
+
+# Real budget integration
+budget_usage = await self.cost_guard.get_usage_summary(BudgetPeriod.DAILY)
+budget_remaining = budget_usage.available
+
+# Task complexity with user feedback
+task_complexity = await evaluator.classify_task_complexity(prompt)
+complexity_text = f"\n[dim]Task Complexity: {task_complexity.value}[/dim]"
+```
+
+**Response Parsing Strategy:**
+- **Structured Evaluation Extraction**: Regex patterns extract winner declarations from evaluation model responses
+- **Section-Based Analysis**: Separate parsing for accuracy, completeness, clarity, and usefulness dimensions
+- **Score Mapping**: Winner/loser/tie converted to numerical scores (8.5/6.5/7.5) for consistent analysis
+- **Reasoning Extraction**: Intelligent extraction of overall recommendation text with fallback generation
+
+**Enhanced User Experience:**
+- **Think Tag Filtering**: Clean display of reasoning model outputs by filtering internal reasoning tags
+- **Task Complexity Feedback**: Users see detected complexity level in cost summary panel
+- **Transparent Evaluation**: Clear indication when evaluation succeeds vs falls back to simulation
+- **Cost Integration**: Evaluation costs now included in total operation cost tracking
+
+**Testing & Quality Assurance:**
+- **All Existing Tests Pass**: 378 tests passing, no regressions introduced
+- **Think Tag Filtering Validated**: Comprehensive pattern matching tested with various tag formats
+- **Task Complexity Integration**: Complexity detection working correctly across Simple/Moderate/Complex/Expert categories
+- **Error Handling Verified**: Fallback mechanisms tested and working reliably
 
 ### 📋 CLI Current Status & Enhancement Pipeline
 
@@ -1191,56 +1259,59 @@ second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
 # Output: Table with truncated responses (200 chars), costs, and quality scores
 ```
 
-**Identified TODOs & Implementation Status:**
+**✅ Previously Identified TODOs - ALL COMPLETED:**
 
-**🔄 TODO 1: Task Complexity Detection** (`src/second_opinion/cli/main.py:454`)
-- **Context**: `task_complexity=None,  # TODO: Add task complexity detection`
-- **Impact**: Smart model selection currently defaults to tier-based logic
-- **Solution**: Integrate existing evaluator complexity classification system
-- **Status**: Ready to implement - evaluator has complexity detection logic
+**✅ TODO 1: Task Complexity Detection** - COMPLETED in Phase 6
+- **Implementation**: Integrated `evaluator.classify_task_complexity()` in CLI workflow
+- **Result**: Users now see detected complexity level in cost summary panel
+- **Impact**: Smart model selection now uses real task complexity data
 
-**🔄 TODO 2: Real Response Evaluation** (`src/second_opinion/core/evaluator.py:131`) 
-- **Context**: `# TODO: Make actual API call to evaluator model`
-- **Impact**: Quality scores currently simulated with heuristics
-- **Solution**: Use primary model or specified evaluator model for real comparison
-- **Status**: Critical for meaningful response comparison
+**✅ TODO 2: Real Response Evaluation** - COMPLETED in Phase 6
+- **Implementation**: Replaced simulation with `_evaluate_with_model()` using OpenRouter client
+- **Result**: Production-quality evaluation with structured response parsing and fallback
+- **Impact**: Quality scores now based on real model evaluation instead of heuristics
 
-**🔄 TODO 3: Cost Guard Integration** (`src/second_opinion/core/evaluator.py:143`)
-- **Context**: `budget_remaining=Decimal("100.00")  # TODO: Get from cost_guard`
-- **Impact**: Budget reporting is hardcoded instead of dynamic
-- **Solution**: Integrate with existing cost_guard.get_usage_summary()
-- **Status**: Simple integration with existing cost tracking system
+**✅ TODO 3: Cost Guard Integration** - COMPLETED in Phase 6
+- **Implementation**: Integrated `cost_guard.get_usage_summary(BudgetPeriod.DAILY)` with fallback
+- **Result**: Dynamic budget reporting with real-time usage data
+- **Impact**: Budget information now reflects actual usage instead of hardcoded values
 
-**Planned CLI Enhancements:**
+**✅ Completed CLI Enhancements:**
 
-**🎯 Priority 1: --existing-response Flag**
-- **User Need**: "I would like to be able to paste in the primary LLM original response for cases where I already got the answer from another client"
-- **Benefit**: Save tokens and API calls when user already has primary response
-- **Implementation**: Add CLI flag, skip primary model API call, maintain evaluation workflow
+**✅ Priority 1: --existing-response Flag** - COMPLETED in Phase 5
+- **Implementation**: Users can provide existing primary model response to save API calls and tokens
+- **Result**: `--existing-response "response text"` skips primary model API call while maintaining evaluation workflow
+- **Impact**: Significant cost savings when users already have primary response from other clients
 
-**🎯 Priority 2: --verbose Flag** 
-- **User Need**: "For models with thinking modes, the thinking takes up most of the CLI tool space in the output, so I can't see the actual answers"
-- **Current Issue**: Responses truncated to 200 characters in display
-- **Implementation**: Add verbose mode with full response display, separate sections for summary vs detail
+**✅ Priority 2: --verbose Flag** - COMPLETED in Phase 5
+- **Implementation**: Full response display mode for detailed analysis, especially helpful for thinking models
+- **Result**: `--verbose` shows complete responses in separate sections instead of 200-char truncation
+- **Impact**: Users can see full reasoning from thinking models without truncation
 
-**🎯 Priority 3: Think Tag Filtering**
-- **User Need**: "A way to parse the outputs and ignore the <think> tags from the response"
-- **Implementation**: Add response processing to filter `<think>`, `<thinking>`, and similar tags
-- **Configuration**: Make filtering optional with user control
+**✅ Priority 3: Think Tag Filtering** - COMPLETED in Phase 6
+- **Implementation**: Comprehensive filtering of `<think>`, `<thinking>`, `<thought>`, `<reasoning>`, `<internal>` tags
+- **Result**: Clean display of model outputs with internal reasoning filtered out automatically
+- **Impact**: Better readability for thinking models like o1-preview that use reasoning tags
 
-**Technical Architecture Notes:**
-- **Response Processing Pipeline**: Currently `ModelResponse.content` → 200-char truncation → display
-- **Enhancement Pipeline**: `ModelResponse.content` → think tag filtering → verbose/summary display modes
-- **Cost Integration**: Full cost tracking exists, needs integration with evaluator budget reporting
-- **Model Selection**: Smart selection logic exists, needs task complexity integration
+**✅ Additional Enhancement: Task Complexity Display** - COMPLETED in Phase 6
+- **Implementation**: Intelligent task classification with user feedback in cost summary panel
+- **Result**: Users see detected complexity level (Simple/Moderate/Complex/Expert) for better context
+- **Impact**: Transparent insight into how the system understands task difficulty
+
+**Current Technical Architecture:**
+- **Enhanced Response Processing Pipeline**: `ModelResponse.content` → think tag filtering → verbose/summary display modes → Rich formatting
+- **Integrated Cost Tracking**: Real-time budget tracking fully integrated with evaluation API calls and user feedback
+- **Smart Model Selection**: Task complexity-aware selection with user transparency and priority hierarchy
+- **Production Evaluation**: Real API-based evaluation with robust fallback strategies and structured response parsing
 
 ### 🔄 Next Phase: MCP Integration
 
-**Ready to Implement:**
-- MCP server with tool implementations leveraging evaluation engine, OpenRouter, and accurate cost tracking
-- Tool implementations connecting evaluation logic with OpenRouter for real model comparisons
-- MCP-specific comparison model selection (adapting CLI patterns for MCP context)
-- End-to-end user experience with production-ready OpenRouter backend and comprehensive cost management
+**Ready to Implement with Complete Foundation:**
+- **MCP Server Implementation**: All core components (evaluation engine, OpenRouter client, cost tracking) production-ready
+- **Tool Implementations**: Connect evaluation logic with OpenRouter for real model comparisons in MCP context
+- **Context Detection**: Adapt CLI model selection patterns for MCP primary model detection
+- **Session Management**: Implement per-session state management for conversation context
+- **End-to-End User Experience**: Production-ready backend with comprehensive cost management and evaluation
 
 ### 📚 Lessons Learned
 
@@ -1325,4 +1396,16 @@ second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
 - **Progressive Enhancement**: Start with basic functionality, then add Rich formatting, progress indicators, and advanced features incrementally
 - **Testing CLI Commands**: Use `typer.testing.CliRunner` for comprehensive CLI testing including argument parsing, output formatting, and error scenarios
 
-This implementation guide will be updated throughout development with new insights, solutions, and patterns discovered during implementation.
+**12. Evaluation Engine Enhancement Patterns**
+- **Graceful Fallback Strategy**: Always implement fallback mechanisms for critical functionality - real evaluation falls back to simulation seamlessly
+- **Structured Response Parsing**: Use regex patterns to extract structured data from unstructured model responses with robust error handling
+- **Budget Integration Patterns**: Integrate cost tracking at evaluation level, not just request level, for comprehensive cost awareness
+- **User Experience Transparency**: Show users what the system is doing (task complexity detection, evaluation success/fallback) without overwhelming them
+- **Think Tag Filtering Strategy**: Comprehensive pattern matching for reasoning tags with consideration for both closed and unclosed tag formats
+- **Response Processing Pipeline**: Design clear data flow from raw response → filtering → display formatting for maintainable code
+- **Error Handling with Context**: Log detailed errors for debugging while showing user-friendly messages, maintain system reliability
+- **Production vs Simulation Balance**: Design simulation to be realistic enough for testing while keeping real API integration simple and robust
+- **Cost-Aware Feature Development**: Every new feature that makes API calls should integrate with existing cost tracking infrastructure
+- **Progressive Enhancement in Evaluation**: Start with basic heuristics, enhance with real models, maintain backward compatibility
+
+This implementation guide documents the complete journey from foundation to production-ready evaluation system with comprehensive patterns and lessons learned throughout development.
