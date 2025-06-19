@@ -9,6 +9,7 @@ This module provides the main CLI application using Typer, with support for:
 """
 
 import asyncio
+from datetime import UTC
 from decimal import Decimal
 
 import typer
@@ -288,6 +289,7 @@ async def execute_second_opinion(
     comparison_models: list[str],
     cost_limit: float,
     context: str | None = None,
+    existing_response: str | None = None,
 ) -> dict:
     """Execute the second opinion operation."""
 
@@ -312,11 +314,11 @@ async def execute_second_opinion(
         model=primary_model, messages=messages, max_tokens=1000, temperature=0.1
     )
 
-    # Check budget for all models
+    # Check budget for models (skip primary if existing response provided)
     total_estimated_cost = Decimal("0")
-    all_models = [primary_model] + comparison_models
+    models_to_run = comparison_models if existing_response else [primary_model] + comparison_models
 
-    for model in all_models:
+    for model in models_to_run:
         try:
             client = get_client_for_model(model)
             estimated_cost = await client.estimate_cost(
@@ -339,9 +341,34 @@ async def execute_second_opinion(
     )
 
     try:
-        # Execute primary model request
-        primary_client = get_client_for_model(primary_model)
-        primary_response = await primary_client.complete(request)
+        # Execute primary model request or use existing response
+        if existing_response:
+            # Sanitize the existing response
+            sanitized_existing_response = sanitize_prompt(existing_response, SecurityContext.USER_PROMPT)
+
+            # Create a mock ModelResponse for existing response
+            from datetime import datetime
+            from uuid import uuid4
+
+            from second_opinion.core.models import ModelResponse, TokenUsage
+
+            primary_response = ModelResponse(
+                content=sanitized_existing_response,
+                model=primary_model,
+                usage=TokenUsage(
+                    input_tokens=0,  # No tokens used for existing response
+                    output_tokens=0,
+                    total_tokens=0
+                ),
+                cost_estimate=Decimal("0.00"),  # No cost for existing response
+                provider="existing",
+                request_id=str(uuid4()),
+                timestamp=datetime.now(UTC)
+            )
+        else:
+            # Execute normal primary model request
+            primary_client = get_client_for_model(primary_model)
+            primary_response = await primary_client.complete(request)
 
         # Execute comparison model requests
         comparison_responses = []
@@ -382,7 +409,7 @@ async def execute_second_opinion(
                 )
                 continue
 
-        # Calculate actual cost
+        # Calculate actual cost (existing response has zero cost)
         actual_cost = primary_response.cost_estimate + sum(
             r.cost_estimate for r in comparison_responses
         )
@@ -430,14 +457,21 @@ def second_opinion_command(
     max_comparisons: int = typer.Option(
         2, "--max-comparisons", help="Maximum number of comparison models to use"
     ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show full responses instead of truncated summaries"
+    ),
+    existing_response: str | None = typer.Option(
+        None, "--existing-response", help="Provide existing primary model response to save API calls"
+    ),
 ):
     """Get a second opinion on a prompt using multiple models."""
 
     # Show operation info
+    existing_info = "\nUsing existing response (no API call)" if existing_response else ""
     console.print(
         Panel.fit(
             f"[bold]Second Opinion Analysis[/bold]\n"
-            f"Primary Model: {primary_model}\n"
+            f"Primary Model: {primary_model}{existing_info}\n"
             f"Cost Limit: ${cost_limit:.2f}",
             border_style="blue",
         )
@@ -474,19 +508,48 @@ def second_opinion_command(
                 comparison_models=selected_models,
                 cost_limit=cost_limit,
                 context=context,
+                existing_response=existing_response,
             )
         )
 
     # Display results
-    display_results(result)
+    display_results(result, verbose=verbose)
 
 
-def display_results(result: dict):
+def display_results(result: dict, verbose: bool = False):
     """Display comparison results with rich formatting."""
+    evaluations = result["evaluations"]
+    total_cost = result["total_cost"]
+
+    if verbose:
+        # Verbose mode: Show full responses in separate sections
+        _display_verbose_results(result)
+    else:
+        # Summary mode: Show truncated responses in table
+        _display_summary_results(result)
+
+    # Cost summary (always shown)
+    cost_panel = Panel.fit(
+        f"[bold]Total Cost:[/bold] ${total_cost:.4f}\n"
+        f"[dim]Estimated: ${result['estimated_cost']:.4f}[/dim]",
+        title="Cost Summary",
+        border_style="green",
+    )
+    console.print(cost_panel)
+
+    # Show recommendations if available
+    if evaluations:
+        console.print("\n[bold]Recommendations:[/bold]")
+        for evaluation in evaluations:
+            if hasattr(evaluation, "recommendation") and evaluation.recommendation:
+                console.print(f"• {evaluation.recommendation}")
+
+
+def _display_summary_results(result: dict):
+    """Display results in summary table format (original behavior)."""
     primary_response = result["primary_response"]
     comparison_responses = result["comparison_responses"]
     evaluations = result["evaluations"]
-    total_cost = result["total_cost"]
 
     # Create comparison table
     table = Table(
@@ -530,21 +593,37 @@ def display_results(result: dict):
 
     console.print(table)
 
-    # Cost summary
-    cost_panel = Panel.fit(
-        f"[bold]Total Cost:[/bold] ${total_cost:.4f}\n"
-        f"[dim]Estimated: ${result['estimated_cost']:.4f}[/dim]",
-        title="Cost Summary",
-        border_style="green",
-    )
-    console.print(cost_panel)
 
-    # Show recommendations if available
-    if evaluations:
-        console.print("\n[bold]Recommendations:[/bold]")
-        for evaluation in evaluations:
-            if hasattr(evaluation, "recommendation") and evaluation.recommendation:
-                console.print(f"• {evaluation.recommendation}")
+def _display_verbose_results(result: dict):
+    """Display results in verbose format with full responses."""
+    primary_response = result["primary_response"]
+    comparison_responses = result["comparison_responses"]
+    evaluations = result["evaluations"]
+
+    # Display primary response
+    console.print(Panel.fit(
+        f"[bold cyan]{primary_response.model} (Primary Model)[/bold cyan]\n"
+        f"[dim]Cost: ${primary_response.cost_estimate:.4f}[/dim]",
+        title="Primary Response",
+        border_style="blue"
+    ))
+    console.print(f"\n{primary_response.content}\n")
+
+    # Display comparison responses
+    for i, comp_response in enumerate(comparison_responses):
+        quality_info = ""
+        if i < len(evaluations) and evaluations[i]:
+            eval_result = evaluations[i]
+            if hasattr(eval_result, "quality_score"):
+                quality_info = f" | Quality: {eval_result.quality_score:.1f}/10"
+
+        console.print(Panel.fit(
+            f"[bold cyan]{comp_response.model}[/bold cyan]\n"
+            f"[dim]Cost: ${comp_response.cost_estimate:.4f}{quality_info}[/dim]",
+            title=f"Comparison Response {i + 1}",
+            border_style="green"
+        ))
+        console.print(f"\n{comp_response.content}\n")
 
 
 # Entry point is handled by pyproject.toml script configuration

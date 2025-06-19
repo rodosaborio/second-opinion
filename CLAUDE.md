@@ -121,9 +121,26 @@ uv run black . && uv run ruff check . && uv run mypy src/
 
 ### Running the Application
 ```bash
-# CLI usage
+# CLI usage - Basic model comparison
 uv run second-opinion --help
-uv run second-opinion --primary-model "anthropic/claude-3-5-sonnet" second_opinion "What's 2+2?"
+uv run second-opinion --primary-model "anthropic/claude-3-5-sonnet" "What's 2+2?"
+
+# CLI usage - Advanced features (NEW!)
+# Verbose mode for full responses (helpful for thinking models)
+uv run second-opinion --primary-model "anthropic/claude-3-5-sonnet" --verbose "Complex question here"
+
+# Use existing response to save API calls and tokens
+uv run second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
+  --existing-response "The capital of France is Paris." \
+  "What's the capital of France?"
+
+# Multiple comparison models with context
+uv run second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
+  --comparison-model "openai/gpt-4o" \
+  --comparison-model "google/gemini-pro" \
+  --context "This is for academic research" \
+  --verbose \
+  "Analyze the economic impact of climate change"
 
 # Start MCP server
 uv run python -m second_opinion.mcp.server

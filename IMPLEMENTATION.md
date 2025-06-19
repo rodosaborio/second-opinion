@@ -1171,6 +1171,69 @@ def display_results(result: dict):
 - ✅ `tests/test_cli/test_main.py` - Comprehensive CLI test suite (531 lines, 17+ test scenarios)
 - ✅ Enhanced pyproject.toml script entry point: `second-opinion = "second_opinion.cli.main:app"`
 
+### 📋 CLI Current Status & Enhancement Pipeline
+
+**Current CLI Architecture:**
+The CLI is implemented as a **model comparison tool** that:
+- Accepts a prompt and primary model specification
+- Automatically selects or accepts explicit comparison models
+- Sends the same prompt to all models simultaneously
+- Displays responses in a Rich-formatted table with cost tracking
+- Provides response evaluation (currently simulated)
+
+**Core Workflow:**
+```bash
+# Current usage pattern
+second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
+  --comparison-model "openai/gpt-4o" \
+  "What's the capital of France?"
+
+# Output: Table with truncated responses (200 chars), costs, and quality scores
+```
+
+**Identified TODOs & Implementation Status:**
+
+**🔄 TODO 1: Task Complexity Detection** (`src/second_opinion/cli/main.py:454`)
+- **Context**: `task_complexity=None,  # TODO: Add task complexity detection`
+- **Impact**: Smart model selection currently defaults to tier-based logic
+- **Solution**: Integrate existing evaluator complexity classification system
+- **Status**: Ready to implement - evaluator has complexity detection logic
+
+**🔄 TODO 2: Real Response Evaluation** (`src/second_opinion/core/evaluator.py:131`) 
+- **Context**: `# TODO: Make actual API call to evaluator model`
+- **Impact**: Quality scores currently simulated with heuristics
+- **Solution**: Use primary model or specified evaluator model for real comparison
+- **Status**: Critical for meaningful response comparison
+
+**🔄 TODO 3: Cost Guard Integration** (`src/second_opinion/core/evaluator.py:143`)
+- **Context**: `budget_remaining=Decimal("100.00")  # TODO: Get from cost_guard`
+- **Impact**: Budget reporting is hardcoded instead of dynamic
+- **Solution**: Integrate with existing cost_guard.get_usage_summary()
+- **Status**: Simple integration with existing cost tracking system
+
+**Planned CLI Enhancements:**
+
+**🎯 Priority 1: --existing-response Flag**
+- **User Need**: "I would like to be able to paste in the primary LLM original response for cases where I already got the answer from another client"
+- **Benefit**: Save tokens and API calls when user already has primary response
+- **Implementation**: Add CLI flag, skip primary model API call, maintain evaluation workflow
+
+**🎯 Priority 2: --verbose Flag** 
+- **User Need**: "For models with thinking modes, the thinking takes up most of the CLI tool space in the output, so I can't see the actual answers"
+- **Current Issue**: Responses truncated to 200 characters in display
+- **Implementation**: Add verbose mode with full response display, separate sections for summary vs detail
+
+**🎯 Priority 3: Think Tag Filtering**
+- **User Need**: "A way to parse the outputs and ignore the <think> tags from the response"
+- **Implementation**: Add response processing to filter `<think>`, `<thinking>`, and similar tags
+- **Configuration**: Make filtering optional with user control
+
+**Technical Architecture Notes:**
+- **Response Processing Pipeline**: Currently `ModelResponse.content` → 200-char truncation → display
+- **Enhancement Pipeline**: `ModelResponse.content` → think tag filtering → verbose/summary display modes
+- **Cost Integration**: Full cost tracking exists, needs integration with evaluator budget reporting
+- **Model Selection**: Smart selection logic exists, needs task complexity integration
+
 ### 🔄 Next Phase: MCP Integration
 
 **Ready to Implement:**
