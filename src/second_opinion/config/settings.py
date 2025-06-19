@@ -93,6 +93,16 @@ class AnalyticsConfig(BaseModel):
     export_enabled: bool = Field(default=True, description="Enable data export")
 
 
+class PricingConfig(BaseModel):
+    """Pricing configuration."""
+    enabled: bool = Field(default=True, description="Enable dynamic pricing updates")
+    cache_ttl_hours: int = Field(default=1, ge=1, le=168, description="Pricing cache TTL in hours")
+    fetch_timeout: float = Field(default=30.0, ge=5.0, le=300.0, description="HTTP fetch timeout in seconds")
+    auto_update_on_startup: bool = Field(default=True, description="Automatically update pricing on startup")
+    fallback_conservative: bool = Field(default=True, description="Use conservative estimates for unknown models")
+    backup_file_path: Optional[str] = Field(default=None, description="Custom backup pricing file path")
+
+
 class DevelopmentConfig(BaseModel):
     """Development-specific configuration."""
     debug_mode: bool = Field(default=False, description="Enable debug mode")
@@ -136,6 +146,7 @@ class AppSettings(BaseSettings):
     mcp: MCPConfig = Field(default_factory=MCPConfig)
     performance: PerformanceConfig = Field(default_factory=PerformanceConfig)
     analytics: AnalyticsConfig = Field(default_factory=AnalyticsConfig)
+    pricing: PricingConfig = Field(default_factory=PricingConfig)
     development: DevelopmentConfig = Field(default_factory=DevelopmentConfig)
     
     model_config = SettingsConfigDict(

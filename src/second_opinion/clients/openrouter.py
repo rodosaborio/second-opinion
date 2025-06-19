@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 
 from ..core.models import ModelRequest, ModelResponse, TokenUsage
+from ..utils.pricing import get_pricing_manager
 from ..utils.sanitization import SecurityError
 from .base import (
     AuthenticationError,
@@ -57,15 +58,8 @@ class OpenRouterClient(BaseClient):
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
         )
 
-        # Default cost estimates (conservative fallbacks)
-        self._default_costs = {
-            "gpt-3.5-turbo": {"input": Decimal("0.0015"), "output": Decimal("0.002")},
-            "gpt-4": {"input": Decimal("0.03"), "output": Decimal("0.06")},
-            "gpt-4o": {"input": Decimal("0.005"), "output": Decimal("0.015")},
-            "claude-3-sonnet": {"input": Decimal("0.003"), "output": Decimal("0.015")},
-            "claude-3-5-sonnet": {"input": Decimal("0.003"), "output": Decimal("0.015")},
-            "claude-3-haiku": {"input": Decimal("0.00025"), "output": Decimal("0.00125")},
-        }
+        # Get pricing manager for dynamic cost calculation
+        self._pricing_manager = get_pricing_manager()
 
         logger.info("Initialized OpenRouter client")
 
@@ -124,22 +118,12 @@ class OpenRouterClient(BaseClient):
         input_tokens = self._estimate_input_tokens(request)
         output_tokens = request.max_tokens or 1000  # Conservative estimate
 
-        # Get cost rates for model
-        model_key = self._normalize_model_name(request.model)
-        costs = self._default_costs.get(model_key)
+        # Use pricing manager for dynamic cost calculation
+        total_cost, source = self._pricing_manager.estimate_cost(
+            request.model, input_tokens, output_tokens
+        )
 
-        if not costs:
-            # Conservative fallback for unknown models
-            logger.warning(f"No cost data for model {request.model}, using fallback")
-            return Decimal("0.10")
-
-        # Calculate cost
-        input_cost = Decimal(input_tokens) * costs["input"] / 1000
-        output_cost = Decimal(output_tokens) * costs["output"] / 1000
-
-        total_cost = input_cost + output_cost
-        logger.debug(f"Estimated cost for {request.model}: ${total_cost}")
-
+        logger.debug(f"Estimated cost for {request.model}: ${total_cost} (source: {source})")
         return total_cost
 
     async def get_available_models(self) -> list[ModelInfo]:
@@ -384,43 +368,27 @@ class OpenRouterClient(BaseClient):
         except Exception as e:
             logger.debug(f"Failed to get model cost info from available models: {e}")
 
-        # Fallback to default costs
-        model_key = self._normalize_model_name(model_name)
-        costs = self._default_costs.get(model_key)
-
-        if costs:
+        # Fallback to pricing manager
+        pricing_info = self._pricing_manager.get_model_pricing(model_name)
+        if pricing_info:
             return ModelInfo(
                 name=model_name,
                 provider=self.provider_name,
-                input_cost_per_1k=costs["input"],
-                output_cost_per_1k=costs["output"]
+                input_cost_per_1k=pricing_info.input_cost_per_1k_tokens,
+                output_cost_per_1k=pricing_info.output_cost_per_1k_tokens,
+                max_tokens=pricing_info.max_tokens,
+                context_window=pricing_info.max_tokens,
+                supports_function_calling=pricing_info.supports_function_calling
             )
 
-        # Ultimate fallback
+        # Ultimate fallback with conservative estimates
         return ModelInfo(
             name=model_name,
             provider=self.provider_name,
-            input_cost_per_1k=Decimal("0.001"),
-            output_cost_per_1k=Decimal("0.002")
+            input_cost_per_1k=Decimal("0.01"),  # More conservative fallback
+            output_cost_per_1k=Decimal("0.02")
         )
 
-    def _normalize_model_name(self, model_name: str) -> str:
-        """Normalize OpenRouter model name to key for cost lookup."""
-        # Remove provider prefix if present
-        if "/" in model_name:
-            model_name = model_name.split("/", 1)[1]
-
-        # Common mappings
-        mappings = {
-            "gpt-3.5-turbo": "gpt-3.5-turbo",
-            "gpt-4": "gpt-4",
-            "gpt-4o": "gpt-4o",
-            "claude-3-sonnet-20240229": "claude-3-sonnet",
-            "claude-3-5-sonnet-20241022": "claude-3-5-sonnet",
-            "claude-3-haiku-20240307": "claude-3-haiku",
-        }
-
-        return mappings.get(model_name, model_name)
 
     def _estimate_input_tokens(self, request: ModelRequest) -> int:
         """Estimate input tokens for a request."""

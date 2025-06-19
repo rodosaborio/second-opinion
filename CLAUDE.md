@@ -52,8 +52,15 @@ Always refer to IMPLEMENTATION.md when:
 - **Production-Ready Implementation** - Full OpenRouter API compliance, security validation, type safety, and comprehensive testing
 - **Enhanced Testing** - 58 additional tests (39 OpenRouter + 19 factory) with 95%+ functional coverage and security scenarios
 
+### ✅ Completed Components (Phase 4b: Dynamic Pricing Integration)
+- **Dynamic Pricing Manager** (`src/second_opinion/utils/pricing.py`) - LiteLLM integration with 1,117+ models, real-time pricing, caching, and intelligent fallbacks
+- **Pricing Configuration** (`src/second_opinion/config/settings.py`) - Full configuration system with TTL, auto-update, and backup settings
+- **OpenRouter Integration** - Real-time cost estimates using comprehensive pricing data instead of hardcoded values
+- **Cost Tracking Enhancement** - Updated to use pricing manager with backward compatibility for legacy systems
+- **Comprehensive Testing** - 50+ additional tests covering pricing manager, integration scenarios, security, and edge cases
+
 ### 🔄 Next: CLI Interface & MCP Integration
-Ready to implement CLI interface and MCP server using the complete OpenRouter client foundation.
+Ready to implement CLI interface and MCP server using the complete OpenRouter client foundation with accurate dynamic pricing.
 
 ## Development Commands
 
@@ -281,6 +288,13 @@ Required environment variables (see `.env.example`):
 - `DATABASE_ENCRYPTION_KEY`: Local database encryption key
 - `DEFAULT_COST_LIMIT`: Default per-request cost limit
 
+### Pricing Configuration Variables
+- `PRICING__ENABLED`: Enable/disable dynamic pricing (default: true)
+- `PRICING__CACHE_TTL_HOURS`: Pricing cache TTL in hours (default: 1)
+- `PRICING__FETCH_TIMEOUT`: HTTP fetch timeout in seconds (default: 30.0)
+- `PRICING__AUTO_UPDATE_ON_STARTUP`: Auto-update pricing on startup (default: true)
+- `PRICING__BACKUP_FILE_PATH`: Custom backup file path (optional)
+
 ## 🔧 Development Patterns & Learnings
 
 ### Configuration Management
@@ -444,4 +458,38 @@ rendered = await prompt_manager.render_prompt(
 ✅ Cost Effectiveness Analysis: Optimal model identification
 
 # Test coverage: 84 tests passing with 95%+ coverage on new components
+```
+
+### Phase 4b Dynamic Pricing System
+
+```python
+# Real-time pricing for 1,117+ models
+pricing_manager = get_pricing_manager()
+cache_info = pricing_manager.get_cache_info()
+# Returns: {"models": 1117, "source": "backup", "is_expired": false}
+
+# Accurate cost estimation
+cost, source = pricing_manager.estimate_cost("gpt-4", 1000, 500)
+# Returns: (Decimal("0.06000"), "pricing_data_backup")
+
+# OpenRouter client integration
+client = OpenRouterClient(api_key="sk-or-...")
+estimated_cost = await client.estimate_cost(request)
+# Uses dynamic pricing automatically
+
+# Cost tracking integration  
+cost_guard = get_cost_guard()
+estimated_cost = await cost_guard.estimate_request_cost(request)
+# Uses pricing manager by default, legacy mode for compatibility
+```
+
+### Integration Test Results
+
+```bash
+# Complete dynamic pricing integration test:
+✅ Pricing Manager: 1,117 models loaded from LiteLLM data
+✅ GPT-4 Cost Estimate: $0.06 for 1000 input + 500 output tokens
+✅ OpenRouter Client: $0.06009 (nearly identical, slight token estimation differences)
+✅ Cost Tracking: Successfully integrated with pricing manager
+✅ 50+ new tests passing with comprehensive coverage
 ```

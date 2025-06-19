@@ -1026,17 +1026,39 @@ logger.info(
 5. **Performance Optimization**: HTTP connection pooling, model metadata caching, exponential backoff retry logic
 6. **Factory Pattern**: Clean provider abstraction ready for additional clients (LM Studio, direct Anthropic, etc.)
 
+### ✅ Phase 4b: Dynamic Pricing Integration - COMPLETED
+
+**What's Working:**
+- **Dynamic Pricing Manager** (`src/second_opinion/utils/pricing.py`) - LiteLLM integration with 1,117+ models, caching, and fallback system
+- **OpenRouter Client Pricing Integration** - Real-time cost estimates using comprehensive pricing data
+- **Cost Tracking Enhancement** - Updated to use pricing manager with backward compatibility
+- **Pricing Configuration** - Full configuration system with TTL, timeouts, and auto-update settings
+- **Comprehensive Testing** - 50+ new tests covering pricing manager, integration, security, and edge cases
+
+**Key Implementation Achievements:**
+1. **LiteLLM Integration**: Fetches and caches pricing data for 1,117+ AI models from LiteLLM's continuously updated database
+2. **Intelligent Fallbacks**: Conservative cost estimates with model tier-based fallback logic for unknown models
+3. **Performance Optimization**: Thread-safe caching with configurable TTL, local backup system, and background updates
+4. **Configuration Integration**: Full settings system with `PricingConfig` class and environment variable support
+5. **Backward Compatibility**: Legacy pricing mode maintained while migrating to dynamic pricing by default
+6. **Production Reliability**: Local backup ensures functionality without network access, graceful error handling
+
 **Technical Implementation Highlights:**
 ```python
-# Complete OpenRouter integration
+# Complete OpenRouter integration with dynamic pricing
 client = create_client("openrouter", api_key="sk-or-...")
 models = await client.get_available_models()  # Cached discovery
-cost = await client.estimate_cost(request)    # Pre-flight estimation
+cost = await client.estimate_cost(request)    # Dynamic pricing estimation
 response = await client.complete(request)     # Full API compliance
 
 # Factory pattern for multiple providers
 client = create_client_from_config("openrouter")  # Config-based creation
 configured_providers = get_configured_providers() # Validation utilities
+
+# Dynamic pricing system
+pricing_manager = get_pricing_manager()
+cost, source = pricing_manager.estimate_cost("gpt-4", 1000, 500)  # Real-time pricing
+pricing_info = pricing_manager.get_model_pricing("claude-3-sonnet")  # Model lookup
 ```
 
 **Security & Quality Validated:**
@@ -1044,14 +1066,15 @@ configured_providers = get_configured_providers() # Validation utilities
 - **Code Quality**: All ruff linting rules passed, black formatting applied
 - **Security Testing**: Malicious input handling, API key protection, injection prevention
 - **Integration Testing**: End-to-end workflow validation with mocked API responses
+- **Pricing Security**: Safe JSON parsing, input validation, conservative fallbacks
 
 ### 🔄 Next Phase: CLI Interface & MCP Integration
 
 **Ready to Implement:**
-- CLI interface with primary model context management using OpenRouter client
-- MCP server with tool implementations leveraging evaluation engine and OpenRouter
+- CLI interface with primary model context management using OpenRouter client and dynamic pricing
+- MCP server with tool implementations leveraging evaluation engine, OpenRouter, and accurate cost tracking
 - Tool implementations connecting evaluation logic with OpenRouter for real model comparisons
-- End-to-end user experience with production-ready OpenRouter backend
+- End-to-end user experience with production-ready OpenRouter backend and comprehensive cost management
 
 ### 📚 Lessons Learned
 
@@ -1112,5 +1135,15 @@ configured_providers = get_configured_providers() # Validation utilities
 - **Type Safety in Large Interfaces**: Comprehensive type annotations catch interface mismatches early and improve IDE support
 - **Mock Testing Strategy**: Realistic HTTP response mocking enables comprehensive testing without external API dependencies
 - **Security Integration**: Leveraging existing sanitization infrastructure ensures consistent security posture across all providers
+
+**10. Dynamic Pricing System Implementation Patterns**
+- **LiteLLM Integration Strategy**: External pricing data source provides comprehensive, up-to-date model pricing without maintenance overhead
+- **Caching Architecture**: Multi-level caching (memory + disk) with TTL ensures performance while maintaining accuracy
+- **Fallback System Design**: Local backup → Conservative estimates → Graceful degradation ensures reliability
+- **Thread Safety Approach**: RLock usage with proper scope minimizes contention while ensuring data consistency
+- **Model Name Normalization**: Strict matching prevents false positives while allowing reasonable variations
+- **Configuration Integration**: Pricing settings integrated into main config system for unified management
+- **Performance Optimization**: Background updates, caching, and conservative estimates balance accuracy with speed
+- **Security Considerations**: Safe JSON parsing, input validation, and network timeouts prevent security issues
 
 This implementation guide will be updated throughout development with new insights, solutions, and patterns discovered during implementation.

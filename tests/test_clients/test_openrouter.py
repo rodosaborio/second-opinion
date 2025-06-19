@@ -248,7 +248,8 @@ class TestOpenRouterClient:
         
         cost = await client.estimate_cost(request)
         
-        assert cost == Decimal("0.10")  # Fallback cost
+        # Pricing manager now provides conservative fallback based on model tier
+        assert cost == Decimal("0.02")  # Conservative fallback for low-tier unknown models
     
     @pytest.mark.asyncio
     async def test_get_available_models_success(self, client):
@@ -326,12 +327,6 @@ class TestOpenRouterClient:
         with pytest.raises(ClientError, match="Failed to retrieve models"):
             await client.get_available_models()
     
-    def test_normalize_model_name(self, client):
-        """Test model name normalization."""
-        assert client._normalize_model_name("openai/gpt-3.5-turbo") == "gpt-3.5-turbo"
-        assert client._normalize_model_name("gpt-4") == "gpt-4"
-        assert client._normalize_model_name("anthropic/claude-3-sonnet-20240229") == "claude-3-sonnet"
-        assert client._normalize_model_name("unknown-model") == "unknown-model"
     
     def test_estimate_input_tokens(self, client):
         """Test input token estimation."""

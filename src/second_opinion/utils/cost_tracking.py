@@ -15,6 +15,7 @@ from enum import Enum
 import uuid
 
 from ..core.models import ModelRequest, BudgetCheck, CostAnalysis
+from ..utils.pricing import get_pricing_manager
 from ..utils.sanitization import validate_cost_limit
 
 
@@ -372,24 +373,18 @@ class CostGuard:
     async def estimate_request_cost(
         self,
         request: ModelRequest,
-        model_pricing: Dict[str, Tuple[Decimal, Decimal]]
+        model_pricing: Optional[Dict[str, Tuple[Decimal, Decimal]]] = None
     ) -> Decimal:
         """
-        Estimate cost for a model request.
+        Estimate cost for a model request using dynamic pricing.
         
         Args:
             request: Model request to estimate
-            model_pricing: Dict mapping model names to (input_cost_per_1k, output_cost_per_1k)
+            model_pricing: Optional legacy pricing dict (deprecated, uses pricing manager by default)
             
         Returns:
             Estimated cost
         """
-        if request.model not in model_pricing:
-            # Conservative fallback estimate
-            return Decimal('0.10')
-        
-        input_cost_per_1k, output_cost_per_1k = model_pricing[request.model]
-        
         # Estimate input tokens from messages
         input_tokens = 0
         for message in request.messages:
@@ -402,11 +397,27 @@ class CostGuard:
         max_tokens = request.max_tokens or 1000
         estimated_output_tokens = min(max_tokens, max(100, input_tokens // 2))
         
-        # Calculate costs
-        input_cost = Decimal(input_tokens) * input_cost_per_1k / 1000
-        output_cost = Decimal(estimated_output_tokens) * output_cost_per_1k / 1000
-        
-        return input_cost + output_cost
+        # Use pricing manager for dynamic cost calculation
+        if model_pricing is None:
+            pricing_manager = get_pricing_manager()
+            cost, source = pricing_manager.estimate_cost(request.model, input_tokens, estimated_output_tokens)
+            logger.debug(f"Estimated cost for {request.model}: ${cost} (source: {source})")
+            return cost
+        else:
+            # Legacy pricing mode (for backward compatibility)
+            logger.warning("Using legacy pricing mode, consider migrating to pricing manager")
+            
+            if request.model not in model_pricing:
+                # Conservative fallback estimate
+                return Decimal('0.10')
+            
+            input_cost_per_1k, output_cost_per_1k = model_pricing[request.model]
+            
+            # Calculate costs
+            input_cost = Decimal(input_tokens) * input_cost_per_1k / 1000
+            output_cost = Decimal(estimated_output_tokens) * output_cost_per_1k / 1000
+            
+            return input_cost + output_cost
     
     async def _check_all_budget_periods(self, additional_cost: Decimal) -> List[BudgetUsage]:
         """Check all budget periods with additional cost."""
