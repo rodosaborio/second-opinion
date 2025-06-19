@@ -214,4 +214,18 @@ uv run pytest --timeout=30 -x --tb=short
 uv run pytest -v --setup-show tests/test_clients/test_openrouter.py
 
 # Profile test performance
-uv run pytest --durations=10 --timeout=30[... rest of the previous content remains the same ...]
+uv run pytest --durations=10 --timeout=30
+```
+
+## Testing Best Practices
+
+- Always use async-friendly testing techniques
+- Implement comprehensive test isolation
+- Prevent global state pollution
+- Use mock objects to simulate complex scenarios
+- Implement timeouts to catch hanging tests
+- Maintain high test coverage (85%+)
+- Write security-focused test scenarios
+- Use fixtures for setup and teardown
+- Leverage pytest markers for test categorization
+- Profile and optimize test performance
