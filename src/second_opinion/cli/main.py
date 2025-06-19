@@ -205,7 +205,41 @@ class ComparisonModelSelector:
 
     def _is_valid_model_name(self, model: str) -> bool:
         """Basic validation of model name format."""
-        return "/" in model and len(model.split("/")) == 2
+        # Allow both provider/model format and direct model names (for local models)
+        return (
+            "/" in model and len(model.split("/")) == 2
+        ) or self._is_local_model_name(  # Provider/model format
+            model
+        )  # Local model format
+
+    def _is_local_model_name(self, model: str) -> bool:
+        """Check if this looks like a local model name."""
+        # Local models typically don't have a provider prefix and may contain specific patterns
+        local_patterns = [
+            "mlx",  # MLX models
+            "qwen",  # Qwen models
+            "llama",  # Llama models
+            "mistral",  # Mistral models
+            "codestral",  # Codestral models
+            "devstral",  # Devstral models
+        ]
+        model_lower = model.lower()
+        return (
+            any(pattern in model_lower for pattern in local_patterns)
+            and "/" not in model
+        )
+
+
+def get_client_for_model(model: str):
+    """Determine the appropriate client for a given model."""
+    selector = ComparisonModelSelector()
+
+    if selector._is_local_model_name(model):
+        # Local model - use LM Studio
+        return create_client("lmstudio")
+    else:
+        # Cloud model - use OpenRouter
+        return create_client("openrouter")
 
 
 def run_async(coro):
@@ -284,11 +318,15 @@ async def execute_second_opinion(
 
     for model in all_models:
         try:
-            client = create_client("openrouter")
-            estimated_cost = await client.estimate_cost(request._replace(model=model))
+            client = get_client_for_model(model)
+            estimated_cost = await client.estimate_cost(
+                request.model_copy(update={"model": model})
+            )
             total_estimated_cost += estimated_cost
         except Exception as e:
-            raise CLIError(f"Failed to estimate cost for model {model}: {str(e)}") from e
+            raise CLIError(
+                f"Failed to estimate cost for model {model}: {str(e)}"
+            ) from e
 
     if total_estimated_cost > Decimal(str(cost_limit)):
         raise CLIError(
@@ -302,15 +340,17 @@ async def execute_second_opinion(
 
     try:
         # Execute primary model request
-        primary_client = create_client("openrouter")
+        primary_client = get_client_for_model(primary_model)
         primary_response = await primary_client.complete(request)
 
         # Execute comparison model requests
         comparison_responses = []
         for model in comparison_models:
             try:
-                client = create_client("openrouter")
-                response = await client.complete(request._replace(model=model))
+                client = get_client_for_model(model)
+                response = await client.complete(
+                    request.model_copy(update={"model": model})
+                )
                 comparison_responses.append(response)
             except Exception as e:
                 console.print(

@@ -7,11 +7,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.second_opinion.clients.base import BaseClient
+from src.second_opinion.clients.lmstudio import LMStudioClient
 from src.second_opinion.clients.openrouter import OpenRouterClient
 from src.second_opinion.utils.client_factory import (
     ClientFactoryError,
     _get_provider_config,
     create_client_from_config,
+    create_lmstudio_client,
     create_openrouter_client,
     get_configured_providers,
     validate_provider_config,
@@ -100,6 +102,47 @@ class TestClientFactory:
         mock_create.assert_called_once_with("openrouter", {})
         assert client == mock_client
 
+    @patch('src.second_opinion.utils.client_factory.get_settings')
+    def test_create_client_from_config_lmstudio(self, mock_get_settings):
+        """Test creating LM Studio client from config."""
+        mock_settings = MagicMock()
+        mock_settings.lmstudio_base_url = "http://localhost:1234"
+        mock_settings.api.timeout = 30
+        mock_settings.api.retries = 2
+        mock_settings.api.max_backoff = 60
+        mock_get_settings.return_value = mock_settings
+
+        client = create_client_from_config("lmstudio")
+
+        assert isinstance(client, LMStudioClient)
+        assert client.provider_name == "lmstudio"
+        assert client.base_url == "http://localhost:1234"
+
+    @patch('src.second_opinion.utils.client_factory.create_client_from_config')
+    def test_create_lmstudio_client_convenience(self, mock_create):
+        """Test convenience function for creating LM Studio client."""
+        mock_client = MagicMock()
+        mock_create.return_value = mock_client
+
+        client = create_lmstudio_client(base_url="http://192.168.1.100:1234", timeout=45)
+
+        mock_create.assert_called_once_with(
+            "lmstudio",
+            {"base_url": "http://192.168.1.100:1234", "timeout": 45}
+        )
+        assert client == mock_client
+
+    @patch('src.second_opinion.utils.client_factory.create_client_from_config')
+    def test_create_lmstudio_client_no_overrides(self, mock_create):
+        """Test convenience function without overrides."""
+        mock_client = MagicMock()
+        mock_create.return_value = mock_client
+
+        client = create_lmstudio_client()
+
+        mock_create.assert_called_once_with("lmstudio", {})
+        assert client == mock_client
+
 
 class TestProviderConfig:
     """Test provider configuration functionality."""
@@ -137,23 +180,20 @@ class TestProviderConfig:
         mock_settings = MagicMock()
         mock_settings.lmstudio_base_url = "http://localhost:1234"
         mock_settings.api.timeout = 30
+        mock_settings.api.retries = 2
+        mock_settings.api.max_backoff = 60
 
         config = _get_provider_config("lmstudio", mock_settings)
 
         expected_config = {
             "base_url": "http://localhost:1234",
             "timeout": 30,
+            "max_retries": 2,
+            "base_delay": 1.0,
+            "max_delay": 60,
         }
 
         assert config == expected_config
-
-    def test_get_provider_config_lmstudio_missing_url(self):
-        """Test getting LM Studio config with missing base URL."""
-        mock_settings = MagicMock()
-        mock_settings.lmstudio_base_url = None
-
-        with pytest.raises(ClientFactoryError, match="LM Studio base URL not configured"):
-            _get_provider_config("lmstudio", mock_settings)
 
     def test_get_provider_config_unknown_provider(self):
         """Test getting config for unknown provider."""
@@ -281,3 +321,42 @@ class TestClientFactoryIntegration:
             # Test without override
             client2 = create_openrouter_client()
             assert client2.api_key == "sk-or-default"
+
+    @pytest.mark.integration
+    def test_lmstudio_factory_creates_working_client(self):
+        """Test that LM Studio factory creates a working client."""
+        with patch('src.second_opinion.utils.client_factory.get_settings') as mock_get_settings:
+            mock_settings = MagicMock()
+            mock_settings.lmstudio_base_url = "http://localhost:1234"
+            mock_settings.api.timeout = 30
+            mock_settings.api.retries = 2
+            mock_settings.api.max_backoff = 60
+            mock_get_settings.return_value = mock_settings
+
+            client = create_client_from_config("lmstudio")
+
+            assert isinstance(client, BaseClient)
+            assert isinstance(client, LMStudioClient)
+            assert client.provider_name == "lmstudio"
+            assert client.base_url == "http://localhost:1234"
+            assert client.timeout == 30
+            assert client.max_retries == 2
+
+    @pytest.mark.integration
+    def test_lmstudio_convenience_functions_work(self):
+        """Test that LM Studio convenience functions integrate properly."""
+        with patch('src.second_opinion.utils.client_factory.get_settings') as mock_get_settings:
+            mock_settings = MagicMock()
+            mock_settings.lmstudio_base_url = "http://localhost:1234"
+            mock_settings.api.timeout = 30
+            mock_settings.api.retries = 2
+            mock_settings.api.max_backoff = 60
+            mock_get_settings.return_value = mock_settings
+
+            # Test with override
+            client = create_lmstudio_client(base_url="http://192.168.1.100:8080")
+            assert client.base_url == "http://192.168.1.100:8080"
+
+            # Test without override
+            client2 = create_lmstudio_client()
+            assert client2.base_url == "http://localhost:1234"

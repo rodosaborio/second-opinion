@@ -129,7 +129,8 @@ class InputSanitizer:
             raise ValidationError(f"Model name exceeds maximum length of {self.MAX_MODEL_NAME_LENGTH}")
 
         # Check for valid model name format (provider/model or just model)
-        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-_./]*[a-zA-Z0-9]$', model_name):
+        # Allow alphanumeric start, alphanumeric/hyphen/underscore/dot/slash/@/: in middle
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-_./:@]*[a-zA-Z0-9]$', model_name):
             raise ValidationError("Model name contains invalid characters")
 
         # Prevent injection through model names
