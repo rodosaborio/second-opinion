@@ -123,7 +123,13 @@ class OpenRouterClient(BaseClient):
             request.model, input_tokens, output_tokens
         )
 
-        logger.debug(f"Estimated cost for {request.model}: ${total_cost} (source: {source})")
+        # Log cost estimation with more detail for debugging
+        logger.info(f"Cost estimate for {request.model}: ${total_cost:.4f} (tokens: {input_tokens}+{output_tokens}, source: {source})")
+        
+        # Print warning if pricing source is fallback
+        if source == "conservative_fallback":
+            print(f"No pricing data for model {request.model}, using conservative estimate")
+
         return total_cost
 
     async def get_available_models(self) -> list[ModelInfo]:
@@ -293,9 +299,15 @@ class OpenRouterClient(BaseClient):
                     usage.output_tokens,
                     model_info
                 )
-            except Exception:
-                # Fallback cost calculation
-                actual_cost = Decimal("0.001") * usage.total_tokens
+                logger.debug(f"Actual cost for {request.model}: ${actual_cost:.4f} ({usage.input_tokens}+{usage.output_tokens} tokens)")
+            except Exception as e:
+                # Fallback cost calculation using pricing manager
+                logger.warning(f"Failed to get model cost info for {request.model}: {e}")
+                fallback_cost, source = self._pricing_manager.estimate_cost(
+                    request.model, usage.input_tokens, usage.output_tokens
+                )
+                actual_cost = fallback_cost
+                logger.debug(f"Using fallback cost for {request.model}: ${actual_cost:.4f} (source: {source})")
 
             return ModelResponse(
                 content=content,

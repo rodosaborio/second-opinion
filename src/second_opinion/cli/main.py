@@ -18,7 +18,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from second_opinion.clients import get_client_for_model
+from second_opinion.clients import detect_model_provider
+from second_opinion.utils.client_factory import create_client_from_config
 from second_opinion.config.model_configs import model_config_manager
 from second_opinion.config.settings import get_settings
 from second_opinion.core.evaluator import TaskComplexity, get_evaluator
@@ -57,27 +58,41 @@ def filter_think_tags(text: str) -> str:
     Returns:
         Text with think tags removed
     """
-    if not text:
-        return text
+    if not text or not text.strip():
+        return text or ""
     
     # Patterns for various thinking tag formats
     think_patterns = [
+        # Complete tags with content
         r'<think>.*?</think>',
         r'<thinking>.*?</thinking>',
         r'<thought>.*?</thought>', 
         r'<reasoning>.*?</reasoning>',
         r'<internal>.*?</internal>',
-        # Handle unclosed tags at start/end
-        r'^<think>.*?(?=\n\n|\n[A-Z]|\Z)',
-        r'^<thinking>.*?(?=\n\n|\n[A-Z]|\Z)',
+        r'<analysis>.*?</analysis>',
+        
+        # Handle unclosed tags - remove everything from tag to end
+        r'<think>.*?(?=\n\n|$)',
+        r'<thinking>.*?(?=\n\n|$)',
+        r'<thought>.*?(?=\n\n|$)',
+        r'<reasoning>.*?(?=\n\n|$)',
+        r'<internal>.*?(?=\n\n|$)',
+        r'<analysis>.*?(?=\n\n|$)',
+        
+        # Handle cases where tags are at the very beginning or end
+        r'^\s*</?think[^>]*>.*?(?=\n[A-Za-z]|\n\n|$)',
+        r'^\s*</?thinking[^>]*>.*?(?=\n[A-Za-z]|\n\n|$)',
     ]
     
     filtered_text = text
     for pattern in think_patterns:
+        # Remove matched patterns
         filtered_text = re.sub(pattern, '', filtered_text, flags=re.DOTALL | re.IGNORECASE)
     
     # Clean up extra whitespace left by removed tags
-    filtered_text = re.sub(r'\n\s*\n\s*\n', '\n\n', filtered_text)  # Multiple newlines
+    filtered_text = re.sub(r'\n\s*\n\s*\n+', '\n\n', filtered_text)  # Multiple newlines
+    filtered_text = re.sub(r'^\s*\n+', '', filtered_text)  # Leading newlines
+    filtered_text = re.sub(r'\n+\s*$', '', filtered_text)  # Trailing newlines
     filtered_text = filtered_text.strip()
     
     return filtered_text
@@ -235,7 +250,7 @@ class ComparisonModelSelector:
         default_models = [
             "anthropic/claude-3-5-sonnet",
             "openai/gpt-4o",
-            "google/gemini-pro",
+            "google/gemini-pro-1.5",
             "anthropic/claude-3-haiku",
             "openai/gpt-4o-mini",
         ]
@@ -356,7 +371,8 @@ async def execute_second_opinion(
 
     for model in models_to_run:
         try:
-            client = get_client_for_model(model)
+            provider = detect_model_provider(model)
+            client = create_client_from_config(provider)
             estimated_cost = await client.estimate_cost(
                 request.model_copy(update={"model": model})
             )
@@ -403,14 +419,16 @@ async def execute_second_opinion(
             )
         else:
             # Execute normal primary model request
-            primary_client = get_client_for_model(primary_model)
+            provider = detect_model_provider(primary_model)
+            primary_client = create_client_from_config(provider)
             primary_response = await primary_client.complete(request)
 
         # Execute comparison model requests
         comparison_responses = []
         for model in comparison_models:
             try:
-                client = get_client_for_model(model)
+                provider = detect_model_provider(model)
+                client = create_client_from_config(provider)
                 response = await client.complete(
                     request.model_copy(update={"model": model})
                 )
@@ -489,8 +507,8 @@ def second_opinion_command(
         "-c",
         help="Specific model(s) to compare against (can be used multiple times)",
     ),
-    cost_limit: float = typer.Option(
-        0.10, "--cost-limit", help="Maximum cost for the operation"
+    cost_limit: float | None = typer.Option(
+        None, "--cost-limit", help="Maximum cost for the operation"
     ),
     context: str | None = typer.Option(
         None, "--context", help="Additional context for better comparisons"
@@ -510,6 +528,18 @@ def second_opinion_command(
 ):
     """Get a second opinion on a prompt using multiple models."""
 
+    # Determine cost limit using hierarchy: CLI flag > model config > settings default
+    if cost_limit is None:
+        try:
+            # Try to get from model configuration first
+            from second_opinion.config.model_configs import model_config_manager
+            tool_config = model_config_manager.get_tool_config("second_opinion")
+            cost_limit = float(tool_config.cost_limit_per_request)
+        except Exception:
+            # Fall back to settings default
+            settings = get_settings()
+            cost_limit = float(settings.cost_management.default_per_request_limit)
+    
     # Show operation info
     existing_info = "\nUsing existing response (no API call)" if existing_response else ""
     console.print(
@@ -596,13 +626,22 @@ def display_results(result: dict, verbose: bool = False):
     )
     console.print(cost_panel)
 
-    # Show recommendations if available
+    # Show recommendations if available (deduplicated)
     if evaluations:
         console.print("\n[bold]Recommendations:[/bold]")
+        all_recommendations = []
         for evaluation in evaluations:
             if hasattr(evaluation, "recommendations") and evaluation.recommendations:
-                for recommendation in evaluation.recommendations:
-                    console.print(f"• {recommendation}")
+                all_recommendations.extend(evaluation.recommendations)
+        
+        # Deduplicate recommendations
+        unique_recommendations = list(dict.fromkeys(all_recommendations))  # Preserves order
+        
+        if unique_recommendations:
+            for recommendation in unique_recommendations:
+                console.print(f"• {recommendation}")
+        else:
+            console.print("• No specific recommendations available")
 
 
 def _display_summary_results(result: dict):

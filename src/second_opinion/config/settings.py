@@ -119,9 +119,6 @@ class AppSettings(BaseSettings):
 
     # API Keys
     openrouter_api_key: str | None = Field(default=None, description="OpenRouter API key", repr=False)
-    anthropic_api_key: str | None = Field(default=None, description="Anthropic API key", repr=False)
-    openai_api_key: str | None = Field(default=None, description="OpenAI API key", repr=False)
-    google_api_key: str | None = Field(default=None, description="Google AI API key", repr=False)
     lmstudio_base_url: str = Field(default="http://localhost:1234", description="LM Studio base URL")
 
     # Security
@@ -173,16 +170,9 @@ class AppSettings(BaseSettings):
 
     @model_validator(mode='after')
     def validate_api_keys(self):
-        """Validate that at least one API key is configured."""
-        api_keys = [
-            self.openrouter_api_key,
-            self.anthropic_api_key,
-            self.openai_api_key,
-            self.google_api_key
-        ]
-
-        if not any(api_keys) and self.environment != 'development':
-            raise ValueError("At least one API key must be configured in non-development environments")
+        """Validate that OpenRouter API key is configured."""
+        if not self.openrouter_api_key and self.environment != 'development':
+            raise ValueError("OpenRouter API key must be configured in non-development environments")
 
         return self
 
@@ -198,13 +188,10 @@ class AppSettings(BaseSettings):
 
     def get_api_key(self, provider: str) -> str | None:
         """Get API key for a specific provider."""
-        provider_map = {
-            'openrouter': self.openrouter_api_key,
-            'anthropic': self.anthropic_api_key,
-            'openai': self.openai_api_key,
-            'google': self.google_api_key
-        }
-        return provider_map.get(provider.lower())
+        # All providers use OpenRouter now
+        if provider.lower() in ['openrouter', 'anthropic', 'openai', 'google']:
+            return self.openrouter_api_key
+        return None
 
     def has_api_key(self, provider: str) -> bool:
         """Check if API key is configured for provider."""
@@ -305,19 +292,11 @@ class ConfigurationManager:
         if not self._settings:
             return
 
-        key_patterns = {
-            'openrouter': r'^sk-or-.*',
-            'anthropic': r'^sk-ant-.*',
-            'openai': r'^sk-.*',
-            'google': r'^.*'  # Google keys have various formats
-        }
-
-        for provider, pattern in key_patterns.items():
-            key = self._settings.get_api_key(provider)
-            if key:
-                import re
-                if not re.match(pattern, key):
-                    print(f"Warning: API key for {provider} may have invalid format")
+        # Only validate OpenRouter key format
+        if self._settings.openrouter_api_key:
+            import re
+            if not re.match(r'^sk-or-.*', self._settings.openrouter_api_key):
+                print("Warning: OpenRouter API key should start with 'sk-or-'")
 
     @property
     def settings(self) -> AppSettings:

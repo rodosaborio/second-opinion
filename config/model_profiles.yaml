@@ -10,71 +10,71 @@ tools:
     description: "Get alternative perspectives on responses"
     comparison_models:
       # Models to use for comparison (rotated based on primary model)
-      - "openai/gpt-4o"
-      - "anthropic/claude-3-5-sonnet"
-      - "google/gemini-pro"
-    max_tokens: 1000
+      - "anthropic/claude-sonnet-4"
+      - "google/gemini-2.5-flash"
+      - "deepseek/deepseek-r1-0528"
+    max_tokens: 2000
     temperature: 0.1
-    cost_limit_per_request: 0.10
+    cost_limit_per_request: 0.50
     system_prompt_template: "second_opinion"
-    
-  # Should Upgrade Tool - Evaluate if more expensive model would be better  
+
+  # Should Upgrade Tool - Evaluate if more expensive model would be better
   should_upgrade:
     description: "Evaluate if a more expensive model would improve results"
     upgrade_targets:
       # Conservative upgrade paths to prevent cost explosions
-      budget_to_mid: "anthropic/claude-3-5-sonnet"
-      mid_to_premium: "openai/gpt-4o"
-      any_to_reasoning: "openai/o1-mini"
-    max_tokens: 300  # Limit expensive model usage
+      budget_to_mid: "anthropic/claude-sonnet-4"
+      mid_to_premium: "google/gemini-2.5-pro"
+      any_to_reasoning: "openai/o3"
+    max_tokens: 500  # Limit expensive model usage
     temperature: 0.0  # Consistent evaluation
-    cost_limit_per_request: 0.05
+    cost_limit_per_request: 0.25
     system_prompt_template: "evaluation"
-    
+
   # Should Downgrade Tool - Check if cheaper model could handle task
   should_downgrade:
     description: "Test if cheaper models could handle the same task"
     downgrade_targets:
-      - "anthropic/claude-3-haiku"
-      - "openai/gpt-4o-mini" 
-      - "google/gemini-flash"
-    max_tokens: 500
+      - "anthropic/claude-3.5-haiku"
+      - "openai/gpt-4o-mini"
+      - "google/gemini-2.5-flash-lite-preview-06-17"
+    max_tokens: 1000
     temperature: 0.1
-    cost_limit_per_request: 0.02
+    cost_limit_per_request: 0.10
     system_prompt_template: "evaluation"
-    
+
   # Compare Responses Tool - Side-by-side analysis
   compare_responses:
     description: "Detailed comparison of two responses"
-    evaluator_model: "anthropic/claude-3-5-sonnet"  # Good at analysis
+    evaluator_model: "anthropic/claude-sonnet-4"  # Good at analysis
     max_tokens: 800
     temperature: 0.0
     cost_limit_per_request: 0.08
     system_prompt_template: "comparison"
-    
+
   # Usage Analytics Tool - Pattern analysis
   usage_analytics:
     description: "Analyze usage patterns and optimization opportunities"
     # Uses local processing, no external model calls
     cost_limit_per_request: 0.00
-    
+
 # Model capability tiers for smart routing
 model_tiers:
   budget:
     - "anthropic/claude-3-haiku"
     - "openai/gpt-4o-mini"
     - "google/gemini-flash"
-  
+
   mid_range:
     - "anthropic/claude-3-5-sonnet"
     - "openai/gpt-4o"
     - "google/gemini-pro"
-    
+
   premium:
     - "anthropic/claude-3-opus"
     - "openai/o1-pro"
     - "openai/o1-mini"
-    
+
   reasoning:
     - "openai/o1-pro"
     - "openai/o1-mini"
@@ -91,7 +91,7 @@ cost_estimates:
     "openai/o1-pro": 0.015
     "google/gemini-flash": 0.0001
     "google/gemini-pro": 0.001
-    
+
   output_token_costs:
     "anthropic/claude-3-haiku": 0.00125
     "anthropic/claude-3-5-sonnet": 0.015

@@ -11,7 +11,8 @@ import re
 from decimal import Decimal
 from typing import Any
 
-from ..clients import get_client_for_model
+from ..clients import detect_model_provider
+from ..utils.client_factory import create_client_from_config
 from ..prompts.manager import render_template
 from ..utils.cost_tracking import CostGuard
 from .models import (
@@ -442,15 +443,37 @@ class ResponseEvaluator:
         primary_cost = float(primary_response.cost_estimate)
         comparison_cost = float(comparison_response.cost_estimate)
         
+        # Handle zero-cost scenarios (likely pricing data issues)
+        if primary_cost == 0.0 and comparison_cost == 0.0:
+            if winner == "comparison":
+                recommendations.append(
+                    f"Consider using {comparison_response.model} for potentially better quality "
+                    f"(cost data unavailable for comparison)"
+                )
+            elif winner == "primary":
+                recommendations.append(
+                    f"Your primary model ({primary_response.model}) appears to provide better quality "
+                    f"(cost data unavailable for detailed recommendation)"
+                )
+            else:
+                recommendations.append(
+                    f"Both models provide similar quality. Choose based on your specific requirements "
+                    f"(cost data unavailable for detailed comparison)"
+                )
+            return recommendations
+        
+        # Normal cost comparison logic
+        cost_threshold = 0.001  # Only consider differences above $0.001
+        
         if winner == "comparison":
             # Comparison model won
-            if comparison_cost < primary_cost:
+            if comparison_cost < primary_cost and (primary_cost - comparison_cost) > cost_threshold:
                 savings = primary_cost - comparison_cost
                 recommendations.append(
                     f"Consider using {comparison_response.model} instead - it provides better quality "
                     f"at ${savings:.4f} lower cost per request"
                 )
-            elif comparison_cost > primary_cost:
+            elif comparison_cost > primary_cost and (comparison_cost - primary_cost) > cost_threshold:
                 cost_increase = comparison_cost - primary_cost
                 recommendations.append(
                     f"Consider upgrading to {comparison_response.model} for better quality "
@@ -462,7 +485,7 @@ class ResponseEvaluator:
                 )
         elif winner == "primary":
             # Primary model won
-            if primary_cost > comparison_cost:
+            if primary_cost > comparison_cost and (primary_cost - comparison_cost) > cost_threshold:
                 cost_difference = primary_cost - comparison_cost
                 recommendations.append(
                     f"Your primary model ({primary_response.model}) provides better quality, "
@@ -475,13 +498,13 @@ class ResponseEvaluator:
                 )
         else:
             # Tie
-            if primary_cost > comparison_cost:
+            if primary_cost > comparison_cost and (primary_cost - comparison_cost) > cost_threshold:
                 savings = primary_cost - comparison_cost
                 recommendations.append(
                     f"Both models provide similar quality. Consider {comparison_response.model} "
                     f"to save ${savings:.4f} per request"
                 )
-            elif comparison_cost > primary_cost:
+            elif comparison_cost > primary_cost and (comparison_cost - primary_cost) > cost_threshold:
                 recommendations.append(
                     f"Both models provide similar quality. Your current model ({primary_response.model}) "
                     f"is more cost-effective"
@@ -598,7 +621,8 @@ class ResponseEvaluator:
         """
         # Create client for the evaluator model (detect provider automatically)
         try:
-            client = get_client_for_model(evaluator_model)
+            provider = detect_model_provider(evaluator_model)
+            client = create_client_from_config(provider)
         except Exception as e:
             raise EvaluationError(
                 f"Failed to create client for evaluator model '{evaluator_model}': {str(e)}",

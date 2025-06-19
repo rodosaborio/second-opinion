@@ -72,6 +72,9 @@ def detect_model_provider(model: str) -> str:
     """
     Detect the appropriate provider for a given model.
     
+    All cloud models (including Anthropic, OpenAI, Google, etc.) use OpenRouter.
+    Only local models use LM Studio.
+    
     Args:
         model: Model identifier
         
@@ -83,12 +86,14 @@ def detect_model_provider(model: str) -> str:
         "lmstudio"
         >>> detect_model_provider("anthropic/claude-3-5-sonnet")
         "openrouter"
+        >>> detect_model_provider("claude-3-5-sonnet")
+        "openrouter"
     """
     # Local model patterns - these should use LM Studio
     local_patterns = [
         "mlx",      # MLX models
         "qwen",     # Qwen models  
-        "llama",    # Llama models
+        "llama",    # Llama models (local)
         "mistral",  # Mistral models (when local)
         "codestral", # Codestral models
         "devstral", # Devstral models
@@ -96,15 +101,11 @@ def detect_model_provider(model: str) -> str:
     
     model_lower = model.lower()
     
-    # If model has provider prefix (provider/model), it's a cloud model
-    if "/" in model and len(model.split("/")) == 2:
-        return "openrouter"
-    
-    # Check for local model patterns
+    # Check for local model patterns (without provider prefix)
     if any(pattern in model_lower for pattern in local_patterns) and "/" not in model:
         return "lmstudio"
     
-    # Default to OpenRouter for unknown models
+    # All other models (including those with provider prefixes) use OpenRouter
     return "openrouter"
 
 

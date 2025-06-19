@@ -157,7 +157,7 @@ class PricingManager:
                         source=cache_data.get('source', 'cache')
                     )
 
-                    logger.debug(f"Loaded pricing cache with {len(pricing_data)} models")
+                    logger.info(f"Loaded pricing cache with {len(pricing_data)} models from cache file")
                     return
 
                 except Exception as e:
@@ -166,6 +166,7 @@ class PricingManager:
             # Fallback to backup file
             if self.backup_file.exists():
                 try:
+                    logger.info(f"Loading pricing data from backup file: {self.backup_file}")
                     with open(self.backup_file) as f:
                         backup_data = json.load(f)
 
@@ -176,15 +177,31 @@ class PricingManager:
                         source='backup'
                     )
 
-                    logger.info(f"Loaded backup pricing data with {len(pricing_data)} models")
+                    logger.info(f"Successfully loaded backup pricing data with {len(pricing_data)} models")
+                    
+                    # Log some sample models for debugging
+                    sample_models = list(pricing_data.keys())[:5]
+                    logger.debug(f"Sample models loaded: {sample_models}")
+                    
+                    # Check for specific models the user is using
+                    test_models = [
+                        "anthropic/claude-sonnet-4",
+                        "openrouter/anthropic/claude-sonnet-4", 
+                        "claude-sonnet-4",
+                        "anthropic/claude-3-haiku",
+                        "openrouter/anthropic/claude-3-haiku"
+                    ]
+                    found_models = [m for m in test_models if m in pricing_data]
+                    logger.debug(f"Test models found in pricing data: {found_models}")
+                    
                     return
 
                 except Exception as e:
-                    logger.warning(f"Failed to load backup pricing data: {e}")
+                    logger.error(f"Failed to load backup pricing data: {e}")
 
             # Initialize empty cache
             self._cache = PricingCache(source='empty')
-            logger.warning("No pricing data available, using empty cache")
+            logger.error("No pricing data available, using empty cache")
 
     def _save_cache(self) -> None:
         """Save current cache to disk."""
@@ -304,36 +321,138 @@ class PricingManager:
         """
         with self._lock:
             if not self._cache:
+                logger.warning(f"No pricing cache available for {model_name}")
                 return None
+
+            logger.debug(f"Looking up pricing for: {model_name}")
 
             # Direct lookup first
             if model_name in self._cache.data:
+                logger.debug(f"Found direct match for {model_name}")
                 return self._cache.data[model_name]
 
-            # Try exact variations only (more strict matching)
-            normalized_names = [
-                model_name.lower(),
-                model_name.replace('/', '-'),
-                model_name.replace('-', '_'),
-                model_name.split('/')[-1] if '/' in model_name else model_name,
-            ]
+            # Generate comprehensive variations to try
+            variations_to_try = self._generate_model_variations(model_name)
+            
+            # Try each variation
+            for variation in variations_to_try:
+                if variation in self._cache.data:
+                    logger.debug(f"Found pricing for {model_name} using variation: {variation}")
+                    return self._cache.data[variation]
 
-            # Only match if the model name is a substantial part of the cached name
-            for name in normalized_names:
-                for cached_name, pricing_info in self._cache.data.items():
-                    cached_lower = cached_name.lower()
-                    name_lower = name.lower()
+            # Fallback: fuzzy matching for partial matches
+            best_match = self._fuzzy_match_model(model_name)
+            if best_match:
+                logger.debug(f"Found pricing for {model_name} using fuzzy match: {best_match}")
+                return self._cache.data[best_match]
 
-                    # Require significant overlap (at least 60% of the name matches)
-                    if len(name_lower) >= 3:  # Only for reasonable length names
-                        # Exact match or name is a significant substring
-                        if (name_lower == cached_lower or
-                            (len(name_lower) > 5 and name_lower in cached_lower and
-                             len(name_lower) / len(cached_lower) >= 0.6)):
-                            logger.debug(f"Found pricing for {model_name} using cached name {cached_name}")
-                            return pricing_info
-
+            logger.debug(f"No pricing found for {model_name} (tried {len(variations_to_try)} variations)")
             return None
+
+    def _generate_model_variations(self, model_name: str) -> list[str]:
+        """Generate common model name variations for lookup."""
+        variations = [model_name]  # Always try original first
+        
+        # For cloud models, try OpenRouter prefixed versions first
+        if "/" in model_name and not model_name.startswith("openrouter/"):
+            variations.append(f"openrouter/{model_name}")
+        
+        # Try without provider prefix
+        if "/" in model_name:
+            base_name = model_name.split("/")[-1]
+            variations.append(base_name)
+            # Also try openrouter prefix with base name
+            variations.append(f"openrouter/{base_name}")
+        
+        # Try with anthropic/ prefix for anthropic models
+        if "claude" in model_name.lower() and not model_name.startswith("anthropic/"):
+            if "/" in model_name:
+                base_name = model_name.split("/")[-1]
+                variations.append(f"anthropic/{base_name}")
+                variations.append(f"openrouter/anthropic/{base_name}")
+            else:
+                variations.append(f"anthropic/{model_name}")
+                variations.append(f"openrouter/anthropic/{model_name}")
+        
+        # Try common OpenAI variations
+        if any(term in model_name.lower() for term in ["gpt", "o1", "o3"]) and not model_name.startswith("openai/"):
+            if "/" in model_name:
+                base_name = model_name.split("/")[-1]
+                variations.append(f"openai/{base_name}")
+                variations.append(f"openrouter/openai/{base_name}")
+            else:
+                variations.append(f"openai/{model_name}")
+                variations.append(f"openrouter/openai/{model_name}")
+        
+        # Try Google variations
+        if "gemini" in model_name.lower() and not model_name.startswith("google/"):
+            if "/" in model_name:
+                base_name = model_name.split("/")[-1]
+                variations.append(f"google/{base_name}")
+                variations.append(f"openrouter/google/{base_name}")
+            else:
+                variations.append(f"google/{model_name}")
+                variations.append(f"openrouter/google/{model_name}")
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_variations = []
+        for var in variations:
+            if var not in seen:
+                seen.add(var)
+                unique_variations.append(var)
+        
+        return unique_variations
+
+    def _fuzzy_match_model(self, model_name: str) -> str | None:
+        """Find the best fuzzy match for a model name."""
+        model_lower = model_name.lower()
+        best_match = None
+        best_score = 0
+        
+        # Extract key terms from the target model name
+        key_terms = []
+        if "claude" in model_lower:
+            key_terms.append("claude")
+            if "sonnet" in model_lower:
+                key_terms.append("sonnet")
+            if "haiku" in model_lower:
+                key_terms.append("haiku")
+            if "opus" in model_lower:
+                key_terms.append("opus")
+        elif "gpt" in model_lower:
+            key_terms.append("gpt")
+        elif "gemini" in model_lower:
+            key_terms.append("gemini")
+        
+        if not key_terms:
+            return None
+        
+        # Score each cached model
+        for cached_name in self._cache.data.keys():
+            cached_lower = cached_name.lower()
+            score = 0
+            
+            # Score based on key terms present
+            for term in key_terms:
+                if term in cached_lower:
+                    score += 10
+            
+            # Prefer openrouter versions for cloud models
+            if "openrouter" in cached_lower and "/" in model_name:
+                score += 5
+            
+            # Prefer exact provider matches
+            if "/" in model_name and "/" in cached_name:
+                requested_provider = model_name.split("/")[0].lower()
+                if requested_provider in cached_lower:
+                    score += 3
+            
+            if score > best_score and score >= 10:  # Require at least one key term match
+                best_score = score
+                best_match = cached_name
+        
+        return best_match
 
     def estimate_cost(
         self,

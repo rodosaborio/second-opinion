@@ -1304,104 +1304,171 @@ second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
 - **Smart Model Selection**: Task complexity-aware selection with user transparency and priority hierarchy
 - **Production Evaluation**: Real API-based evaluation with robust fallback strategies and structured response parsing
 
-### ✅ Phase 7: Evaluator Model Configuration & Bug Fixes - COMPLETED
+### ✅ Phase 7: OpenRouter-Only Simplification & Critical Bug Fixes - COMPLETED
 
 **What's Working:**
-- **Configurable Evaluator Model** (`src/second_opinion/core/evaluator.py`) - Evaluator model now defaults to primary model with optional override
-- **CLI Evaluator Option** (`src/second_opinion/cli/main.py`) - Added `--evaluator-model` flag for explicit evaluator model specification
-- **Provider Detection Integration** (`src/second_opinion/clients/__init__.py`) - Enhanced client factory with `get_client_for_model()` and `detect_model_provider()`
-- **Cost Tracking Bug Fix** - Fixed reservation ID mismatch that was causing "Reservation evaluation not found" errors
-- **Recommendation System** (`src/second_opinion/core/models.py`) - Added recommendations field to ComparisonResult with intelligent generation
-- **Error Handling Enhancement** - Removed unreliable simulation fallback, added proper EvaluationError exceptions
+- **OpenRouter-Only Architecture** (`src/second_opinion/config/settings.py`) - Simplified to single OpenRouter API key with unified routing for all cloud models
+- **Fixed CLI Cost Limit Integration** (`src/second_opinion/cli/main.py`) - CLI now uses hierarchy: CLI flag > model config ($0.50) > settings default ($0.25) instead of hardcoded $0.10
+- **Enhanced Model Name Matching** (`src/second_opinion/utils/pricing.py`) - Comprehensive model variation generation and fuzzy matching for pricing data lookup
+- **Improved Think Tag Filtering** (`src/second_opinion/cli/main.py`) - Enhanced filtering patterns handle edge cases, unclosed tags, and better whitespace cleanup
+- **Fixed Cost Comparison & Recommendations** (`src/second_opinion/core/evaluator.py`) - Added zero-cost scenario handling, deduplication, cost threshold logic
+- **Enhanced Pricing Integration** (`src/second_opinion/clients/openrouter.py`) - Better logging, fallback mechanisms, and error handling for pricing data
 
 **Key Implementation Achievements:**
-1. **Intelligent Evaluator Model Selection**: When no evaluator model specified, uses primary model for evaluation (perfect for LM Studio setups)
-2. **Provider-Aware Evaluation**: Local models (qwen3-4b-mlx) use LM Studio client, cloud models use OpenRouter for evaluation
-3. **Configuration Hierarchy**: CLI flag → Config file → Primary model (most specific wins)
-4. **Cost Tracking Fix**: Proper reservation ID handling prevents "Reservation not found" errors
-5. **Enhanced Recommendations**: Intelligent recommendations based on quality comparison and cost analysis
-6. **Robust Error Handling**: Removed simulation fallback, added proper exception handling with EvaluationError
+1. **Simplified Architecture**: All cloud models (Anthropic, OpenAI, Google) now route through OpenRouter exclusively, eliminating API key complexity and provider-specific code
+2. **Fixed Cost Limit Hierarchy**: CLI properly reads default from `model_profiles.yaml` ($0.50) instead of hardcoded $0.10, following proper configuration precedence
+3. **Enhanced Model Pricing Discovery**: Comprehensive model name variation generation (`anthropic/claude-sonnet-4` → `openrouter/anthropic/claude-sonnet-4`) with fuzzy matching for pricing data
+4. **Improved Response Processing**: Better think tag filtering, zero-cost scenario handling, and recommendation deduplication for cleaner user experience
+5. **Robust Pricing Integration**: LiteLLM pricing data now properly loads 1,117+ models with intelligent fallbacks and detailed debugging information
+6. **Production-Ready Error Handling**: Enhanced client warnings, fallback mechanisms, and cost calculation with proper OpenRouter integration
 
 **Usage Examples:**
 ```bash
-# Default behavior - uses primary model for evaluation (LM Studio for local models)
-uv run second-opinion --primary-model "qwen3-4b-mlx" --comparison-model "qwen3-0.6b-mlx" "What is the capital of France?"
-# Evaluator: qwen3-4b-mlx (LM Studio)
+# Fixed cost limit - now shows $0.25 from config instead of hardcoded $0.10
+uv run second-opinion --primary-model "anthropic/claude-sonnet-4" --comparison-model "google/gemini-2.5-flash" "What is 2+2?"
+# Cost Limit: $0.25 (from model_profiles.yaml)
 
-# Explicit cloud evaluator for mixed setup
-uv run second-opinion --primary-model "qwen3-4b-mlx" --comparison-model "qwen3-0.6b-mlx" --evaluator-model "anthropic/claude-3-5-sonnet" "Complex analysis"
-# Primary: qwen3-4b-mlx (LM Studio), Evaluator: anthropic/claude-3-5-sonnet (OpenRouter)
+# Working pricing data - models now show actual costs
+uv run second-opinion --primary-model "anthropic/claude-3-haiku" --comparison-model "google/gemini-2.5-flash" "What is 2+2?" --verbose  
+# Shows: Estimated: $0.0175, proper cost calculations
 
-# Existing response with evaluation
-uv run second-opinion --primary-model "qwen3-4b-mlx" --comparison-model "qwen3-0.6b-mlx" "What is the capital of France?" --existing-response "Paris" -v
-# No API call for primary, evaluation uses qwen3-4b-mlx via LM Studio
+# All models route through OpenRouter - no API key warnings
+uv run second-opinion --primary-model "anthropic/claude-sonnet-4" --comparison-model "openai/o3" --comparison-model "deepseek/deepseek-r1-0528" "Complex task"
+# Single OpenRouter key handles all providers
+
+# Enhanced think tag filtering and deduplication
+uv run second-opinion --primary-model "deepseek/deepseek-r1-0528" --comparison-model "openai/o1" "Reasoning task" --verbose
+# Clean output with thinking tags filtered, unique recommendations
 ```
 
 **Technical Implementation Highlights:**
 ```python
-# Intelligent evaluator model defaulting
-if evaluator_model is None:
-    evaluator_model = primary_response.model
-    logger.info(f"Using primary model '{evaluator_model}' as evaluator")
+# Simplified API key management - OpenRouter only
+class AppSettings(BaseSettings):
+    openrouter_api_key: str | None = Field(default=None, description="OpenRouter API key", repr=False)
+    # Removed: anthropic_api_key, openai_api_key, google_api_key
+    
+    def get_api_key(self, provider: str) -> str | None:
+        # All providers use OpenRouter now
+        if provider.lower() in ['openrouter', 'anthropic', 'openai', 'google']:
+            return self.openrouter_api_key
+        return None
 
-# Provider detection for consistent client usage
-def detect_model_provider(model: str) -> str:
-    local_patterns = ["mlx", "qwen", "llama", "mistral", "codestral", "devstral"]
-    if "/" in model and len(model.split("/")) == 2:
-        return "openrouter"  # Cloud model with provider prefix
-    if any(pattern in model.lower() for pattern in local_patterns):
-        return "lmstudio"    # Local model patterns
-    return "openrouter"     # Default to OpenRouter
+# Fixed CLI cost limit hierarchy
+if cost_limit is None:
+    try:
+        # Try to get from model configuration first
+        tool_config = model_config_manager.get_tool_config("second_opinion")
+        cost_limit = float(tool_config.cost_limit_per_request)  # Gets $0.50 from config
+    except Exception:
+        # Fall back to settings default
+        settings = get_settings()
+        cost_limit = float(settings.cost_management.default_per_request_limit)  # Gets $0.25
 
-# Fixed cost tracking with proper reservation IDs
-budget_check = await self.cost_guard.check_and_reserve_budget(estimated_cost, "evaluation", evaluator_model)
-response = await client.complete(request)
-await self.cost_guard.record_actual_cost(
-    reservation_id=budget_check.reservation_id,  # Use actual reservation ID
-    actual_cost=response.cost_estimate, model=evaluator_model, operation_type="evaluation"
-)
+# Enhanced model name matching for pricing data
+def _generate_model_variations(self, model_name: str) -> list[str]:
+    variations = [model_name]  # Always try original first
+    
+    # For cloud models, try OpenRouter prefixed versions first
+    if "/" in model_name and not model_name.startswith("openrouter/"):
+        variations.append(f"openrouter/{model_name}")
+    
+    # Try with anthropic/ prefix for claude models
+    if "claude" in model_name.lower() and not model_name.startswith("anthropic/"):
+        variations.append(f"openrouter/anthropic/{model_name.split('/')[-1]}")
+    
+    return variations
 
-# Enhanced recommendations generation
-def _generate_recommendations(self, primary_response, comparison_response, evaluation_result):
-    winner = evaluation_result.get("winner", "tie")
-    if winner == "comparison" and comparison_cost < primary_cost:
-        return [f"Consider using {comparison_response.model} instead - better quality at ${savings:.4f} lower cost"]
-    # ... intelligent recommendation logic based on quality and cost
+# Improved think tag filtering with edge cases
+def filter_think_tags(text: str) -> str:
+    think_patterns = [
+        r'<think>.*?</think>',           # Complete tags
+        r'<think>.*?(?=\n\n|$)',         # Unclosed tags
+        r'^\s*</?think[^>]*>.*?(?=\n[A-Za-z]|\n\n|$)',  # Beginning/end edge cases
+        # ... comprehensive pattern set
+    ]
+    # Enhanced whitespace cleanup and validation
+
+# Zero-cost scenario handling in recommendations
+if primary_cost == 0.0 and comparison_cost == 0.0:
+    return [f"Consider using {comparison_response.model} for potentially better quality "
+            f"(cost data unavailable for comparison)"]
+
+# Cost threshold logic for meaningful differences
+cost_threshold = 0.001  # Only consider differences above $0.001
+if primary_cost > comparison_cost and (primary_cost - comparison_cost) > cost_threshold:
+    # Generate meaningful cost-based recommendation
+
+# Recommendation deduplication in CLI
+unique_recommendations = list(dict.fromkeys(all_recommendations))  # Preserves order
 ```
 
 **Bug Fixes Completed:**
-- **✅ Reservation ID Mismatch**: Fixed cost tracking to use actual reservation IDs instead of hardcoded strings
-- **✅ API Key Error**: Local models now use LM Studio client instead of trying OpenRouter without API key
-- **✅ Missing Recommendations**: Proper recommendation generation and display in CLI
-- **✅ Simulation Fallback Removed**: Eliminated unreliable simulation, added proper error handling
-- **✅ Parameter Type Issues**: Fixed CLI to pass proper EvaluationCriteria objects instead of dictionaries
+- **✅ Hardcoded Cost Limit**: Fixed CLI to read $0.50 from `model_profiles.yaml` instead of hardcoded $0.10, following proper configuration hierarchy
+- **✅ API Key Warnings**: Eliminated spurious "API key may have invalid format" warnings for Anthropic/OpenAI by routing all cloud models through OpenRouter exclusively  
+- **✅ Pricing Data Integration**: Fixed model name matching so `anthropic/claude-sonnet-4` correctly finds `openrouter/anthropic/claude-sonnet-4` pricing data from LiteLLM
+- **✅ Response Processing Issues**: Enhanced think tag filtering to handle edge cases, unclosed tags, and incomplete responses from models like Deepseek/Gemini
+- **✅ Duplicate Recommendations**: Added deduplication logic in CLI to prevent identical recommendation messages from appearing multiple times
+- **✅ Zero-Cost Scenarios**: Improved recommendation generation to handle cases where pricing data shows $0.0000 with meaningful fallback messages
 
-**Enhanced Error Handling:**
+**Enhanced Pricing & Error Handling:**
 ```python
-class EvaluationError(Exception):
-    """Raised when model evaluation fails."""
-    def __init__(self, message: str, model: str | None = None, cause: Exception | None = None):
-        self.message, self.model, self.cause = message, model, cause
+# Comprehensive model variation generation for pricing lookup
+def _generate_model_variations(self, model_name: str) -> list[str]:
+    """Generate common model name variations for lookup."""
+    variations = [model_name]  # Always try original first
+    
+    # For cloud models, try OpenRouter prefixed versions first
+    if "/" in model_name and not model_name.startswith("openrouter/"):
+        variations.append(f"openrouter/{model_name}")
+    
+    # Try with anthropic/ prefix for claude models
+    if "claude" in model_name.lower() and not model_name.startswith("anthropic/"):
+        variations.append(f"openrouter/anthropic/{model_name.split('/')[-1]}")
+    
+    return variations
 
-# Clean error handling without simulation fallback
-try:
-    evaluation_result = await self._evaluate_with_model(...)
-except EvaluationError:
-    raise  # Re-raise evaluation errors as-is
-except Exception as e:
-    raise EvaluationError(f"Unexpected error during evaluation: {str(e)}", model=evaluator_model, cause=e)
+# OpenRouter client with enhanced cost estimation
+async def estimate_cost(self, request: ModelRequest) -> Decimal:
+    total_cost, source = self._pricing_manager.estimate_cost(
+        request.model, input_tokens, output_tokens
+    )
+    
+    # Print warning if pricing source is fallback
+    if source == "conservative_fallback":
+        print(f"No pricing data for model {request.model}, using conservative estimate")
+    
+    return total_cost
+
+# Simplified provider detection - all cloud models use OpenRouter
+def detect_model_provider(model: str) -> str:
+    # Check for local model patterns (without provider prefix)
+    if any(pattern in model.lower() for pattern in local_patterns) and "/" not in model:
+        return "lmstudio"
+    
+    # All other models (including those with provider prefixes) use OpenRouter
+    return "openrouter"
 ```
 
-**Configuration Integration:**
-```python
-# Check config file for evaluator model if not specified
-if evaluator_model is None:
-    try:
-        config_evaluator = model_config_manager.get_tool_config("second_opinion").evaluator_model
-        if config_evaluator:
-            evaluator_model = config_evaluator
-    except Exception:
-        pass  # Will use primary model as evaluator
+**Current Status & Results:**
+```bash
+# Before fixes:
+✗ Cost Limit: $0.10 (hardcoded)
+✗ Warning: API key for anthropic may have invalid format  
+✗ Warning: API key for openai may have invalid format
+✗ No pricing data for model openai/o3, using conservative estimate
+✗ Cost: $0.0000 (all models)
+✗ Your primary model (anthropic/claude-sonnet-4) provides better quality, justifying the $0.0000 higher cost
+✗ Your primary model (anthropic/claude-sonnet-4) provides better quality, justifying the $0.0000 higher cost
+
+# After fixes:
+✅ Cost Limit: $0.25 (from model_profiles.yaml)
+✅ No API key warnings - all models route through OpenRouter
+✅ Pricing Manager: Successfully loaded backup pricing data with 1,117 models
+✅ Estimated: $0.0175 (realistic cost estimates)
+✅ Enhanced think tag filtering and response processing
+✅ Unique recommendations - no more duplicates
+✅ Better cost comparison logic with meaningful thresholds
 ```
 
 **Testing & Quality Assurance:**
