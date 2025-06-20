@@ -1,0 +1,43 @@
+# MCP-specific configuration for Second Opinion
+# This file configures the MCP server behavior and tool settings
+
+version: "1.0"
+
+# MCP Server Configuration
+server:
+  name: "Second Opinion"
+  description: "AI tool for getting second opinions and optimizing model usage"
+  host: "localhost"
+  port: 8000
+  dev_mode: true
+  cors_enabled: true
+
+# Session Management
+session:
+  max_sessions: 100
+  session_timeout_hours: 24
+  cleanup_interval_minutes: 60
+
+# Tool-specific MCP settings
+tools:
+  second_opinion:
+    description: "Compare AI responses across models for alternative perspectives"
+    max_prompt_length: 50000
+    max_response_length: 100000
+    default_comparison_models: 2
+    enable_response_reuse: true
+    enable_cost_optimization: true
+
+# Cost Management for MCP
+cost_management:
+  per_session_limit: 5.00
+  warn_at_percentage: 80
+  enable_budget_tracking: true
+  track_by_session: true
+
+# Logging for MCP operations
+logging:
+  level: "INFO"
+  log_tool_usage: true
+  log_session_activity: true
+  log_cost_tracking: true
