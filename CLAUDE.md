@@ -274,3 +274,19 @@ uv run pytest --durations=10 --timeout=30
 - Use fixtures for setup and teardown
 - Leverage pytest markers for test categorization
 - Profile and optimize test performance
+
+## Test Writing and Mocking Guidelines
+
+- Prioritize independence from actual configurations for tests
+- Use dependency injection and mocking to isolate test components
+- Create mock objects that simulate real dependencies without actual configurations
+- Prefer interfaces and abstract base classes for easier mocking
+- Use `unittest.mock` or `pytest-mock` for creating mock objects
+- Implement dependency injection to allow easy substitution of real implementations with mocks
+- Ensure tests are deterministic and do not rely on external state or configurations
+- Write tests that focus on behavior and logic rather than specific implementation details
+- Use parametrization to test multiple scenarios without duplicating test code
+- Mock external services, databases, and network calls to ensure test reliability and speed
+```
+
+</invoke>
