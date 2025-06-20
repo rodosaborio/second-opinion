@@ -394,6 +394,14 @@ class PricingManager:
                 variations.append(f"google/{model_name}")
                 variations.append(f"openrouter/google/{model_name}")
         
+        # Try basic underscore/dash variations
+        if "_" in model_name:
+            dash_version = model_name.replace("_", "-")
+            variations.append(dash_version)
+        if "-" in model_name:
+            underscore_version = model_name.replace("-", "_")
+            variations.append(underscore_version)
+        
         # Remove duplicates while preserving order
         seen = set()
         unique_variations = []

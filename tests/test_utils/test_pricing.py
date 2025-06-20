@@ -192,14 +192,13 @@ class TestPricingManager:
         # Should match gpt-3.5-turbo
         variations = [
             "gpt-3.5-turbo",
-            "openai/gpt-3.5-turbo",
-            "gpt_3_5_turbo"
+            "openai/gpt-3.5-turbo"
         ]
 
         for variation in variations:
             pricing_info = pricing_manager.get_model_pricing(variation)
-            if pricing_info:  # Some variations might not match with strict rules
-                assert pricing_info.model_name == "gpt-3.5-turbo"
+            assert pricing_info is not None, f"Should find pricing for {variation}"
+            assert pricing_info.model_name == "gpt-3.5-turbo"
 
     def test_get_model_pricing_unknown_model(self, pricing_manager):
         """Test getting pricing for unknown model."""
@@ -228,17 +227,22 @@ class TestPricingManager:
 
     def test_conservative_fallback_by_tier(self, pricing_manager):
         """Test conservative fallback varies by model tier."""
-        # High-tier models
-        cost_high, _ = pricing_manager.estimate_cost("gpt-4-super", 1000, 1000)
+        # High-tier models (use model names that won't match existing data)
+        cost_high, _ = pricing_manager.estimate_cost("unknown-opus-xl", 1000, 1000)
 
-        # Mid-tier models
-        cost_mid, _ = pricing_manager.estimate_cost("claude-2-medium", 1000, 1000)
+        # Mid-tier models  
+        cost_mid, _ = pricing_manager.estimate_cost("unknown-sonnet-pro", 1000, 1000)
 
         # Low-tier models
-        cost_low, _ = pricing_manager.estimate_cost("basic-model", 1000, 1000)
+        cost_low, _ = pricing_manager.estimate_cost("unknown-basic-model", 1000, 1000)
 
         # High-tier should be most expensive, low-tier least expensive
         assert cost_high >= cost_mid >= cost_low
+        
+        # Check expected fallback values
+        assert cost_high == Decimal("0.15")  # High-tier
+        assert cost_mid == Decimal("0.05")   # Mid-tier  
+        assert cost_low == Decimal("0.02")   # Low-tier
 
     @pytest.mark.asyncio
     async def test_fetch_latest_pricing_success(self, pricing_manager, sample_litellm_data):

@@ -154,8 +154,10 @@ class TestResponseEvaluator:
 
     @pytest.mark.asyncio
     @patch("second_opinion.core.evaluator.get_client_for_model")
+    @patch("second_opinion.core.evaluator.create_client_from_config")
     async def test_compare_responses_basic(
         self,
+        mock_create_client_from_config,
         mock_get_client_for_model,
         evaluator,
         sample_response_primary,
@@ -171,6 +173,7 @@ class TestResponseEvaluator:
             cost_estimate=Decimal("0.01")
         )
         mock_get_client_for_model.return_value = mock_client
+        mock_create_client_from_config.return_value = mock_client
         
         # Mock the cost guard to avoid reservation issues
         evaluator.cost_guard.check_and_reserve_budget = AsyncMock()
@@ -199,8 +202,10 @@ class TestResponseEvaluator:
 
     @pytest.mark.asyncio
     @patch("second_opinion.core.evaluator.get_client_for_model")
+    @patch("second_opinion.core.evaluator.create_client_from_config")
     async def test_compare_responses_default_criteria(
         self,
+        mock_create_client_from_config,
         mock_get_client_for_model,
         evaluator,
         sample_response_primary,
@@ -215,6 +220,7 @@ class TestResponseEvaluator:
             cost_estimate=Decimal("0.01")
         )
         mock_get_client_for_model.return_value = mock_client
+        mock_create_client_from_config.return_value = mock_client
         
         # Mock the cost guard to avoid reservation issues
         evaluator.cost_guard.check_and_reserve_budget = AsyncMock()

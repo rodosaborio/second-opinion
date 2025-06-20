@@ -24,6 +24,45 @@ logging.getLogger("second_opinion").setLevel(logging.WARNING)
 
 
 @pytest.fixture(autouse=True, scope="function")
+def isolated_environment(tmp_path):
+    """
+    Isolate environment variables for each test to prevent test pollution.
+    
+    This ensures that configuration tests don't inherit environment variables
+    from the host system, .env files, or other tests.
+    """
+    import os
+    
+    # Store original environment variables that could affect settings
+    sensitive_env_vars = [
+        "LOG_LEVEL", "ENVIRONMENT", "APP_NAME", 
+        "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "LMSTUDIO_BASE_URL",
+        "DATABASE_ENCRYPTION_KEY", "COST_LIMIT_DAILY", "COST_LIMIT_MONTHLY"
+    ]
+    
+    original_env = {}
+    for var in sensitive_env_vars:
+        original_env[var] = os.environ.get(var)
+        # Remove from environment to test defaults
+        if var in os.environ:
+            del os.environ[var]
+    
+    # Change working directory to temp path to avoid loading .env files
+    original_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    
+    yield
+    
+    # Restore original environment and working directory
+    os.chdir(original_cwd)
+    for var, original_value in original_env.items():
+        if original_value is not None:
+            os.environ[var] = original_value
+        elif var in os.environ:
+            del os.environ[var]
+
+
+@pytest.fixture(autouse=True, scope="function")
 def reset_global_state():
     """
     Reset all global state between tests to ensure isolation.

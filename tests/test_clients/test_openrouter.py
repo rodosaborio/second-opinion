@@ -2,6 +2,7 @@
 Tests for the OpenRouter client implementation.
 """
 
+import os
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -219,8 +220,18 @@ class TestOpenRouterClient:
             await client.complete(sample_request)
 
     @pytest.mark.asyncio
-    async def test_estimate_cost_known_model(self, client):
+    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-test-key"})
+    @patch("src.second_opinion.clients.openrouter.get_pricing_manager")
+    async def test_estimate_cost_known_model(self, mock_get_pricing_manager):
         """Test cost estimation for known model."""
+        # Mock pricing manager to return realistic costs
+        mock_pricing_manager = MagicMock()
+        mock_pricing_manager.estimate_cost.return_value = (Decimal("0.00025"), "pricing_data")
+        mock_get_pricing_manager.return_value = mock_pricing_manager
+        
+        # Create client after mock is set up
+        client = OpenRouterClient(api_key="sk-or-test123")
+        
         request = ModelRequest(
             model="gpt-3.5-turbo",
             messages=[Message(role="user", content="Hello" * 100)],  # ~100 tokens

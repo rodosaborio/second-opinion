@@ -94,7 +94,7 @@ class TestAppSettings:
 
     def test_api_key_validation_production(self):
         """Test that API keys are required in production."""
-        with pytest.raises(ValidationError, match="At least one API key must be configured"):
+        with pytest.raises(ValidationError, match="OpenRouter API key must be configured"):
             AppSettings(environment="production")
 
     def test_api_key_validation_with_key(self):
@@ -120,20 +120,26 @@ class TestAppSettings:
     def test_get_api_key(self):
         """Test getting API keys for providers."""
         settings = AppSettings(
-            openrouter_api_key="sk-or-test",
-            anthropic_api_key="sk-ant-test"
+            openrouter_api_key="sk-or-test"
         )
 
+        # All providers use OpenRouter API key
         assert settings.get_api_key("openrouter") == "sk-or-test"
-        assert settings.get_api_key("anthropic") == "sk-ant-test"
+        assert settings.get_api_key("anthropic") == "sk-or-test"
         assert settings.get_api_key("nonexistent") is None
 
     def test_has_api_key(self):
         """Test checking if API keys are configured."""
         settings = AppSettings(openrouter_api_key="sk-or-test")
 
+        # All providers use OpenRouter API key
         assert settings.has_api_key("openrouter") is True
-        assert settings.has_api_key("anthropic") is False
+        assert settings.has_api_key("anthropic") is True  # Uses OpenRouter key
+        
+        # Test with no API key
+        settings_no_key = AppSettings()
+        assert settings_no_key.has_api_key("openrouter") is False
+        assert settings_no_key.has_api_key("anthropic") is False
 
     def test_path_helpers(self):
         """Test path helper methods."""
@@ -263,8 +269,7 @@ class TestSecurityValidation:
         })
 
         captured = capsys.readouterr()
-        assert "Warning: API key for openrouter may have invalid format" in captured.out
-        assert "anthropic" not in captured.out  # Should not warn for valid format
+        assert "Warning: OpenRouter API key should start with 'sk-or-'" in captured.out
 
     def test_directory_creation_security(self):
         """Test that directories are created with appropriate permissions."""
