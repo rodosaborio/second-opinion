@@ -11,10 +11,11 @@ from decimal import Decimal
 from typing import List, Optional
 
 from ...cli.main import filter_think_tags
+from ...clients import detect_model_provider
 from ...config.model_configs import model_config_manager
 from ...config.settings import get_settings
 from ...core.evaluator import get_evaluator
-from ...core.models import EvaluationCriteria, ModelRequest, TaskComplexity
+from ...core.models import EvaluationCriteria, Message, ModelRequest, TaskComplexity
 from ...utils.client_factory import create_client_from_config
 from ...utils.cost_tracking import get_cost_guard, BudgetPeriod
 from ...utils.sanitization import sanitize_prompt, validate_model_name, validate_cost_limit, SecurityContext
@@ -31,57 +32,63 @@ async def second_opinion_tool(
     cost_limit: Optional[float] = None,
 ) -> str:
     """
-    Compare AI responses across models for alternative perspectives and quality assessment.
+    Get a second opinion on an AI response by comparing it against alternative models.
     
-    This tool helps optimize AI model usage by comparing responses from different models,
-    providing quality assessments, and suggesting cost-effective alternatives. It supports
-    response reuse to minimize API costs when you already have a primary model response.
+    This tool is designed for natural conversation flow where an AI client has already
+    provided a response and wants to evaluate it against alternatives. It helps optimize
+    AI model usage by providing quality assessments, cost optimization recommendations,
+    and suggestions for when to use local vs cloud models.
+    
+    NATURAL USAGE PATTERN:
+    1. User asks: "Write a Python function to calculate fibonacci"
+    2. AI responds: <provides code>
+    3. User asks: "Can you get a second opinion on that?"
+    4. AI calls this tool with its response for comparison
     
     Args:
-        prompt: The question or task to analyze and compare across models
-        primary_model: The model name that generated the original response 
-                      (e.g., "anthropic/claude-3-5-sonnet"). If not provided, will use
-                      the most frequently used model from session history or default.
-        primary_response: The original response to compare against. When provided,
-                         saves API costs by skipping the primary model call. This is
-                         especially useful when you already have a response from another client.
-        context: Additional context about the task or domain to improve comparison quality.
-                For example: "This is for academic research" or "Technical documentation".
-        comparison_models: Specific models to compare against the primary model.
-                          Can be a list like ["openai/gpt-4o", "google/gemini-pro"].
-                          If not provided, models will be auto-selected based on the
-                          primary model tier and task complexity.
-        cost_limit: Maximum cost limit for this operation in USD (e.g., 0.25).
-                   If not provided, uses the configured default limit.
+        prompt: The original question or task that was asked
+        primary_model: The model that provided the original response. Use OpenRouter format:
+                      - Claude Desktop: "anthropic/claude-3-5-sonnet"
+                      - ChatGPT: "openai/gpt-4o" or "openai/gpt-4o-mini"
+                      - Gemini: "google/gemini-pro-1.5"
+                      - Local models: "qwen3-4b-mlx", "codestral-22b-v0.1", etc.
+        primary_response: The response to evaluate (RECOMMENDED). When provided, saves
+                         costs and evaluates the actual response the user saw.
+        context: Additional context about the task domain for better comparison quality.
+                For example: "coding task", "academic research", "creative writing".
+        comparison_models: Specific models to compare against. If not provided, will
+                          auto-select alternatives including cost-effective local options.
+        cost_limit: Maximum cost limit for this operation in USD (default: $0.25).
     
     Returns:
-        A formatted comparison report showing:
-        - Response quality assessment across models
-        - Cost analysis and optimization recommendations
-        - Task complexity evaluation
-        - Actionable insights for model selection
+        A second opinion report with:
+        - Quality assessment of the original response
+        - Comparison with alternative model approaches  
+        - Cost optimization recommendations (including local models)
+        - Decision guidance: "stick with your model" vs "consider alternatives"
         
-    Example Usage:
-        # Basic comparison with auto-selected models
+    RECOMMENDED USAGE (Natural Conversation Flow):
+        # After providing a response to user, get second opinion
         result = await second_opinion_tool(
-            prompt="What's the capital of France?",
-            primary_model="anthropic/claude-3-5-sonnet"
-        )
-        
-        # Cost-efficient comparison with existing response
-        result = await second_opinion_tool(
-            prompt="Explain quantum computing",
+            prompt="Write a Python function to calculate fibonacci",
             primary_model="anthropic/claude-3-5-sonnet",
-            primary_response="Quantum computing is...",  # Saves API call
-            comparison_models=["openai/gpt-4o", "google/gemini-pro"],
-            context="For technical documentation"
+            primary_response="def fibonacci(n):\n    if n <= 1:\n        return n...",
+            context="coding task"
         )
         
-        # Budget-conscious comparison
+    OTHER USAGE PATTERNS:
+        # Compare model capabilities for a new task
         result = await second_opinion_tool(
-            prompt="Write a marketing email",
-            primary_model="openai/gpt-4o-mini",
-            cost_limit=0.10
+            prompt="Explain quantum computing to a 10-year-old",
+            primary_model="openai/gpt-4o-mini",  # Will generate response
+            context="educational content"
+        )
+        
+        # Test local model vs cloud alternatives
+        result = await second_opinion_tool(
+            prompt="Debug this code snippet",
+            primary_model="qwen3-4b-mlx",  # Local model
+            comparison_models=["anthropic/claude-3-5-sonnet", "openai/gpt-4o"]
         )
     """
     try:
@@ -95,14 +102,26 @@ async def second_opinion_tool(
         if context:
             clean_context = sanitize_prompt(context, SecurityContext.USER_PROMPT)
         
-        # Validate and normalize model names
+        # Validate and normalize model names with helpful suggestions
         if primary_model:
-            primary_model = validate_model_name(primary_model)
+            try:
+                primary_model = validate_model_name(primary_model)
+            except Exception as e:
+                # Provide helpful model name suggestions
+                suggestions = _get_model_name_suggestions(primary_model)
+                suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                return f"❌ **Invalid Primary Model**: {str(e)}{suggestion_text}"
         
         if comparison_models:
-            comparison_models = [
-                validate_model_name(model) for model in comparison_models
-            ]
+            try:
+                comparison_models = [
+                    validate_model_name(model) for model in comparison_models
+                ]
+            except Exception as e:
+                # Provide helpful model name suggestions
+                suggestions = _get_model_name_suggestions(str(e))
+                suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                return f"❌ **Invalid Comparison Model**: {str(e)}{suggestion_text}"
         
         # Validate cost limit
         if cost_limit is not None:
@@ -156,10 +175,11 @@ async def second_opinion_tool(
         # Estimate cost for primary model (if we need to call it)
         if not primary_response:
             try:
-                primary_client = create_client_from_config(primary_model.split('/')[0] if '/' in primary_model else 'openrouter')
+                provider = detect_model_provider(primary_model)
+                primary_client = create_client_from_config(provider)
                 primary_request = ModelRequest(
                     model=primary_model,
-                    messages=[{"role": "user", "content": clean_prompt}],
+                    messages=[Message(role="user", content=clean_prompt)],
                     max_tokens=2000,
                     temperature=0.1,
                     system_prompt=clean_context
@@ -173,10 +193,11 @@ async def second_opinion_tool(
         # Estimate cost for comparison models
         for model in comparison_models:
             try:
-                client = create_client_from_config(model.split('/')[0] if '/' in model else 'openrouter')
+                provider = detect_model_provider(model)
+                client = create_client_from_config(provider)
                 request = ModelRequest(
                     model=model,
-                    messages=[{"role": "user", "content": clean_prompt}],
+                    messages=[Message(role="user", content=clean_prompt)],
                     max_tokens=2000,
                     temperature=0.1,
                     system_prompt=clean_context
@@ -193,7 +214,7 @@ async def second_opinion_tool(
         # Check budget
         try:
             budget_check = await cost_guard.check_and_reserve_budget(
-                estimated_cost, "second_opinion", primary_model
+                estimated_cost, "second_opinion", primary_model, per_request_override=cost_limit_decimal
             )
             reservation_id = budget_check.reservation_id
         except Exception as e:
@@ -209,10 +230,11 @@ async def second_opinion_tool(
         else:
             logger.info(f"Generating primary response with {primary_model}")
             try:
-                primary_client = create_client_from_config(primary_model.split('/')[0] if '/' in primary_model else 'openrouter')
+                provider = detect_model_provider(primary_model)
+                primary_client = create_client_from_config(provider)
                 primary_request = ModelRequest(
                     model=primary_model,
-                    messages=[{"role": "user", "content": clean_prompt}],
+                    messages=[Message(role="user", content=clean_prompt)],
                     max_tokens=2000,
                     temperature=0.1,
                     system_prompt=clean_context
@@ -232,10 +254,11 @@ async def second_opinion_tool(
         for model in comparison_models:
             try:
                 logger.info(f"Generating comparison response with {model}")
-                client = create_client_from_config(model.split('/')[0] if '/' in model else 'openrouter')
+                provider = detect_model_provider(model)
+                client = create_client_from_config(provider)
                 request = ModelRequest(
                     model=model,
-                    messages=[{"role": "user", "content": clean_prompt}],
+                    messages=[Message(role="user", content=clean_prompt)],
                     max_tokens=2000,
                     temperature=0.1,
                     system_prompt=clean_context
@@ -263,7 +286,7 @@ async def second_opinion_tool(
             evaluation_results = []
             evaluation_cost = Decimal("0.0")
             
-            for i, (model, response, model_cost) in enumerate(zip(comparison_models, comparison_responses, comparison_costs)):
+            for model, response, model_cost in zip(comparison_models, comparison_responses, comparison_costs):
                 try:
                     result = await evaluator.compare_responses(
                         primary_response=clean_primary_response,
@@ -332,8 +355,8 @@ async def _format_comparison_report(
     
     report = []
     
-    # Header
-    report.append("# 🔍 Second Opinion Analysis")
+    # Header with decision-support framing
+    report.append("# 🤔 Second Opinion: Should You Stick or Switch?")
     report.append("")
     
     # Task info
@@ -370,7 +393,7 @@ async def _format_comparison_report(
     
     # Comparison responses
     report.append("## 🔀 Alternative Responses")
-    for i, (model, response, cost) in enumerate(zip(comparison_models, comparison_responses, comparison_costs)):
+    for model, response, cost in zip(comparison_models, comparison_responses, comparison_costs):
         report.append(f"### {model} (${cost:.4f})")
         report.append("")
         if response.startswith("Error:"):
@@ -401,28 +424,97 @@ async def _format_comparison_report(
         report.append(f"**Analysis**: {reasoning}")
         report.append("")
     
-    # Recommendations
-    report.append("## 🎯 Recommendations")
+    # Decision-focused recommendations
+    report.append("## 🎯 My Recommendation")
+    
+    primary_provider = detect_model_provider(primary_model)
     
     if best_model == primary_model:
-        report.append(f"✅ **{primary_model}** provided the best response for this task")
+        report.append(f"**✅ STICK with {primary_model}**")
+        report.append(f"Your model provided the best response quality for this task.")
     else:
-        report.append(f"💡 **{best_model}** might be better suited for this type of task")
+        report.append(f"**💡 CONSIDER switching to {best_model}**")
+        report.append(f"This alternative might provide better results for similar tasks.")
     
-    # Cost optimization suggestions
-    cheapest_model = min(zip(comparison_models, comparison_costs), key=lambda x: x[1], default=(None, None))
-    if cheapest_model[0] and cheapest_model[1] < actual_cost * Decimal("0.5"):
-        report.append(f"💰 Consider using **{cheapest_model[0]}** for similar tasks to save ~${(actual_cost - cheapest_model[1]):.3f} per request")
+    report.append("")
     
-    # Task complexity recommendations
-    if task_complexity in [TaskComplexity.SIMPLE, TaskComplexity.MODERATE]:
-        budget_models = ["anthropic/claude-3-haiku", "openai/gpt-4o-mini", "google/gemini-flash"]
-        relevant_budget = [m for m in budget_models if m not in [primary_model] + comparison_models]
-        if relevant_budget:
-            report.append(f"🎯 For {task_complexity.value.lower()} tasks, consider testing: **{relevant_budget[0]}**")
+    # Cost optimization with local model focus
+    local_models = [m for m in comparison_models if detect_model_provider(m) == "lmstudio"]
+    if local_models and primary_provider == "openrouter":
+        local_model = local_models[0]
+        report.append("## 💰 Cost Optimization Opportunity")
+        report.append(f"**Local Alternative**: Consider testing **{local_model}** for development or high-volume use")
+        report.append(f"- **Cost**: $0.00 (local inference)")
+        report.append(f"- **Your current cost**: ${actual_cost:.4f} per request")
+        report.append(f"- **Potential savings**: 100% for similar quality tasks")
+        report.append("")
+    
+    # Actionable next steps
+    report.append("## 🚀 Next Steps")
+    if best_model == primary_model:
+        if local_models:
+            report.append(f"1. **Keep using** {primary_model} for quality")
+            report.append(f"2. **Test** {local_models[0]} for cost savings on similar tasks")
+        else:
+            report.append(f"1. **Continue using** {primary_model} - it's working well!")
+            report.append(f"2. **Consider** local models for development and cost optimization")
+    else:
+        report.append(f"1. **Try** {best_model} for this type of task")
+        report.append(f"2. **Compare results** to see if the switch improves your workflow")
+        if local_models:
+            report.append(f"3. **Experiment** with {local_models[0]} for cost-effective alternatives")
     
     report.append("")
     report.append("---")
-    report.append("*Second Opinion Analysis Complete*")
+    report.append("*Second Opinion Complete - Happy model hunting! 🎯*")
     
     return "\n".join(report)
+
+
+def _get_model_name_suggestions(invalid_model: str) -> str:
+    """
+    Generate helpful model name suggestions based on common patterns.
+    
+    Args:
+        invalid_model: The invalid model name that was provided
+        
+    Returns:
+        Formatted string with model name suggestions
+    """
+    suggestions = []
+    
+    # Common provider suggestions
+    suggestions.append("**Cloud Models (OpenRouter format):**")
+    suggestions.append("- Claude: `anthropic/claude-3-5-sonnet`, `anthropic/claude-3-haiku`")
+    suggestions.append("- ChatGPT: `openai/gpt-4o`, `openai/gpt-4o-mini`")
+    suggestions.append("- Gemini: `google/gemini-pro-1.5`, `google/gemini-flash-1.5`")
+    suggestions.append("")
+    suggestions.append("**Local Models (LM Studio):**")
+    suggestions.append("- Qwen: `qwen3-4b-mlx`, `qwen3-0.6b-mlx`")
+    suggestions.append("- Codestral: `codestral-22b-v0.1`, `devstral-small-2505-mlx`")
+    
+    # Analyze the invalid model for specific suggestions
+    invalid_lower = invalid_model.lower() if invalid_model else ""
+    
+    if "claude" in invalid_lower:
+        suggestions.append("")
+        suggestions.append("**For Claude models, try:**")
+        suggestions.append("- `anthropic/claude-3-5-sonnet` (recommended)")
+        suggestions.append("- `anthropic/claude-3-haiku` (budget option)")
+    elif "gpt" in invalid_lower or "openai" in invalid_lower:
+        suggestions.append("")
+        suggestions.append("**For OpenAI models, try:**")
+        suggestions.append("- `openai/gpt-4o` (latest)")
+        suggestions.append("- `openai/gpt-4o-mini` (budget option)")
+    elif "gemini" in invalid_lower or "google" in invalid_lower:
+        suggestions.append("")
+        suggestions.append("**For Google models, try:**")
+        suggestions.append("- `google/gemini-pro-1.5`")
+        suggestions.append("- `google/gemini-flash-1.5`")
+    elif any(local in invalid_lower for local in ["qwen", "codestral", "llama", "mlx"]):
+        suggestions.append("")
+        suggestions.append("**For local models, try:**")
+        suggestions.append("- `qwen3-4b-mlx` (good balance)")
+        suggestions.append("- `codestral-22b-v0.1` (code-focused)")
+    
+    return "\n".join(suggestions)

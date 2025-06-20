@@ -483,10 +483,10 @@ class TestGlobalFunctions:
         # Reset global state
         set_cost_guard(None)
 
-        # Getting cost guard should create default
+        # Getting cost guard should create default using configuration
         guard = get_cost_guard()
         assert isinstance(guard, CostGuard)
-        assert guard.per_request_limit == Decimal('0.10')  # Default value
+        assert guard.per_request_limit > Decimal('0')  # Should have a positive limit from config
 
     def test_set_cost_guard_none(self):
         """Test setting cost guard to None."""

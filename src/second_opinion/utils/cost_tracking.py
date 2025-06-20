@@ -154,7 +154,8 @@ class CostGuard:
         estimated_cost: Decimal,
         operation_type: str,
         model: str,
-        user_id: str | None = None
+        user_id: str | None = None,
+        per_request_override: Decimal | None = None
     ) -> BudgetCheck:
         """
         Check budget limits and reserve budget for operation.
@@ -164,6 +165,7 @@ class CostGuard:
             operation_type: Type of operation (e.g., 'second_opinion', 'compare')
             model: Model being used
             user_id: Optional user identifier
+            per_request_override: Override per-request limit for this operation
             
         Returns:
             BudgetCheck with reservation details
@@ -175,12 +177,13 @@ class CostGuard:
             # Clean up expired reservations
             await self._cleanup_expired_reservations()
 
-            # Validate per-request limit
-            if estimated_cost > self.per_request_limit:
+            # Validate per-request limit (use override if provided)
+            effective_per_request_limit = per_request_override if per_request_override is not None else self.per_request_limit
+            if estimated_cost > effective_per_request_limit:
                 raise CostLimitError(
-                    f"Estimated cost ${estimated_cost} exceeds per-request limit ${self.per_request_limit}",
+                    f"Estimated cost ${estimated_cost} exceeds per-request limit ${effective_per_request_limit}",
                     estimated_cost,
-                    self.per_request_limit,
+                    effective_per_request_limit,
                     "request"
                 )
 
@@ -524,7 +527,18 @@ def get_cost_guard() -> CostGuard:
     """Get global cost guard instance."""
     global _cost_guard
     if _cost_guard is None:
-        _cost_guard = CostGuard()
+        # Import here to avoid circular imports
+        from ..config.settings import get_settings
+        
+        settings = get_settings()
+        cost_config = settings.cost_management
+        
+        _cost_guard = CostGuard(
+            per_request_limit=cost_config.default_per_request_limit,
+            daily_limit=cost_config.daily_limit,
+            monthly_limit=cost_config.monthly_limit,
+            warning_threshold=cost_config.warning_threshold
+        )
     return _cost_guard
 
 

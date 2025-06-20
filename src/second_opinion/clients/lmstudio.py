@@ -35,7 +35,10 @@ class LMStudioClient(BaseClient):
     def __init__(self, base_url: str = "http://localhost:1234", **kwargs: Any) -> None:
         super().__init__("lmstudio", api_key=None, **kwargs)
 
+        # Ensure base_url includes /v1 for LM Studio API
         self.base_url = base_url.rstrip("/")
+        if not self.base_url.endswith("/v1"):
+            self.base_url += "/v1"
 
         # HTTP client configuration (no authentication needed for local server)
         self._http_client = httpx.AsyncClient(
@@ -130,7 +133,7 @@ class LMStudioClient(BaseClient):
             return cached_models
 
         try:
-            response = await self._http_client.get("/v1/models")
+            response = await self._http_client.get("/models")
             await self._handle_http_error(response)
 
             data = response.json()
@@ -187,7 +190,7 @@ class LMStudioClient(BaseClient):
 
         try:
             # Try to get models list as health check
-            response = await self._http_client.get("/v1/models", timeout=5.0)
+            response = await self._http_client.get("/models", timeout=5.0)
 
             if response.status_code == 200:
                 data = response.json()
@@ -265,7 +268,7 @@ class LMStudioClient(BaseClient):
         """
         try:
             response = await self._http_client.post(
-                "/v1/chat/completions", json=payload
+                "/chat/completions", json=payload
             )
             await self._handle_http_error(response)
             return response

@@ -865,6 +865,105 @@ async def retry_with_backoff(
 
 ## Implementation Challenges & Solutions
 
+### Challenge: Hardcoded Provider Selection (FIXED)
+
+**Issue**: MCP tool was hardcoded to use 'openrouter' provider, preventing LM Studio (local model) usage.
+
+**Root Cause**: Direct hardcoding instead of using configuration-driven provider detection.
+
+**Solution**:
+```python
+# Before (hardcoded):
+primary_client = create_client_from_config('openrouter')
+
+# After (config-driven):  
+provider = detect_model_provider(primary_model)
+primary_client = create_client_from_config(provider)
+```
+
+**Implementation Pattern**:
+- Always use `detect_model_provider()` for dynamic provider selection
+- Support both cloud (OpenRouter) and local (LM Studio) providers automatically
+- Provider detection based on model name patterns (mlx, qwen, llama → lmstudio)
+
+### Challenge: Test Infrastructure with Incomplete Mocks (FIXED)
+
+**Issue**: Mock classes missing abstract method implementations causing `TypeError: Can't instantiate abstract class`.
+
+**Root Cause**: BaseClient abstract methods not fully implemented in test mocks.
+
+**Solution**:
+```python
+class MockClient(BaseClient):
+    async def complete(self, request: ModelRequest) -> ModelResponse: ...
+    async def estimate_cost(self, request: ModelRequest) -> Decimal: ...
+    async def list_models(self) -> List[ModelInfo]: ...
+    async def get_model_info(self, model: str) -> ModelInfo: ...
+    async def get_available_models(self) -> List[ModelInfo]: ...  # Was missing!
+```
+
+**Implementation Pattern**:
+- Implement ALL abstract methods in mock classes
+- Use proper Pydantic objects (`TokenUsage`, `Message`) instead of raw dictionaries
+- Create comprehensive dependency injection with monkeypatch
+
+### Challenge: Overly Strict Security Validation (FIXED)
+
+**Issue**: Prompt injection detection blocked legitimate code snippets containing backticks and shell patterns.
+
+**Root Cause**: Single security validation level for all contexts.
+
+**Solution**:
+```python
+def _contains_injection_pattern(self, text: str, context: SecurityContext) -> bool:
+    if context == SecurityContext.USER_PROMPT:
+        # More permissive for user prompts containing code
+        serious_patterns = [
+            r'<script[^>]*>',     # Script tags
+            r'javascript:',       # JavaScript URLs  
+            r'UNION\s+SELECT',    # SQL injection
+            # Removed: backticks, shell patterns for code snippets
+        ]
+    else:
+        # Strict validation for API requests
+        return self._strict_validation(text)
+```
+
+**Implementation Pattern**:
+- Context-aware validation with `SecurityContext` enum
+- Balance security for threats while enabling legitimate code-related use cases
+- Different validation rules for user prompts vs API requests
+
+### Challenge: Configuration Hierarchy Broken (FIXED)
+
+**Issue**: Hardcoded budget values overrode user-provided cost limits and configuration settings.
+
+**Root Cause**: Budget configuration ignored CLI flags and tool configurations.
+
+**Solution**:
+```python
+# Fixed hierarchy: CLI flags > tool config > settings default
+def get_cost_guard() -> CostGuard:
+    settings = get_settings()
+    cost_config = settings.cost_management
+    return CostGuard(
+        per_request_limit=cost_config.default_per_request_limit,  # Config-driven
+        daily_limit=cost_config.daily_limit,
+        monthly_limit=cost_config.monthly_limit
+    )
+
+# Use per_request_override for user cost limits
+budget_check = await cost_guard.check_and_reserve_budget(
+    estimated_cost, "second_opinion", primary_model, 
+    per_request_override=user_cost_limit  # Highest priority
+)
+```
+
+**Implementation Pattern**:
+- Always respect configuration hierarchy: CLI > tool config > defaults
+- Use `per_request_override` parameter for user-provided limits
+- Never hardcode values that should be configurable
+
 ### Challenge: Model Provider Inconsistencies
 
 **Issue**: Different providers have different API formats, error codes, and capabilities.
@@ -1561,6 +1660,74 @@ REASONING: [Brief explanation focusing on factual correctness]
 - **Core Tool Implementation** (`src/second_opinion/mcp/tools/second_opinion.py`) - Full `second_opinion` tool with response reuse, cost optimization, and rich documentation
 - **MCP Configuration Integration** (`config/mcp_profiles.yaml`, extended `settings.py`) - MCP-specific settings with server and tool configuration
 - **Comprehensive Testing Infrastructure** (`tests/test_mcp/*.py`) - 27 tests covering server, session, tool functionality, and integration scenarios
+
+### ✅ Phase 8b: Natural Conversation Flow Alignment - COMPLETED
+
+**What's Working:**
+- **Enhanced Tool Documentation** (`src/second_opinion/mcp/tools/second_opinion.py`, `src/second_opinion/mcp/server.py`) - Redesigned for natural conversation flow with clear MCP client guidance
+- **Smart LM Studio Positioning** (`src/second_opinion/cli/main.py`) - Local models positioned as cost/development alternatives rather than primary options
+- **Decision-Support Response Format** (`src/second_opinion/mcp/tools/second_opinion.py`) - "Should You Stick or Switch?" framing with actionable recommendations
+- **Enhanced Model Name Validation** - Helpful error messages with context-aware suggestions for common model format issues
+- **Real-World Testing & Bug Fixes** - LM Studio URL construction bug identified and fixed during comprehensive testing
+
+**Key Implementation Achievements:**
+
+1. **Natural Conversation Flow Design**: Tool now supports the intended workflow where AI clients provide existing responses for comparison rather than research-style model comparison
+2. **Enhanced Documentation & Examples**: Clear guidance for MCP clients with OpenRouter model format examples and natural usage patterns
+3. **Decision-Focused UX**: Changed from "Second Opinion Analysis" to "Should You Stick or Switch?" with clear STICK/CONSIDER recommendations
+4. **Local Model Cost Optimization**: LM Studio models intelligently suggested as cost-effective alternatives when primary is cloud-based
+5. **Model Name Validation**: Context-aware error suggestions help MCP clients use correct model formats (e.g., `anthropic/claude-3-5-sonnet`)
+6. **Production Bug Fix**: Fixed critical LM Studio URL construction issue (`/v1/v1/models` → `/v1/models`) discovered during real-world testing
+
+**Updated Tool Interface for Natural Flow:**
+```python
+# Natural conversation flow (recommended)
+await second_opinion(
+    prompt="Write a Python function to calculate fibonacci",
+    primary_model="anthropic/claude-3-5-sonnet",        # AI client self-identifies
+    primary_response="def fibonacci(n):\n...",          # Actual response to evaluate
+    context="coding task"                               # Domain context
+)
+# Tool evaluates provided response vs alternatives, suggests "STICK" or "CONSIDER switching"
+```
+
+**Enhanced Comparison Model Selection:**
+- **Cloud primary → includes local alternatives**: Cost optimization with LM Studio models
+- **Local primary → compares against cloud**: Quality benchmarking against premium options  
+- **Smart tier-based selection**: Budget/mid-range/premium models selected based on primary model and task complexity
+- **Cost-aware recommendations**: Local models highlighted for development and high-volume use cases
+
+**Testing Results:**
+- ✅ **LM Studio Integration**: Both qwen3-0.6b-mlx and qwen3-4b-mlx working correctly after URL fix
+- ✅ **Model Detection Logic**: Correctly routes local vs cloud models to appropriate clients
+- ✅ **Cost Optimization**: `primary_response` parameter saves API calls as intended
+- ✅ **Error Handling**: Invalid model names show helpful suggestions with format examples
+- ✅ **Natural Flow**: Tool supports conversation pattern: User → AI → "Get second opinion" → Comparison
+
+**Decision-Support Response Format:**
+```markdown
+# 🤔 Second Opinion: Should You Stick or Switch?
+
+## 🎯 My Recommendation
+**✅ STICK with anthropic/claude-3-5-sonnet**
+Your model provided the best response quality for this task.
+
+## 💰 Cost Optimization Opportunity  
+**Local Alternative**: Consider testing **qwen3-4b-mlx** for development or high-volume use
+- **Cost**: $0.00 (local inference)
+- **Your current cost**: $0.0080 per request  
+- **Potential savings**: 100% for similar quality tasks
+
+## 🚀 Next Steps
+1. **Keep using** anthropic/claude-3-5-sonnet for quality
+2. **Test** qwen3-4b-mlx for cost savings on similar tasks
+```
+
+**Manual Model Specification Strategy (Validated):**
+- **Reliable**: MCP clients specify their model name explicitly (e.g., "anthropic/claude-3-5-sonnet")
+- **Simple**: No complex detection logic needed - reduces bugs and improves reliability
+- **User-Correctable**: If model gets its name wrong, user can instruct it to use the correct format
+- **Future-Proof**: New models just specify their name vs updating detection rules
 
 **Key Implementation Achievements:**
 

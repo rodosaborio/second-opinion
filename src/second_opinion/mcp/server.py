@@ -88,7 +88,7 @@ from .tools.second_opinion import second_opinion_tool
 # Register the core second_opinion tool
 @mcp.tool(
     name="second_opinion",
-    description="Compare AI responses across models for alternative perspectives and quality assessment"
+    description="Get a second opinion on an AI response by comparing it against alternative models for quality assessment and cost optimization"
 )
 async def second_opinion(
     prompt: str,
@@ -99,47 +99,45 @@ async def second_opinion(
     cost_limit: float | None = None,
 ) -> str:
     """
-    Compare AI responses across models for alternative perspectives and quality assessment.
+    Get a second opinion on an AI response by comparing it against alternative models.
     
-    This tool helps optimize AI model usage by comparing responses from different models,
-    providing quality assessments, and suggesting cost-effective alternatives. It supports
-    response reuse to minimize API costs when you already have a primary model response.
+    This tool is designed for natural conversation flow where an AI client has already
+    provided a response and wants to evaluate it against alternatives. It helps optimize
+    AI model usage by providing quality assessments, cost optimization recommendations,
+    and suggestions for when to use local vs cloud models.
+    
+    NATURAL USAGE PATTERN:
+    1. User asks: "Write a Python function to calculate fibonacci"
+    2. AI responds: <provides code>
+    3. User asks: "Can you get a second opinion on that?"
+    4. AI calls this tool with its response for comparison
     
     Args:
-        prompt: The question or task to analyze and compare across models
-        primary_model: The model name that generated the original response 
-                      (e.g., "anthropic/claude-3-5-sonnet"). If not provided, will use
-                      the most frequently used model from session history or default.
-        primary_response: The original response to compare against. When provided,
-                         saves API costs by skipping the primary model call. This is
-                         especially useful when you already have a response from another client.
-        context: Additional context about the task or domain to improve comparison quality.
-                For example: "This is for academic research" or "Technical documentation".
-        comparison_models: Specific models to compare against the primary model.
-                          Can be a list like ["openai/gpt-4o", "google/gemini-pro"].
-                          If not provided, models will be auto-selected based on the
-                          primary model tier and task complexity.
-        cost_limit: Maximum cost limit for this operation in USD (e.g., 0.25).
-                   If not provided, uses the configured default limit.
+        prompt: The original question or task that was asked
+        primary_model: The model that provided the original response. Use OpenRouter format:
+                      - Claude Desktop: "anthropic/claude-3-5-sonnet"
+                      - ChatGPT: "openai/gpt-4o" or "openai/gpt-4o-mini"
+                      - Gemini: "google/gemini-pro-1.5"
+                      - Local models: "qwen3-4b-mlx", "codestral-22b-v0.1", etc.
+        primary_response: The response to evaluate (RECOMMENDED). When provided, saves
+                         costs and evaluates the actual response the user saw.
+        context: Additional context about the task domain for better comparison quality.
+                For example: "coding task", "academic research", "creative writing".
+        comparison_models: Specific models to compare against. If not provided, will
+                          auto-select alternatives including cost-effective local options.
+        cost_limit: Maximum cost limit for this operation in USD (default: $0.25).
     
     Returns:
-        A formatted comparison report showing response quality assessment, cost analysis,
-        task complexity evaluation, and actionable insights for model selection.
+        A second opinion report with quality assessment, cost optimization recommendations,
+        and decision guidance for model selection.
         
-    Example Usage:
-        # Basic comparison with auto-selected models
+    RECOMMENDED USAGE (Natural Conversation Flow):
+        # After providing a response to user, get second opinion
         result = await second_opinion(
-            prompt="What's the capital of France?",
-            primary_model="anthropic/claude-3-5-sonnet"
-        )
-        
-        # Cost-efficient comparison with existing response
-        result = await second_opinion(
-            prompt="Explain quantum computing",
+            prompt="Write a Python function to calculate fibonacci",
             primary_model="anthropic/claude-3-5-sonnet",
-            primary_response="Quantum computing is...",  # Saves API call
-            comparison_models=["openai/gpt-4o", "google/gemini-pro"],
-            context="For technical documentation"
+            primary_response="def fibonacci(n):\n    if n <= 1:\n        return n...",
+            context="coding task"
         )
     """
     # Get or create session for this request

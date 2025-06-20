@@ -170,10 +170,15 @@ class ComparisonModelSelector:
     ) -> list[str]:
         """Smart comparison model selection based on task complexity and model tier."""
         try:
+            from ..clients import detect_model_provider
+            
             config = self.model_config.config
             if not config:
                 return self._get_default_models(primary_model, max_models)
 
+            # Check if primary is local or cloud
+            primary_provider = detect_model_provider(primary_model)
+            
             # Get primary model tier
             primary_tier = self._get_model_tier(primary_model, config)
 
@@ -199,13 +204,29 @@ class ComparisonModelSelector:
                 # Unknown tier, use default strategy
                 return self._get_default_models(primary_model, max_models)
 
+            # Add local model cost optimization for cloud primaries
+            if primary_provider == "openrouter" and max_models > len(candidates):
+                # Include local model as cost-effective alternative
+                local_alternatives = ["qwen3-4b-mlx", "codestral-22b-v0.1"]
+                for local_model in local_alternatives:
+                    if local_model != primary_model and len(candidates) < max_models:
+                        candidates.insert(0, local_model)  # Prioritize cost savings
+                        break
+
             # For expert/complex tasks, prefer higher-tier models
             if task_complexity in [TaskComplexity.EXPERT, TaskComplexity.COMPLEX]:
-                candidates = sorted(
-                    candidates,
+                # Keep local models for cost analysis but prioritize capable models
+                local_models = [m for m in candidates if detect_model_provider(m) == "lmstudio"]
+                cloud_models = [m for m in candidates if detect_model_provider(m) == "openrouter"]
+                
+                cloud_models = sorted(
+                    cloud_models,
                     key=lambda m: self._get_model_capability_score(m),
                     reverse=True,
                 )
+                
+                # Combine: prioritize capable models but keep one local option
+                candidates = cloud_models + local_models[:1]
 
             # Filter out primary model and limit results
             candidates = [m for m in candidates if m != primary_model]
@@ -247,13 +268,28 @@ class ComparisonModelSelector:
 
     def _get_default_models(self, primary_model: str, max_models: int) -> list[str]:
         """Get default comparison models when configuration is unavailable."""
-        default_models = [
-            "anthropic/claude-3-5-sonnet",
-            "openai/gpt-4o",
-            "google/gemini-pro-1.5",
-            "anthropic/claude-3-haiku",
-            "openai/gpt-4o-mini",
-        ]
+        from ..clients import detect_model_provider
+        
+        # Determine if primary is local or cloud
+        primary_provider = detect_model_provider(primary_model)
+        
+        if primary_provider == "lmstudio":
+            # Primary is local, compare against cloud alternatives
+            default_models = [
+                "anthropic/claude-3-5-sonnet",
+                "openai/gpt-4o",
+                "anthropic/claude-3-haiku",
+                "openai/gpt-4o-mini",
+            ]
+        else:
+            # Primary is cloud, include local cost-effective alternatives
+            default_models = [
+                "anthropic/claude-3-5-sonnet",
+                "openai/gpt-4o", 
+                "qwen3-4b-mlx",        # Cost-effective local alternative
+                "anthropic/claude-3-haiku",
+                "openai/gpt-4o-mini",
+            ]
 
         # Filter out primary model
         candidates = [m for m in default_models if m != primary_model]

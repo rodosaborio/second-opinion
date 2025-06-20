@@ -78,8 +78,15 @@ Always refer to IMPLEMENTATION.md when:
 - **Robust Error Handling** - Graceful fallback to simulation when evaluation API calls fail
 - **Comprehensive Testing** - All existing tests pass, new functionality validated
 
-### 🔄 Next: MCP Integration
-Ready to implement MCP server tools using the complete evaluation engine, CLI interface, and OpenRouter foundation.
+### ✅ Completed Components (Phase 7: MCP Tools & Configuration-Driven Design)
+- **MCP Tool Implementation** (`src/second_opinion/mcp/tools/second_opinion.py`) - Fixed hardcoded providers, now uses `detect_model_provider()` for config-driven client selection
+- **Security Enhancements** (`src/second_opinion/utils/sanitization.py`) - Updated prompt injection detection to allow code snippets while maintaining security
+- **Budget Configuration Fixes** (`src/second_opinion/utils/cost_tracking.py`) - Fixed hierarchy to use config-based limits with per-request overrides  
+- **Comprehensive Test Infrastructure** (`tests/test_mcp/`) - Created proper mock utilities and unit tests independent of real API keys
+- **Enhanced Testing** - 15 MCP tool tests + existing test suite all passing with improved mock strategies
+
+### ✅ Complete MCP Integration
+MCP server tools fully implemented using the complete evaluation engine, CLI interface, and OpenRouter foundation.
 
 ## Development Commands
 
@@ -179,6 +186,32 @@ uv run python -m second_opinion.mcp.server --dev
 
 ## 🔧 Development Patterns & Learnings
 
+### Lesson Learned: Avoid Hardcoding in Production Code
+- **Never hardcode provider names**: Use `detect_model_provider()` for dynamic provider selection
+- **Configuration-driven design**: Always prefer configurations over hardcoded values
+- **Problem**: Hardcoded 'openrouter' prevented LM Studio (local model) usage
+- **Solution**: Use provider detection based on model names to support both cloud and local providers
+- **Pattern**: `provider = detect_model_provider(model)` followed by `create_client_from_config(provider)`
+
+### Lesson Learned: Test Infrastructure with Better Mocks
+- **Independent test configurations**: Test mocks should not depend on real API configurations
+- **Complete abstract method implementation**: Mock classes must implement ALL abstract methods from base classes
+- **Proper Pydantic object creation**: Use actual model objects (`TokenUsage`, `Message`) instead of raw dictionaries
+- **Comprehensive dependency injection**: Mock all external dependencies through fixtures and monkeypatch
+- **Context-aware mocking**: Provider detection mocks should handle model name patterns correctly
+
+### Lesson Learned: Security Context Awareness
+- **Context-aware validation**: Security checks should be permissive for code-related prompts in user context
+- **Problem**: Overly strict prompt injection detection blocked legitimate code snippets with backticks
+- **Solution**: Different validation rules for `SecurityContext.USER_PROMPT` vs `SecurityContext.API_REQUEST`
+- **Balance**: Maintain security for serious threats while enabling code-related use cases
+
+### Lesson Learned: Configuration Hierarchy
+- **Budget management**: Ensure CLI flags > tool config > settings default hierarchy works correctly
+- **Problem**: Hardcoded values overrode configuration-based budget limits
+- **Solution**: Use `per_request_override` parameter and proper configuration resolution
+- **Pattern**: Always check for user-provided values before falling back to configuration defaults
+
 ### Lesson Learned: Blocking Calls and Test Behavior
 - Discovered critical issues with blocking calls in async test environments
 - Blocking calls can cause test deadlocks and unexpected timeouts
@@ -277,16 +310,52 @@ uv run pytest --durations=10 --timeout=30
 
 ## Test Writing and Mocking Guidelines
 
+### Configuration Independence
 - Prioritize independence from actual configurations for tests
 - Use dependency injection and mocking to isolate test components
 - Create mock objects that simulate real dependencies without actual configurations
+- Ensure tests are deterministic and do not rely on external state or configurations
+
+### Comprehensive Mock Implementation
+- **Complete abstract method implementation**: Mock classes must implement ALL abstract methods from base classes
+```python
+class MockClient(BaseClient):
+    async def complete(self, request: ModelRequest) -> ModelResponse: ...
+    async def estimate_cost(self, request: ModelRequest) -> Decimal: ...
+    async def list_models(self) -> List[ModelInfo]: ...
+    async def get_model_info(self, model: str) -> ModelInfo: ...
+    async def get_available_models(self) -> List[ModelInfo]: ...  # Often missed!
+```
+
+### Proper Object Creation in Mocks
+- **Use actual Pydantic objects**: Don't use raw dictionaries for complex objects
+```python
+# Good: Proper object creation
+return ModelResponse(
+    content=mock_content,
+    model=request.model,
+    usage=TokenUsage(input_tokens=10, output_tokens=20, total_tokens=30),  # Real object
+    cost_estimate=self.mock_costs,
+    provider=self.provider_name,
+    metadata={'mock': True}
+)
+
+# Bad: Raw dictionary usage
+return ModelResponse(
+    usage={'input_tokens': 10, 'output_tokens': 20}  # Will fail Pydantic validation
+)
+```
+
+### Dependency Injection Patterns  
 - Prefer interfaces and abstract base classes for easier mocking
 - Use `unittest.mock` or `pytest-mock` for creating mock objects
 - Implement dependency injection to allow easy substitution of real implementations with mocks
-- Ensure tests are deterministic and do not rely on external state or configurations
+- Use monkeypatch for comprehensive dependency replacement
+
+### Test Design Principles
 - Write tests that focus on behavior and logic rather than specific implementation details
 - Use parametrization to test multiple scenarios without duplicating test code
 - Mock external services, databases, and network calls to ensure test reliability and speed
-```
+- Create context-aware mocks that handle different scenarios (provider detection, model patterns, etc.)
 
 </invoke>

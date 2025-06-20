@@ -217,8 +217,27 @@ class InputSanitizer:
 
     def _contains_injection_pattern(self, text: str, context: SecurityContext = SecurityContext.USER_PROMPT) -> bool:
         """Check if text contains potential injection patterns."""
+        # For user prompts, be more permissive to allow code snippets
+        if context == SecurityContext.USER_PROMPT:
+            # Only check for serious injection attempts, allow code patterns
+            serious_patterns = [
+                r'<script[^>]*>',                    # Script tags (opening)
+                r'</script>',                        # Script tags (closing)
+                r'javascript:',                      # JavaScript URLs
+                r'data:.*base64',                    # Base64 data URLs
+                r'<iframe[^>]*>',                    # Iframe tags
+                r'UNION\s+SELECT',                   # SQL injection attempts
+                r'DROP\s+TABLE',                     # SQL injection attempts
+                r'DELETE\s+FROM',                    # SQL injection attempts
+                r'INSERT\s+INTO',                    # SQL injection attempts
+                r'\\x[0-9a-fA-F]{2}',               # Hex escapes
+                r'%[0-9a-fA-F]{2}',                 # URL encoding
+            ]
+            serious_regex = re.compile('|'.join(serious_patterns), re.IGNORECASE)
+            return bool(serious_regex.search(text))
+        
         # For system prompts, we're more lenient with command-like patterns since they'll be sanitized
-        if context == SecurityContext.SYSTEM_PROMPT:
+        elif context == SecurityContext.SYSTEM_PROMPT:
             # Check for serious injection attempts but allow backticks (they'll be sanitized)
             serious_patterns = [
                 r'<script[^>]*>',                    # Script tags (opening)
@@ -230,7 +249,7 @@ class InputSanitizer:
             serious_regex = re.compile('|'.join(serious_patterns), re.IGNORECASE)
             return bool(serious_regex.search(text))
 
-        # For other contexts, check all patterns
+        # For other contexts (API_REQUEST, CONFIGURATION), check all patterns
         return bool(self._injection_regex.search(text))
 
     def _normalize_whitespace(self, text: str) -> str:
