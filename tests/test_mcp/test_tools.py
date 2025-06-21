@@ -172,7 +172,7 @@ class TestSecondOpinionTool:
                     primary_model="gpt-4///injection",
                     comparison_models=["claude-3<test>"],
                 )
-            except Exception:
+            except Exception:  # noqa: S110
                 pass  # Expected to fail due to mocking, but validation should be called
 
             # Verify sanitization was called
@@ -257,7 +257,7 @@ class TestSecondOpinionTool:
                     primary_model="gpt-4",
                     # No comparison_models specified - should auto-select
                 )
-            except Exception:
+            except Exception:  # noqa: S110
                 pass  # Expected due to incomplete mocking
 
             # Verify model selector was used

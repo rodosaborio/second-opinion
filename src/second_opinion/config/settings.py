@@ -343,11 +343,11 @@ class ConfigurationManager:
                 config = yaml.safe_load(f)
                 return config or {}
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML configuration: {e}")
+            raise ValueError(f"Invalid YAML configuration: {e}") from e
         except FileNotFoundError:
             return {}
         except Exception as e:
-            raise ValueError(f"Failed to load configuration: {e}")
+            raise ValueError(f"Failed to load configuration: {e}") from e
 
     def _validate_configuration(self):
         """Perform additional configuration validation."""
@@ -368,7 +368,7 @@ class ConfigurationManager:
         try:
             path.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            raise ValueError(f"Cannot create directory {dir_path}: {e}")
+            raise ValueError(f"Cannot create directory {dir_path}: {e}") from e
 
     def _validate_api_key_formats(self):
         """Validate API key formats for security."""

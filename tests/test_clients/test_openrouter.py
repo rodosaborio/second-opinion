@@ -408,7 +408,7 @@ class TestOpenRouterClientSecurity:
         )
 
         with pytest.raises(SecurityError):
-            validated = await client.validate_request(malicious_request)
+            await client.validate_request(malicious_request)
 
     @pytest.mark.security
     @pytest.mark.asyncio

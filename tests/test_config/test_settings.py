@@ -259,7 +259,7 @@ class TestSecurityValidation:
     def test_api_key_format_validation(self, capsys):
         """Test API key format validation warnings."""
         manager = ConfigurationManager()
-        settings = manager.load_configuration(
+        manager.load_configuration(
             override_env={
                 "OPENROUTER_API_KEY": "invalid-key-format",
                 "ANTHROPIC_API_KEY": "sk-ant-valid-format",
@@ -272,7 +272,7 @@ class TestSecurityValidation:
     def test_directory_creation_security(self):
         """Test that directories are created with appropriate permissions."""
         manager = ConfigurationManager()
-        settings = manager.load_configuration(
+        manager.load_configuration(
             override_env={
                 "DATA_DIR": "./test_secure_data",
                 "CONFIG_DIR": "./test_secure_config",

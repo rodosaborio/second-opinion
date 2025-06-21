@@ -380,6 +380,7 @@ class BaseClient(ABC):
         """Async context manager entry."""
         return self
 
+    @abstractmethod
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         # Cleanup resources if needed

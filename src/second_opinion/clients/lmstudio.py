@@ -95,7 +95,7 @@ class LMStudioClient(BaseClient):
 
         except Exception as e:
             logger.error(f"LM Studio completion failed: {e}")
-            if isinstance(e, (ClientError, SecurityError)):
+            if isinstance(e, ClientError | SecurityError):
                 raise
             else:
                 raise ClientError(

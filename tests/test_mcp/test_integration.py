@@ -240,8 +240,8 @@ class TestMCPIntegration:
 
         # Test with empty prompt - should return error message, not raise exception
         result = await tool.run({"prompt": ""})
-        content = result[0].text if hasattr(result[0], "text") else str(result[0])
         # Should handle gracefully, not crash
+        assert result is not None
 
         # Test with invalid model name
         result = await tool.run(

@@ -9,6 +9,7 @@ This module provides the main CLI application using Typer, with support for:
 """
 
 import asyncio
+import logging
 import re
 from datetime import UTC
 from decimal import Decimal
@@ -36,6 +37,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 class CLIError(Exception):
@@ -624,9 +626,9 @@ def second_opinion_command(
             ).evaluator_model
             if config_evaluator:
                 evaluator_model = config_evaluator
-        except Exception:
+        except Exception as e:
             # Config not available or no evaluator specified, will use primary model
-            pass
+            logger.debug(f"Could not load evaluator from config: {e}")
 
     # Show model selection
     if comparison_model:

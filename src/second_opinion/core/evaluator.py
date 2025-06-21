@@ -780,8 +780,6 @@ class ResponseEvaluator:
         }
 
         # Try to extract winners from the structured response
-        response_lower = evaluation_text.lower()
-
         # Look for winner declarations in each section
         accuracy_winner = self._extract_section_winner(evaluation_text, "accuracy")
         completeness_winner = self._extract_section_winner(

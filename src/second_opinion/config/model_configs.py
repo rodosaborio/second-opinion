@@ -224,9 +224,9 @@ class ModelConfigManager:
             self._config = ModelProfilesConfig()
             return self._config
         except yaml.YAMLError as e:
-            raise ValueError(f"Invalid YAML in model config: {e}")
+            raise ValueError(f"Invalid YAML in model config: {e}") from e
         except Exception as e:
-            raise ValueError(f"Failed to load model config: {e}")
+            raise ValueError(f"Failed to load model config: {e}") from e
 
     def get_model_config(
         self, tool_name: str, primary_model: str | None = None

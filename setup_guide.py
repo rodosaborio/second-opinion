@@ -41,8 +41,12 @@ def check_env_file():
 def check_dependencies():
     """Check if dependencies are installed."""
     try:
-        from src.second_opinion.config.settings import get_settings
+        import importlib.util
 
+        # Check if our main module can be imported
+        spec = importlib.util.find_spec("src.second_opinion.config.settings")
+        if spec is None:
+            raise ImportError("Second Opinion package not found")
         print("✅ Dependencies installed correctly")
         return True
     except ImportError as e:
@@ -80,11 +84,17 @@ def test_api_connection():
     """Test API connection with a minimal request."""
     print("\nTesting API connection...")
     try:
+        import shutil
         import subprocess
 
-        result = subprocess.run(
+        # Find uv executable
+        uv_path = shutil.which("uv")
+        if not uv_path:
+            raise FileNotFoundError("uv command not found in PATH")
+
+        result = subprocess.run(  # noqa: S603
             [
-                "uv",
+                uv_path,
                 "run",
                 "second-opinion",
                 "--primary-model",

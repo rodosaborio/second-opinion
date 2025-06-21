@@ -395,7 +395,7 @@ async def second_opinion(
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
                 raise ImportError(
                     f"Unable to import second_opinion_tool after trying multiple strategies. Last error: {final_error}"
-                )
+                ) from final_error
 
         if second_opinion_tool is None:
             raise ImportError("second_opinion_tool is None after all import attempts")
@@ -613,7 +613,7 @@ async def should_downgrade(
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
                 raise ImportError(
                     f"Unable to import should_downgrade_tool after trying multiple strategies. Last error: {final_error}"
-                )
+                ) from final_error
 
         if should_downgrade_tool is None:
             raise ImportError("should_downgrade_tool is None after all import attempts")
@@ -830,7 +830,7 @@ async def should_upgrade(
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
                 raise ImportError(
                     f"Unable to import should_upgrade_tool after trying multiple strategies. Last error: {final_error}"
-                )
+                ) from final_error
 
         if should_upgrade_tool is None:
             raise ImportError("should_upgrade_tool is None after all import attempts")
@@ -1048,7 +1048,7 @@ async def compare_responses(
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
                 raise ImportError(
                     f"Unable to import compare_responses_tool after trying multiple strategies. Last error: {final_error}"
-                )
+                ) from final_error
 
         if compare_responses_tool is None:
             raise ImportError(
@@ -1295,7 +1295,7 @@ async def consult(
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
                 raise ImportError(
                     f"Unable to import consult_tool after trying multiple strategies. Last error: {final_error}"
-                )
+                ) from final_error
 
         if consult_tool is None:
             raise ImportError("consult_tool is None after all import attempts")

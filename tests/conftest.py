@@ -439,13 +439,7 @@ def _clear_module_caches():
     """Clear any module-level caches that might persist between tests."""
 
     # Clear any function caches
-    try:
-        import functools
-
-        # Clear lru_cache instances if any exist
-        # This is a generic approach - specific caches can be added as needed
-    except ImportError:
-        pass
+    # Note: functools.lru_cache clearing can be added here if needed in the future
 
     # Clear any global variables that might cache instances
     import sys

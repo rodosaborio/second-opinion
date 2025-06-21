@@ -105,6 +105,10 @@ class MockClient(BaseClient):
             ),
         ]
 
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Mock implementation of async context manager exit."""
+        pass
+
 
 @pytest.fixture
 def mock_openrouter_client():

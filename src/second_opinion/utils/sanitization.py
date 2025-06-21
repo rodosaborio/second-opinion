@@ -274,7 +274,7 @@ class InputSanitizer:
                 clean_value = self._sanitize_string_value(value)
                 if clean_value and len(clean_value) <= 1000:
                     sanitized[clean_key] = clean_value
-            elif isinstance(value, (int, float, bool)):
+            elif isinstance(value, int | float | bool):
                 sanitized[clean_key] = value
             elif isinstance(value, Decimal):
                 sanitized[clean_key] = value
@@ -306,8 +306,8 @@ class InputSanitizer:
                 cost_decimal = Decimal(cleaned)
             else:
                 cost_decimal = Decimal(str(cost_limit))
-        except (ValueError, TypeError, ArithmeticError):
-            raise ValidationError("Invalid cost limit format")
+        except (ValueError, TypeError, ArithmeticError) as e:
+            raise ValidationError("Invalid cost limit format") from e
 
         if cost_decimal < 0:
             raise ValidationError("Cost limit cannot be negative")

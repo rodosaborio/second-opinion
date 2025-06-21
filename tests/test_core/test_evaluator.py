@@ -144,7 +144,7 @@ class TestResponseEvaluator:
         long_task = "Please provide a comprehensive analysis of the socioeconomic implications of artificial intelligence adoption across various industries, considering both positive and negative effects, potential regulatory frameworks, and long-term societal impacts. Include specific examples and cite relevant research studies."
 
         short_complexity = await evaluator.classify_task_complexity(short_task)
-        medium_complexity = await evaluator.classify_task_complexity(medium_task)
+        await evaluator.classify_task_complexity(medium_task)
         long_complexity = await evaluator.classify_task_complexity(long_task)
 
         # Short tasks should trend toward simple

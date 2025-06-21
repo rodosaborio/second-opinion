@@ -99,7 +99,7 @@ class PromptManager:
             with open(template_path, encoding="utf-8") as f:
                 content = f.read()
         except Exception as e:
-            raise ValueError(f"Failed to read template {template_name}: {e}")
+            raise ValueError(f"Failed to read template {template_name}: {e}") from e
 
         if not content.strip():
             raise ValueError(f"Template {template_name} is empty")
@@ -177,9 +177,9 @@ class PromptManager:
         except KeyError as e:
             raise ValueError(
                 f"Template '{template_name}' contains undefined parameter: {e}"
-            )
+            ) from e
         except Exception as e:
-            raise ValueError(f"Failed to render template '{template_name}': {e}")
+            raise ValueError(f"Failed to render template '{template_name}': {e}") from e
 
         logger.debug(f"Rendered template '{template_name}' for model '{model}'")
         return rendered
@@ -284,7 +284,7 @@ class PromptManager:
     def _extract_parameters(self, content: str) -> list[str]:
         """Extract parameter names from template content."""
         matches = self._param_pattern.findall(content)
-        return sorted(list(set(matches)))  # Remove duplicates and sort
+        return sorted(set(matches))  # Remove duplicates and sort
 
 
 # Global prompt manager instance
