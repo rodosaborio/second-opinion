@@ -16,26 +16,26 @@ logger = logging.getLogger(__name__)
 
 class ClientFactoryError(Exception):
     """Error creating client from configuration."""
+
     pass
 
 
 def create_client_from_config(
-    provider: str,
-    config_overrides: dict[str, Any] | None = None
+    provider: str, config_overrides: dict[str, Any] | None = None
 ) -> BaseClient:
     """
     Create a client using application configuration.
-    
+
     Args:
         provider: Provider name (e.g., "openrouter")
         config_overrides: Optional configuration overrides
-        
+
     Returns:
         Configured client instance
-        
+
     Raises:
         ClientFactoryError: If client creation fails
-        
+
     Example:
         >>> client = create_client_from_config("openrouter")
         >>> response = await client.complete(request)
@@ -96,17 +96,14 @@ def _get_provider_config(provider: str, settings) -> dict[str, Any]:
         raise ClientFactoryError(f"Unknown provider configuration: {provider}")
 
 
-def create_openrouter_client(
-    api_key: str | None = None,
-    **kwargs
-) -> BaseClient:
+def create_openrouter_client(api_key: str | None = None, **kwargs) -> BaseClient:
     """
     Convenience function to create an OpenRouter client.
-    
+
     Args:
         api_key: Optional API key override
         **kwargs: Additional client configuration
-        
+
     Returns:
         Configured OpenRouter client
     """
@@ -118,17 +115,14 @@ def create_openrouter_client(
     return create_client_from_config("openrouter", config_overrides)
 
 
-def create_lmstudio_client(
-    base_url: str | None = None,
-    **kwargs
-) -> BaseClient:
+def create_lmstudio_client(base_url: str | None = None, **kwargs) -> BaseClient:
     """
     Convenience function to create an LM Studio client.
-    
+
     Args:
         base_url: Optional base URL override (default: http://localhost:1234)
         **kwargs: Additional client configuration
-        
+
     Returns:
         Configured LM Studio client
     """
@@ -143,10 +137,10 @@ def create_lmstudio_client(
 def validate_provider_config(provider: str) -> bool:
     """
     Validate that a provider is properly configured.
-    
+
     Args:
         provider: Provider name to validate
-        
+
     Returns:
         True if properly configured, False otherwise
     """

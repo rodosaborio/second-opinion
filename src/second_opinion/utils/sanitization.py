@@ -14,11 +14,13 @@ from ..core.models import SecurityContext
 
 class SecurityError(Exception):
     """Security-related validation error."""
+
     pass
 
 
 class ValidationError(Exception):
     """General validation error."""
+
     pass
 
 
@@ -32,46 +34,50 @@ class InputSanitizer:
 
     # Patterns for detecting potential security issues
     API_KEY_PATTERNS = [
-        r'sk-[a-zA-Z0-9-_]{20,}',           # OpenAI/Anthropic style
-        r'sk-or-[a-zA-Z0-9-_]{20,}',        # OpenRouter style
-        r'sk-ant-[a-zA-Z0-9-_]{20,}',       # Anthropic style
-        r'(?<![a-zA-Z0-9])[a-zA-Z0-9]{40,}(?![a-zA-Z0-9])',  # Generic long tokens with boundaries
-        r'Bearer\s+[a-zA-Z0-9\-_=]{20,}',   # Bearer tokens
+        r"sk-[a-zA-Z0-9-_]{20,}",  # OpenAI/Anthropic style
+        r"sk-or-[a-zA-Z0-9-_]{20,}",  # OpenRouter style
+        r"sk-ant-[a-zA-Z0-9-_]{20,}",  # Anthropic style
+        r"(?<![a-zA-Z0-9])[a-zA-Z0-9]{40,}(?![a-zA-Z0-9])",  # Generic long tokens with boundaries
+        r"Bearer\s+[a-zA-Z0-9\-_=]{20,}",  # Bearer tokens
         r'api[_-]?key["\']?\s*[:=]\s*["\']?[a-zA-Z0-9\-_]{20,}',  # API key assignments
     ]
 
     # Patterns for potentially malicious content
     INJECTION_PATTERNS = [
-        r'<script[^>]*>',                    # Script tags (opening)
-        r'</script>',                        # Script tags (closing)
-        r'javascript:',                      # JavaScript URLs
-        r'data:.*base64',                    # Base64 data URLs
-        r'\\x[0-9a-fA-F]{2}',               # Hex escapes
-        r'%[0-9a-fA-F]{2}',                 # URL encoding
-        r'UNION\s+SELECT',                   # SQL injection attempts
-        r'DROP\s+TABLE',                     # SQL injection attempts
-        r'DELETE\s+FROM',                    # SQL injection attempts
-        r'INSERT\s+INTO',                    # SQL injection attempts
-        r'<iframe[^>]*>',                    # Iframe tags
-        r'`[^`]*`',                         # Backtick commands
-        r'\$\([^)]*\)',                     # Command substitution
+        r"<script[^>]*>",  # Script tags (opening)
+        r"</script>",  # Script tags (closing)
+        r"javascript:",  # JavaScript URLs
+        r"data:.*base64",  # Base64 data URLs
+        r"\\x[0-9a-fA-F]{2}",  # Hex escapes
+        r"%[0-9a-fA-F]{2}",  # URL encoding
+        r"UNION\s+SELECT",  # SQL injection attempts
+        r"DROP\s+TABLE",  # SQL injection attempts
+        r"DELETE\s+FROM",  # SQL injection attempts
+        r"INSERT\s+INTO",  # SQL injection attempts
+        r"<iframe[^>]*>",  # Iframe tags
+        r"`[^`]*`",  # Backtick commands
+        r"\$\([^)]*\)",  # Command substitution
     ]
 
     def __init__(self):
-        self._api_key_regex = re.compile('|'.join(self.API_KEY_PATTERNS), re.IGNORECASE)
-        self._injection_regex = re.compile('|'.join(self.INJECTION_PATTERNS), re.IGNORECASE)
+        self._api_key_regex = re.compile("|".join(self.API_KEY_PATTERNS), re.IGNORECASE)
+        self._injection_regex = re.compile(
+            "|".join(self.INJECTION_PATTERNS), re.IGNORECASE
+        )
 
-    def sanitize_prompt(self, prompt: str, context: SecurityContext = SecurityContext.USER_PROMPT) -> str:
+    def sanitize_prompt(
+        self, prompt: str, context: SecurityContext = SecurityContext.USER_PROMPT
+    ) -> str:
         """
         Sanitize user prompts for safe API consumption.
-        
+
         Args:
             prompt: The user prompt to sanitize
             context: Security context for validation level
-            
+
         Returns:
             Sanitized prompt
-            
+
         Raises:
             SecurityError: If potential security issues are detected
             ValidationError: If validation fails
@@ -81,7 +87,9 @@ class InputSanitizer:
 
         # Check for potential API keys
         if self._contains_api_key_pattern(prompt):
-            raise SecurityError("Potential API key or sensitive token detected in prompt")
+            raise SecurityError(
+                "Potential API key or sensitive token detected in prompt"
+            )
 
         # Check for injection attempts (context-aware)
         if self._contains_injection_pattern(prompt, context):
@@ -93,7 +101,9 @@ class InputSanitizer:
         # Check size limits based on context
         max_length = self._get_max_length_for_context(context)
         if len(prompt) > max_length:
-            raise ValidationError(f"Prompt exceeds maximum length of {max_length} characters")
+            raise ValidationError(
+                f"Prompt exceeds maximum length of {max_length} characters"
+            )
 
         # Additional sanitization based on context
         if context == SecurityContext.SYSTEM_PROMPT:
@@ -106,13 +116,13 @@ class InputSanitizer:
     def validate_model_name(self, model_name: str) -> str:
         """
         Validate and normalize model names with intelligent format conversion.
-        
+
         Args:
             model_name: The model name to validate
-            
+
         Returns:
             Normalized model name in standard format
-            
+
         Raises:
             ValidationError: If model name is invalid
         """
@@ -126,11 +136,15 @@ class InputSanitizer:
             raise ValidationError("Model name cannot be empty")
 
         if len(original_model_name) > self.MAX_MODEL_NAME_LENGTH:
-            raise ValidationError(f"Model name exceeds maximum length of {self.MAX_MODEL_NAME_LENGTH}")
+            raise ValidationError(
+                f"Model name exceeds maximum length of {self.MAX_MODEL_NAME_LENGTH}"
+            )
 
         # Check for injection patterns BEFORE normalization to prevent bypassing security
         # Use CONFIGURATION context for stricter validation of model names
-        if self._contains_injection_pattern(original_model_name, SecurityContext.CONFIGURATION):
+        if self._contains_injection_pattern(
+            original_model_name, SecurityContext.CONFIGURATION
+        ):
             raise SecurityError("Potential injection attempt in model name")
 
         # Try to normalize common model name patterns
@@ -138,11 +152,17 @@ class InputSanitizer:
 
         # Check for valid model name format (provider/model or just model)
         # Allow alphanumeric start, alphanumeric/hyphen/underscore/dot/slash/colon in middle
-        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-_./:]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$', normalized_name):
-            raise ValidationError(f"Model name '{original_model_name}' contains invalid characters. Normalized to '{normalized_name}' but still invalid.")
+        if not re.match(
+            r"^[a-zA-Z0-9][a-zA-Z0-9\-_./:]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$", normalized_name
+        ):
+            raise ValidationError(
+                f"Model name '{original_model_name}' contains invalid characters. Normalized to '{normalized_name}' but still invalid."
+            )
 
         # Double-check for injection patterns after normalization as well
-        if self._contains_injection_pattern(normalized_name, SecurityContext.CONFIGURATION):
+        if self._contains_injection_pattern(
+            normalized_name, SecurityContext.CONFIGURATION
+        ):
             raise SecurityError("Potential injection attempt in model name")
 
         return normalized_name
@@ -150,10 +170,10 @@ class InputSanitizer:
     def _normalize_model_name(self, model_name: str) -> str:
         """
         Normalize model names to standard OpenRouter format.
-        
+
         Args:
             model_name: Original model name
-            
+
         Returns:
             Normalized model name
         """
@@ -165,7 +185,6 @@ class InputSanitizer:
             "claude-3.5-sonnet": "anthropic/claude-3-5-sonnet",
             "claude 3 haiku": "anthropic/claude-3-haiku",
             "claude-3-haiku": "anthropic/claude-3-haiku",
-            
             # ChatGPT variants
             "gpt-4o": "openai/gpt-4o",
             "gpt 4o": "openai/gpt-4o",
@@ -174,7 +193,6 @@ class InputSanitizer:
             "gpt 4o mini": "openai/gpt-4o-mini",
             "gpt4o": "openai/gpt-4o",
             "gpt4o-mini": "openai/gpt-4o-mini",
-            
             # Gemini variants
             "gemini": "google/gemini-pro-1.5",
             "gemini pro": "google/gemini-pro-1.5",
@@ -185,7 +203,6 @@ class InputSanitizer:
             "gemini flash": "google/gemini-flash-1.5",
             "gemini-flash": "google/gemini-flash-1.5",
             "gemini-flash-1.5": "google/gemini-flash-1.5",
-            
             # Local model variants (keep as-is, just normalize spacing/hyphens)
             "qwen 3 4b mlx": "qwen3-4b-mlx",
             "qwen3 4b mlx": "qwen3-4b-mlx",
@@ -194,43 +211,48 @@ class InputSanitizer:
             "codestral 22b": "codestral-22b-v0.1",
             "codestral-22b": "codestral-22b-v0.1",
         }
-        
+
         # If already in provider/model format, keep as-is (check first to avoid unwanted normalization)
-        if "/" in model_name and re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-_.]*\/[a-zA-Z0-9][a-zA-Z0-9\-_.]*$', model_name):
+        if "/" in model_name and re.match(
+            r"^[a-zA-Z0-9][a-zA-Z0-9\-_.]*\/[a-zA-Z0-9][a-zA-Z0-9\-_.]*$", model_name
+        ):
             return model_name
-        
+
         # Convert to lowercase for mapping lookup
         lower_name = model_name.lower().strip()
-        
+
         # Check exact match first
         if lower_name in normalization_map:
             return normalization_map[lower_name]
-        
+
         # Check partial matches for common patterns
         for pattern, normalized in normalization_map.items():
             if pattern in lower_name:
                 return normalized
-        
+
         # For local models, normalize spacing and special characters
-        if any(keyword in lower_name for keyword in ["qwen", "codestral", "llama", "mlx", "gguf"]):
+        if any(
+            keyword in lower_name
+            for keyword in ["qwen", "codestral", "llama", "mlx", "gguf"]
+        ):
             # Replace spaces with hyphens, keep alphanumeric, hyphens, dots
-            normalized = re.sub(r'[^a-zA-Z0-9\-.]', '-', model_name)
+            normalized = re.sub(r"[^a-zA-Z0-9\-.]", "-", model_name)
             # Remove multiple consecutive hyphens
-            normalized = re.sub(r'-+', '-', normalized)
+            normalized = re.sub(r"-+", "-", normalized)
             # Remove leading/trailing hyphens
-            normalized = normalized.strip('-')
+            normalized = normalized.strip("-")
             return normalized
-        
+
         # Return original if no normalization needed
         return model_name
 
     def sanitize_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:
         """
         Sanitize metadata dictionary for safe storage and processing.
-        
+
         Args:
             metadata: Dictionary of metadata to sanitize
-            
+
         Returns:
             Sanitized metadata dictionary
         """
@@ -262,13 +284,13 @@ class InputSanitizer:
     def validate_cost_limit(self, cost_limit: str | float | Decimal) -> Decimal:
         """
         Validate and normalize cost limit values.
-        
+
         Args:
             cost_limit: Cost limit to validate
-            
+
         Returns:
             Normalized cost limit as Decimal
-            
+
         Raises:
             ValidationError: If cost limit is invalid
         """
@@ -278,8 +300,8 @@ class InputSanitizer:
         try:
             if isinstance(cost_limit, str):
                 # Remove any currency symbols or spaces
-                cleaned = re.sub(r'[^\d.-]', '', cost_limit)
-                if not cleaned or cleaned in ['.', '-', '-.']:
+                cleaned = re.sub(r"[^\d.-]", "", cost_limit)
+                if not cleaned or cleaned in [".", "-", "-."]:
                     raise ValueError("Empty or invalid string")
                 cost_decimal = Decimal(cleaned)
             else:
@@ -290,48 +312,50 @@ class InputSanitizer:
         if cost_decimal < 0:
             raise ValidationError("Cost limit cannot be negative")
 
-        if cost_decimal > Decimal('1000'):
+        if cost_decimal > Decimal("1000"):
             raise ValidationError("Cost limit exceeds maximum allowed value of $1000")
 
         # Ensure reasonable precision (max 4 decimal places)
-        return cost_decimal.quantize(Decimal('0.0001'))
+        return cost_decimal.quantize(Decimal("0.0001"))
 
     def _contains_api_key_pattern(self, text: str) -> bool:
         """Check if text contains potential API key patterns."""
         return bool(self._api_key_regex.search(text))
 
-    def _contains_injection_pattern(self, text: str, context: SecurityContext = SecurityContext.USER_PROMPT) -> bool:
+    def _contains_injection_pattern(
+        self, text: str, context: SecurityContext = SecurityContext.USER_PROMPT
+    ) -> bool:
         """Check if text contains potential injection patterns."""
         # For user prompts, be more permissive to allow code snippets
         if context == SecurityContext.USER_PROMPT:
             # Only check for serious injection attempts, allow code patterns
             serious_patterns = [
-                r'<script[^>]*>',                    # Script tags (opening)
-                r'</script>',                        # Script tags (closing)
-                r'javascript:',                      # JavaScript URLs
-                r'data:.*base64',                    # Base64 data URLs
-                r'<iframe[^>]*>',                    # Iframe tags
-                r'UNION\s+SELECT',                   # SQL injection attempts
-                r'DROP\s+TABLE',                     # SQL injection attempts
-                r'DELETE\s+FROM',                    # SQL injection attempts
-                r'INSERT\s+INTO',                    # SQL injection attempts
-                r'\\x[0-9a-fA-F]{2}',               # Hex escapes
-                r'%[0-9a-fA-F]{2}',                 # URL encoding
+                r"<script[^>]*>",  # Script tags (opening)
+                r"</script>",  # Script tags (closing)
+                r"javascript:",  # JavaScript URLs
+                r"data:.*base64",  # Base64 data URLs
+                r"<iframe[^>]*>",  # Iframe tags
+                r"UNION\s+SELECT",  # SQL injection attempts
+                r"DROP\s+TABLE",  # SQL injection attempts
+                r"DELETE\s+FROM",  # SQL injection attempts
+                r"INSERT\s+INTO",  # SQL injection attempts
+                r"\\x[0-9a-fA-F]{2}",  # Hex escapes
+                r"%[0-9a-fA-F]{2}",  # URL encoding
             ]
-            serious_regex = re.compile('|'.join(serious_patterns), re.IGNORECASE)
+            serious_regex = re.compile("|".join(serious_patterns), re.IGNORECASE)
             return bool(serious_regex.search(text))
-        
+
         # For system prompts, we're more lenient with command-like patterns since they'll be sanitized
         elif context == SecurityContext.SYSTEM_PROMPT:
             # Check for serious injection attempts but allow backticks (they'll be sanitized)
             serious_patterns = [
-                r'<script[^>]*>',                    # Script tags (opening)
-                r'</script>',                        # Script tags (closing)
-                r'javascript:',                      # JavaScript URLs
-                r'data:.*base64',                    # Base64 data URLs
-                r'<iframe[^>]*>',                    # Iframe tags
+                r"<script[^>]*>",  # Script tags (opening)
+                r"</script>",  # Script tags (closing)
+                r"javascript:",  # JavaScript URLs
+                r"data:.*base64",  # Base64 data URLs
+                r"<iframe[^>]*>",  # Iframe tags
             ]
-            serious_regex = re.compile('|'.join(serious_patterns), re.IGNORECASE)
+            serious_regex = re.compile("|".join(serious_patterns), re.IGNORECASE)
             return bool(serious_regex.search(text))
 
         # For other contexts (API_REQUEST, CONFIGURATION), check all patterns
@@ -343,10 +367,10 @@ class InputSanitizer:
         text = text.strip()
 
         # Replace multiple spaces with single space, but preserve newlines and tabs
-        text = re.sub(r'[ ]+', ' ', text)
+        text = re.sub(r"[ ]+", " ", text)
 
         # Remove null bytes and control characters (except newlines and tabs)
-        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+        text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
 
         return text
 
@@ -363,13 +387,13 @@ class InputSanitizer:
         """Additional sanitization for system prompts."""
         # Remove potential command injection attempts
         dangerous_patterns = [
-            r'`[^`]*`',          # Backtick commands
-            r'\$\([^)]*\)',      # Command substitution
-            r'>\s*[/\\]',        # File redirection
+            r"`[^`]*`",  # Backtick commands
+            r"\$\([^)]*\)",  # Command substitution
+            r">\s*[/\\]",  # File redirection
         ]
 
         for pattern in dangerous_patterns:
-            prompt = re.sub(pattern, '[REMOVED]', prompt, flags=re.IGNORECASE)
+            prompt = re.sub(pattern, "[REMOVED]", prompt, flags=re.IGNORECASE)
 
         return prompt
 
@@ -377,14 +401,14 @@ class InputSanitizer:
         """Additional sanitization for API requests."""
         # Remove potential API manipulation attempts
         api_patterns = [
-            r'Content-Type:\s*[^\n]*',
-            r'Authorization:\s*[^\n]*',
-            r'X-API-Key:\s*[^\n]*',
-            r'Cookie:\s*[^\n]*',
+            r"Content-Type:\s*[^\n]*",
+            r"Authorization:\s*[^\n]*",
+            r"X-API-Key:\s*[^\n]*",
+            r"Cookie:\s*[^\n]*",
         ]
 
         for pattern in api_patterns:
-            prompt = re.sub(pattern, '', prompt, flags=re.IGNORECASE)
+            prompt = re.sub(pattern, "", prompt, flags=re.IGNORECASE)
 
         return prompt
 
@@ -394,7 +418,9 @@ class InputSanitizer:
             return ""
 
         # Check for potential security issues
-        if self._contains_api_key_pattern(value) or self._contains_injection_pattern(value, SecurityContext.CONFIGURATION):
+        if self._contains_api_key_pattern(value) or self._contains_injection_pattern(
+            value, SecurityContext.CONFIGURATION
+        ):
             return ""
 
         # Normalize and return
@@ -405,7 +431,9 @@ class InputSanitizer:
 _sanitizer = InputSanitizer()
 
 
-def sanitize_prompt(prompt: str, context: SecurityContext = SecurityContext.USER_PROMPT) -> str:
+def sanitize_prompt(
+    prompt: str, context: SecurityContext = SecurityContext.USER_PROMPT
+) -> str:
     """Global function to sanitize prompts."""
     return _sanitizer.sanitize_prompt(prompt, context)
 

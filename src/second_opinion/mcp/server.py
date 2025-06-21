@@ -36,7 +36,7 @@ def setup_mcp_logging(debug: bool = False) -> logging.Logger:
 
     # Create formatter with more detail
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - [MCP] %(message)s'
+        "%(asctime)s - %(name)s - %(levelname)s - [MCP] %(message)s"
     )
 
     # Add stderr handler (MCP servers should log to stderr)
@@ -46,8 +46,10 @@ def setup_mcp_logging(debug: bool = False) -> logging.Logger:
 
     return logger
 
+
 # Set up logger
 logger = setup_mcp_logging(debug=True)  # Enable debug for troubleshooting
+
 
 def setup_python_path():
     """Set up Python path for MCP server context."""
@@ -78,6 +80,7 @@ def setup_python_path():
     else:
         logger.info(f"Already in sys.path: {project_root_str}")
 
+
 def log_environment_info():
     """Log comprehensive environment information for debugging."""
     logger.info("=== MCP Server Environment Information ===")
@@ -90,27 +93,28 @@ def log_environment_info():
         logger.info(f"  [{i}] {path}")
 
     # Log key environment variables
-    env_vars = ['PATH', 'UV_PROJECT_ENVIRONMENT', 'VIRTUAL_ENV', 'CONDA_DEFAULT_ENV']
+    env_vars = ["PATH", "UV_PROJECT_ENVIRONMENT", "VIRTUAL_ENV", "CONDA_DEFAULT_ENV"]
     for var in env_vars:
-        value = os.environ.get(var, 'Not set')
+        value = os.environ.get(var, "Not set")
         logger.info(f"{var}: {value}")
 
     logger.info("=== End Environment Information ===")
+
 
 def test_critical_imports():
     """Test importing critical modules and log results."""
     logger.info("=== Testing Critical Imports ===")
 
     critical_modules = [
-        'second_opinion',
-        'second_opinion.mcp',
-        'second_opinion.mcp.tools',
-        'second_opinion.mcp.tools.second_opinion',
-        'second_opinion.mcp.tools.should_downgrade',
-        'second_opinion.mcp.tools.should_upgrade',
-        'second_opinion.core.models',
-        'second_opinion.clients',
-        'second_opinion.utils.cost_tracking',
+        "second_opinion",
+        "second_opinion.mcp",
+        "second_opinion.mcp.tools",
+        "second_opinion.mcp.tools.second_opinion",
+        "second_opinion.mcp.tools.should_downgrade",
+        "second_opinion.mcp.tools.should_upgrade",
+        "second_opinion.core.models",
+        "second_opinion.clients",
+        "second_opinion.utils.cost_tracking",
     ]
 
     successful_imports = []
@@ -125,13 +129,17 @@ def test_critical_imports():
             logger.error(f"✗ Failed to import {module_name}: {e}")
             logger.error(f"  Error type: {type(e).__name__}")
             import traceback
+
             logger.error(f"  Traceback:\n{traceback.format_exc()}")
             failed_imports.append((module_name, str(e)))
 
-    logger.info(f"Import summary: {len(successful_imports)} successful, {len(failed_imports)} failed")
+    logger.info(
+        f"Import summary: {len(successful_imports)} successful, {len(failed_imports)} failed"
+    )
     logger.info("=== End Import Tests ===")
 
     return successful_imports, failed_imports
+
 
 # Global session storage (in production, this would be more sophisticated)
 _sessions: dict[str, MCPSession] = {}
@@ -160,7 +168,9 @@ async def mcp_lifespan(_: FastMCP) -> AsyncIterator[dict[str, Any]]:
     successful_imports, failed_imports = test_critical_imports()
 
     if failed_imports:
-        logger.warning(f"Some imports failed, but continuing startup. Failed: {[name for name, _ in failed_imports]}")
+        logger.warning(
+            f"Some imports failed, but continuing startup. Failed: {[name for name, _ in failed_imports]}"
+        )
 
     try:
         # Initialize core systems
@@ -170,12 +180,16 @@ async def mcp_lifespan(_: FastMCP) -> AsyncIterator[dict[str, Any]]:
 
         # Validate essential configuration
         if not settings.openrouter_api_key:
-            logger.warning("No OpenRouter API key configured - tool functionality may be limited")
+            logger.warning(
+                "No OpenRouter API key configured - tool functionality may be limited"
+            )
 
         # Initialize pricing data
         try:
             await pricing_manager.load_pricing_data()
-            logger.info(f"Pricing manager initialized with {len(pricing_manager._pricing_data)} models")
+            logger.info(
+                f"Pricing manager initialized with {len(pricing_manager._pricing_data)} models"
+            )
         except Exception as e:
             logger.warning(f"Failed to load pricing data: {e}")
 
@@ -215,40 +229,60 @@ mcp = FastMCP(
 # Register the core second_opinion tool
 @mcp.tool(
     name="second_opinion",
-    description="Get a second opinion on an AI response by comparing it against alternative models for quality assessment and cost optimization"
+    description="Get a second opinion on an AI response by comparing it against alternative models for quality assessment and cost optimization",
 )
 async def second_opinion(
     prompt: str = Field(
         ...,
         description="The original question or task that was asked. This helps provide context for comparison quality.",
-        examples=["Write a Python function to calculate fibonacci", "Explain quantum computing", "Debug this code snippet"]
+        examples=[
+            "Write a Python function to calculate fibonacci",
+            "Explain quantum computing",
+            "Debug this code snippet",
+        ],
     ),
     primary_model: str | None = Field(
         None,
         description="The model that provided the original response. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5') or model name for local models (e.g. 'qwen3-4b-mlx', 'codestral-22b-v0.1').",
-        examples=["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "google/gemini-pro-1.5", "qwen3-4b-mlx"]
+        examples=[
+            "anthropic/claude-3-5-sonnet",
+            "openai/gpt-4o",
+            "google/gemini-pro-1.5",
+            "qwen3-4b-mlx",
+        ],
     ),
     primary_response: str | None = Field(
         None,
         description="The response to evaluate (RECOMMENDED). When provided, saves costs and evaluates the actual response the user saw. If not provided, will generate a new response from the primary model.",
-        examples=["def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"]
+        examples=[
+            "def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"
+        ],
     ),
     context: str | None = Field(
         None,
         description="Additional context about the task domain for better comparison quality. Helps select appropriate comparison models and evaluation criteria.",
-        examples=["coding task", "academic research", "creative writing", "technical documentation", "educational content"]
+        examples=[
+            "coding task",
+            "academic research",
+            "creative writing",
+            "technical documentation",
+            "educational content",
+        ],
     ),
     comparison_models: list[str] | None = Field(
         None,
         description="Specific models to compare against. If not provided, will auto-select alternatives including cost-effective local options. Use OpenRouter format for cloud models.",
-        examples=[["openai/gpt-4o", "google/gemini-pro-1.5"], ["qwen3-4b-mlx", "anthropic/claude-3-haiku"]]
+        examples=[
+            ["openai/gpt-4o", "google/gemini-pro-1.5"],
+            ["qwen3-4b-mlx", "anthropic/claude-3-haiku"],
+        ],
     ),
     cost_limit: float | None = Field(
         None,
         description="Maximum cost limit for this operation in USD. Defaults to $0.25. Set higher for complex tasks requiring multiple model calls.",
         examples=[0.25, 0.50, 1.00],
         ge=0.01,
-        le=10.00
+        le=10.00,
     ),
 ) -> str:
     """
@@ -313,18 +347,29 @@ async def second_opinion(
         second_opinion_tool = None
         import_strategies = [
             # Strategy 1: Relative import (current approach)
-            lambda: __import__('.tools.second_opinion', package=__package__, fromlist=['second_opinion_tool']).second_opinion_tool,
+            lambda: __import__(
+                ".tools.second_opinion",
+                package=__package__,
+                fromlist=["second_opinion_tool"],
+            ).second_opinion_tool,
             # Strategy 2: Absolute import
-            lambda: __import__('second_opinion.mcp.tools.second_opinion', fromlist=['second_opinion_tool']).second_opinion_tool,
+            lambda: __import__(
+                "second_opinion.mcp.tools.second_opinion",
+                fromlist=["second_opinion_tool"],
+            ).second_opinion_tool,
             # Strategy 3: Direct module import
-            lambda: __import__('second_opinion.mcp.tools.second_opinion').second_opinion_tool,
+            lambda: __import__(
+                "second_opinion.mcp.tools.second_opinion"
+            ).second_opinion_tool,
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
             try:
                 logger.info(f"Trying import strategy {i}...")
                 second_opinion_tool = strategy()
-                logger.info(f"✓ Successfully imported second_opinion_tool using strategy {i}")
+                logger.info(
+                    f"✓ Successfully imported second_opinion_tool using strategy {i}"
+                )
                 break
             except Exception as e:
                 logger.warning(f"✗ Import strategy {i} failed: {e}")
@@ -332,17 +377,25 @@ async def second_opinion(
 
         if second_opinion_tool is None:
             # Final fallback: try to import manually step by step
-            logger.info("All import strategies failed, trying manual step-by-step import...")
+            logger.info(
+                "All import strategies failed, trying manual step-by-step import..."
+            )
             try:
                 import importlib
-                module = importlib.import_module('second_opinion.mcp.tools.second_opinion')
+
+                module = importlib.import_module(
+                    "second_opinion.mcp.tools.second_opinion"
+                )
                 second_opinion_tool = module.second_opinion_tool
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")
                 import traceback
+
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(f"Unable to import second_opinion_tool after trying multiple strategies. Last error: {final_error}")
+                raise ImportError(
+                    f"Unable to import second_opinion_tool after trying multiple strategies. Last error: {final_error}"
+                )
 
         if second_opinion_tool is None:
             raise ImportError("second_opinion_tool is None after all import attempts")
@@ -350,7 +403,9 @@ async def second_opinion(
         # Call the tool implementation
         logger.info("Calling second_opinion_tool implementation...")
         logger.info(f"Tool function type: {type(second_opinion_tool)}")
-        logger.info(f"Tool function module: {getattr(second_opinion_tool, '__module__', 'unknown')}")
+        logger.info(
+            f"Tool function module: {getattr(second_opinion_tool, '__module__', 'unknown')}"
+        )
 
         result = await second_opinion_tool(
             prompt=prompt,
@@ -369,7 +424,7 @@ async def second_opinion(
             prompt=prompt,
             primary_model=primary_model or "unknown",
             comparison_models=comparison_models or [],
-            result_summary="Comparison completed successfully"
+            result_summary="Comparison completed successfully",
         )
 
         return result
@@ -377,6 +432,7 @@ async def second_opinion(
     except Exception as e:
         # Log comprehensive error information
         import traceback
+
         error_details = traceback.format_exc()
         logger.error("=== Error in second_opinion MCP tool ===")
         logger.error(f"Error type: {type(e).__name__}")
@@ -390,7 +446,7 @@ async def second_opinion(
             prompt=prompt,
             primary_model=primary_model or "unknown",
             comparison_models=comparison_models or [],
-            result_summary=f"Error: {str(e)}"
+            result_summary=f"Error: {str(e)}",
         )
 
         # Return user-friendly error message instead of raising
@@ -400,39 +456,54 @@ async def second_opinion(
 # Register the should_downgrade tool
 @mcp.tool(
     name="should_downgrade",
-    description="Analyze whether cheaper model alternatives could achieve similar quality for cost optimization"
+    description="Analyze whether cheaper model alternatives could achieve similar quality for cost optimization",
 )
 async def should_downgrade(
     current_response: str = Field(
         ...,
         description="The response to analyze for potential cost savings. This is the output from your current (expensive) model that you want to test for downgrade opportunities.",
-        examples=["def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"]
+        examples=[
+            "def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"
+        ],
     ),
     task: str = Field(
         ...,
         description="The original task/question that generated the current response. This provides context for comparing quality across models.",
-        examples=["Write a Python function to calculate fibonacci", "Explain quantum computing", "Debug this code snippet"]
+        examples=[
+            "Write a Python function to calculate fibonacci",
+            "Explain quantum computing",
+            "Debug this code snippet",
+        ],
     ),
     current_model: str | None = Field(
         None,
         description="The model that generated the current response. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o') or model name for local models (e.g. 'qwen3-4b-mlx').",
-        examples=["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "google/gemini-pro-1.5", "qwen3-4b-mlx"]
+        examples=[
+            "anthropic/claude-3-5-sonnet",
+            "openai/gpt-4o",
+            "google/gemini-pro-1.5",
+            "qwen3-4b-mlx",
+        ],
     ),
     downgrade_candidates: list[str] | None = Field(
         None,
         description="Specific cheaper models to test instead of auto-selection. Use OpenRouter format for cloud models or local model names. If not provided, will auto-select based on current model and task complexity.",
-        examples=[["anthropic/claude-3-haiku", "openai/gpt-4o-mini"], ["qwen3-4b-mlx", "codestral-22b-v0.1"], ["google/gemini-flash-1.5"]]
+        examples=[
+            ["anthropic/claude-3-haiku", "openai/gpt-4o-mini"],
+            ["qwen3-4b-mlx", "codestral-22b-v0.1"],
+            ["google/gemini-flash-1.5"],
+        ],
     ),
     test_local: bool = Field(
         True,
-        description="Whether to include local models in the comparison for maximum cost savings. Local models have zero marginal cost but may have quality trade-offs."
+        description="Whether to include local models in the comparison for maximum cost savings. Local models have zero marginal cost but may have quality trade-offs.",
     ),
     cost_limit: float | None = Field(
         None,
         description="Maximum cost limit for testing downgrade options in USD. Defaults to $0.15 for cost-focused testing. Set higher for more comprehensive analysis.",
         examples=[0.15, 0.25, 0.50],
         ge=0.01,
-        le=5.00
+        le=5.00,
     ),
 ) -> str:
     """
@@ -494,18 +565,29 @@ async def should_downgrade(
         should_downgrade_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: __import__('.tools.should_downgrade', package=__package__, fromlist=['should_downgrade_tool']).should_downgrade_tool,
+            lambda: __import__(
+                ".tools.should_downgrade",
+                package=__package__,
+                fromlist=["should_downgrade_tool"],
+            ).should_downgrade_tool,
             # Strategy 2: Absolute import
-            lambda: __import__('second_opinion.mcp.tools.should_downgrade', fromlist=['should_downgrade_tool']).should_downgrade_tool,
+            lambda: __import__(
+                "second_opinion.mcp.tools.should_downgrade",
+                fromlist=["should_downgrade_tool"],
+            ).should_downgrade_tool,
             # Strategy 3: Direct module import
-            lambda: __import__('second_opinion.mcp.tools.should_downgrade').should_downgrade_tool,
+            lambda: __import__(
+                "second_opinion.mcp.tools.should_downgrade"
+            ).should_downgrade_tool,
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
             try:
                 logger.info(f"Trying import strategy {i}...")
                 should_downgrade_tool = strategy()
-                logger.info(f"✓ Successfully imported should_downgrade_tool using strategy {i}")
+                logger.info(
+                    f"✓ Successfully imported should_downgrade_tool using strategy {i}"
+                )
                 break
             except Exception as e:
                 logger.warning(f"✗ Import strategy {i} failed: {e}")
@@ -513,17 +595,25 @@ async def should_downgrade(
 
         if should_downgrade_tool is None:
             # Final fallback: manual importlib approach
-            logger.info("All import strategies failed, trying manual step-by-step import...")
+            logger.info(
+                "All import strategies failed, trying manual step-by-step import..."
+            )
             try:
                 import importlib
-                module = importlib.import_module('second_opinion.mcp.tools.should_downgrade')
+
+                module = importlib.import_module(
+                    "second_opinion.mcp.tools.should_downgrade"
+                )
                 should_downgrade_tool = module.should_downgrade_tool
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")
                 import traceback
+
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(f"Unable to import should_downgrade_tool after trying multiple strategies. Last error: {final_error}")
+                raise ImportError(
+                    f"Unable to import should_downgrade_tool after trying multiple strategies. Last error: {final_error}"
+                )
 
         if should_downgrade_tool is None:
             raise ImportError("should_downgrade_tool is None after all import attempts")
@@ -531,7 +621,9 @@ async def should_downgrade(
         # Call the tool implementation
         logger.info("Calling should_downgrade_tool implementation...")
         logger.info(f"Tool function type: {type(should_downgrade_tool)}")
-        logger.info(f"Tool function module: {getattr(should_downgrade_tool, '__module__', 'unknown')}")
+        logger.info(
+            f"Tool function module: {getattr(should_downgrade_tool, '__module__', 'unknown')}"
+        )
 
         result = await should_downgrade_tool(
             current_response=current_response,
@@ -550,7 +642,7 @@ async def should_downgrade(
             prompt=task,
             primary_model=current_model or "unknown",
             comparison_models=[],  # Downgrade candidates are selected internally
-            result_summary="Downgrade analysis completed successfully"
+            result_summary="Downgrade analysis completed successfully",
         )
 
         return result
@@ -558,6 +650,7 @@ async def should_downgrade(
     except Exception as e:
         # Log comprehensive error information
         import traceback
+
         error_details = traceback.format_exc()
         logger.error("=== Error in should_downgrade MCP tool ===")
         logger.error(f"Error type: {type(e).__name__}")
@@ -571,7 +664,7 @@ async def should_downgrade(
             prompt=task,
             primary_model=current_model or "unknown",
             comparison_models=[],
-            result_summary=f"Error: {str(e)}"
+            result_summary=f"Error: {str(e)}",
         )
 
         # Return user-friendly error message
@@ -581,39 +674,53 @@ async def should_downgrade(
 # Register the should_upgrade tool
 @mcp.tool(
     name="should_upgrade",
-    description="Analyze whether premium model alternatives could provide quality improvements that justify additional cost"
+    description="Analyze whether premium model alternatives could provide quality improvements that justify additional cost",
 )
 async def should_upgrade(
     current_response: str = Field(
         ...,
         description="The response to analyze for potential quality improvements. This is the output from your current (budget/mid-tier) model that you want to test for upgrade opportunities.",
-        examples=["def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"]
+        examples=[
+            "def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"
+        ],
     ),
     task: str = Field(
         ...,
         description="The original task/question that generated the current response. This provides context for comparing quality across models.",
-        examples=["Write a Python function to calculate fibonacci", "Explain quantum computing", "Debug this code snippet"]
+        examples=[
+            "Write a Python function to calculate fibonacci",
+            "Explain quantum computing",
+            "Debug this code snippet",
+        ],
     ),
     current_model: str | None = Field(
         None,
         description="The model that generated the current response. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-haiku', 'openai/gpt-4o-mini') or model name for local models (e.g. 'qwen3-4b-mlx').",
-        examples=["anthropic/claude-3-haiku", "openai/gpt-4o-mini", "google/gemini-flash-1.5", "qwen3-4b-mlx"]
+        examples=[
+            "anthropic/claude-3-haiku",
+            "openai/gpt-4o-mini",
+            "google/gemini-flash-1.5",
+            "qwen3-4b-mlx",
+        ],
     ),
     upgrade_candidates: list[str] | None = Field(
         None,
         description="Specific premium models to test instead of auto-selection. Use OpenRouter format for cloud models. If not provided, will auto-select based on current model and task complexity.",
-        examples=[["anthropic/claude-3-opus", "openai/gpt-4o"], ["anthropic/claude-3-5-sonnet", "google/gemini-pro-1.5"]]
+        examples=[
+            ["anthropic/claude-3-opus", "openai/gpt-4o"],
+            ["anthropic/claude-3-5-sonnet", "google/gemini-pro-1.5"],
+        ],
     ),
     include_premium: bool = Field(
         True,
-        description="Whether to include premium models in the comparison for maximum quality improvement. Premium models provide the best quality but at higher cost."
+        description="Whether to include premium models in the comparison for maximum quality improvement. Premium models provide the best quality but at higher cost.",
     ),
     cost_limit: float | None = Field(
         None,
         description="Maximum cost limit for testing upgrade options in USD. Defaults to $0.50 for comprehensive quality testing. Set higher for complex tasks requiring premium models.",
         examples=[0.50, 1.00, 2.00],
         ge=0.01,
-        le=10.00
+        le=10.00,
     ),
 ) -> str:
     """
@@ -675,18 +782,29 @@ async def should_upgrade(
         should_upgrade_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: __import__('.tools.should_upgrade', package=__package__, fromlist=['should_upgrade_tool']).should_upgrade_tool,
+            lambda: __import__(
+                ".tools.should_upgrade",
+                package=__package__,
+                fromlist=["should_upgrade_tool"],
+            ).should_upgrade_tool,
             # Strategy 2: Absolute import
-            lambda: __import__('second_opinion.mcp.tools.should_upgrade', fromlist=['should_upgrade_tool']).should_upgrade_tool,
+            lambda: __import__(
+                "second_opinion.mcp.tools.should_upgrade",
+                fromlist=["should_upgrade_tool"],
+            ).should_upgrade_tool,
             # Strategy 3: Direct module import
-            lambda: __import__('second_opinion.mcp.tools.should_upgrade').should_upgrade_tool,
+            lambda: __import__(
+                "second_opinion.mcp.tools.should_upgrade"
+            ).should_upgrade_tool,
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
             try:
                 logger.info(f"Trying import strategy {i}...")
                 should_upgrade_tool = strategy()
-                logger.info(f"✓ Successfully imported should_upgrade_tool using strategy {i}")
+                logger.info(
+                    f"✓ Successfully imported should_upgrade_tool using strategy {i}"
+                )
                 break
             except Exception as e:
                 logger.warning(f"✗ Import strategy {i} failed: {e}")
@@ -694,17 +812,25 @@ async def should_upgrade(
 
         if should_upgrade_tool is None:
             # Final fallback: manual importlib approach
-            logger.info("All import strategies failed, trying manual step-by-step import...")
+            logger.info(
+                "All import strategies failed, trying manual step-by-step import..."
+            )
             try:
                 import importlib
-                module = importlib.import_module('second_opinion.mcp.tools.should_upgrade')
+
+                module = importlib.import_module(
+                    "second_opinion.mcp.tools.should_upgrade"
+                )
                 should_upgrade_tool = module.should_upgrade_tool
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")
                 import traceback
+
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(f"Unable to import should_upgrade_tool after trying multiple strategies. Last error: {final_error}")
+                raise ImportError(
+                    f"Unable to import should_upgrade_tool after trying multiple strategies. Last error: {final_error}"
+                )
 
         if should_upgrade_tool is None:
             raise ImportError("should_upgrade_tool is None after all import attempts")
@@ -712,7 +838,9 @@ async def should_upgrade(
         # Call the tool implementation
         logger.info("Calling should_upgrade_tool implementation...")
         logger.info(f"Tool function type: {type(should_upgrade_tool)}")
-        logger.info(f"Tool function module: {getattr(should_upgrade_tool, '__module__', 'unknown')}")
+        logger.info(
+            f"Tool function module: {getattr(should_upgrade_tool, '__module__', 'unknown')}"
+        )
 
         result = await should_upgrade_tool(
             current_response=current_response,
@@ -731,7 +859,7 @@ async def should_upgrade(
             prompt=task,
             primary_model=current_model or "unknown",
             comparison_models=[],  # Upgrade candidates are selected internally
-            result_summary="Upgrade analysis completed successfully"
+            result_summary="Upgrade analysis completed successfully",
         )
 
         return result
@@ -739,6 +867,7 @@ async def should_upgrade(
     except Exception as e:
         # Log comprehensive error information
         import traceback
+
         error_details = traceback.format_exc()
         logger.error("=== Error in should_upgrade MCP tool ===")
         logger.error(f"Error type: {type(e).__name__}")
@@ -752,7 +881,7 @@ async def should_upgrade(
             prompt=task,
             primary_model=current_model or "unknown",
             comparison_models=[],
-            result_summary=f"Error: {str(e)}"
+            result_summary=f"Error: {str(e)}",
         )
 
         # Return user-friendly error message
@@ -762,40 +891,58 @@ async def should_upgrade(
 # Register the compare_responses tool
 @mcp.tool(
     name="compare_responses",
-    description="Compare two AI responses with detailed side-by-side analysis across quality criteria"
+    description="Compare two AI responses with detailed side-by-side analysis across quality criteria",
 )
 async def compare_responses(
     response_a: str = Field(
         ...,
         description="The first response to compare. This is one of the responses you want to analyze for quality, accuracy, and usefulness.",
-        examples=["def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"]
+        examples=[
+            "def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"
+        ],
     ),
     response_b: str = Field(
         ...,
         description="The second response to compare. This is the other response you want to analyze for quality, accuracy, and usefulness.",
-        examples=["def fibonacci(n):\n    return n if n <= 1 else fibonacci(n-1) + fibonacci(n-2)"]
+        examples=[
+            "def fibonacci(n):\n    return n if n <= 1 else fibonacci(n-1) + fibonacci(n-2)"
+        ],
     ),
     task: str = Field(
         ...,
         description="The original task/question that generated both responses. This provides context for comparing quality and relevance.",
-        examples=["Write a Python function to calculate fibonacci", "Explain quantum computing", "Debug this code snippet"]
+        examples=[
+            "Write a Python function to calculate fibonacci",
+            "Explain quantum computing",
+            "Debug this code snippet",
+        ],
     ),
     model_a: str | None = Field(
         None,
         description="The model that generated response_a. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o') or model name for local models (e.g. 'qwen3-4b-mlx').",
-        examples=["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "google/gemini-pro-1.5", "qwen3-4b-mlx"]
+        examples=[
+            "anthropic/claude-3-5-sonnet",
+            "openai/gpt-4o",
+            "google/gemini-pro-1.5",
+            "qwen3-4b-mlx",
+        ],
     ),
     model_b: str | None = Field(
         None,
         description="The model that generated response_b. Use OpenRouter format for cloud models or model name for local models (same format as model_a).",
-        examples=["anthropic/claude-3-haiku", "openai/gpt-4o-mini", "google/gemini-flash-1.5", "codestral-22b-v0.1"]
+        examples=[
+            "anthropic/claude-3-haiku",
+            "openai/gpt-4o-mini",
+            "google/gemini-flash-1.5",
+            "codestral-22b-v0.1",
+        ],
     ),
     cost_limit: float | None = Field(
         None,
         description="Maximum cost limit for evaluation in USD. Defaults to $0.25. Note: No additional API costs when comparing existing responses.",
         examples=[0.25, 0.50, 1.00],
         ge=0.01,
-        le=10.00
+        le=10.00,
     ),
 ) -> str:
     """
@@ -815,7 +962,7 @@ async def compare_responses(
 
     Args:
         response_a: The first response to compare
-        response_b: The second response to compare  
+        response_b: The second response to compare
         task: The original task that generated both responses (for context)
         model_a: Model that generated response_a (optional, for cost analysis)
         model_b: Model that generated response_b (optional, for cost analysis)
@@ -853,18 +1000,29 @@ async def compare_responses(
         compare_responses_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: __import__('.tools.compare_responses', package=__package__, fromlist=['compare_responses_tool']).compare_responses_tool,
+            lambda: __import__(
+                ".tools.compare_responses",
+                package=__package__,
+                fromlist=["compare_responses_tool"],
+            ).compare_responses_tool,
             # Strategy 2: Absolute import
-            lambda: __import__('second_opinion.mcp.tools.compare_responses', fromlist=['compare_responses_tool']).compare_responses_tool,
+            lambda: __import__(
+                "second_opinion.mcp.tools.compare_responses",
+                fromlist=["compare_responses_tool"],
+            ).compare_responses_tool,
             # Strategy 3: Direct module import
-            lambda: __import__('second_opinion.mcp.tools.compare_responses').compare_responses_tool,
+            lambda: __import__(
+                "second_opinion.mcp.tools.compare_responses"
+            ).compare_responses_tool,
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
             try:
                 logger.info(f"Trying import strategy {i}...")
                 compare_responses_tool = strategy()
-                logger.info(f"✓ Successfully imported compare_responses_tool using strategy {i}")
+                logger.info(
+                    f"✓ Successfully imported compare_responses_tool using strategy {i}"
+                )
                 break
             except Exception as e:
                 logger.warning(f"✗ Import strategy {i} failed: {e}")
@@ -872,25 +1030,37 @@ async def compare_responses(
 
         if compare_responses_tool is None:
             # Final fallback: manual importlib approach
-            logger.info("All import strategies failed, trying manual step-by-step import...")
+            logger.info(
+                "All import strategies failed, trying manual step-by-step import..."
+            )
             try:
                 import importlib
-                module = importlib.import_module('second_opinion.mcp.tools.compare_responses')
+
+                module = importlib.import_module(
+                    "second_opinion.mcp.tools.compare_responses"
+                )
                 compare_responses_tool = module.compare_responses_tool
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")
                 import traceback
+
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(f"Unable to import compare_responses_tool after trying multiple strategies. Last error: {final_error}")
+                raise ImportError(
+                    f"Unable to import compare_responses_tool after trying multiple strategies. Last error: {final_error}"
+                )
 
         if compare_responses_tool is None:
-            raise ImportError("compare_responses_tool is None after all import attempts")
+            raise ImportError(
+                "compare_responses_tool is None after all import attempts"
+            )
 
         # Call the tool implementation
         logger.info("Calling compare_responses_tool implementation...")
         logger.info(f"Tool function type: {type(compare_responses_tool)}")
-        logger.info(f"Tool function module: {getattr(compare_responses_tool, '__module__', 'unknown')}")
+        logger.info(
+            f"Tool function module: {getattr(compare_responses_tool, '__module__', 'unknown')}"
+        )
 
         result = await compare_responses_tool(
             response_a=response_a,
@@ -909,7 +1079,7 @@ async def compare_responses(
             prompt=task,
             primary_model=model_a or "unknown",
             comparison_models=[model_b] if model_b else [],
-            result_summary="Response comparison completed successfully"
+            result_summary="Response comparison completed successfully",
         )
 
         return result
@@ -917,6 +1087,7 @@ async def compare_responses(
     except Exception as e:
         # Log comprehensive error information
         import traceback
+
         error_details = traceback.format_exc()
         logger.error("=== Error in compare_responses MCP tool ===")
         logger.error(f"Error type: {type(e).__name__}")
@@ -930,7 +1101,7 @@ async def compare_responses(
             prompt=task,
             primary_model=model_a or "unknown",
             comparison_models=[model_b] if model_b else [],
-            result_summary=f"Error: {str(e)}"
+            result_summary=f"Error: {str(e)}",
         )
 
         # Return user-friendly error message
@@ -940,47 +1111,61 @@ async def compare_responses(
 # Register the consult tool
 @mcp.tool(
     name="consult",
-    description="Consult with AI models for expert opinions, task delegation, and multi-turn problem solving"
+    description="Consult with AI models for expert opinions, task delegation, and multi-turn problem solving",
 )
 async def consult(
     query: str = Field(
         ...,
         description="The question or task to consult about. This can be a request for expert opinion, task delegation, or complex problem-solving.",
-        examples=["Should I use async/await or threading for this I/O operation?", "Write unit tests for this function", "Help me design a scalable authentication system"]
+        examples=[
+            "Should I use async/await or threading for this I/O operation?",
+            "Write unit tests for this function",
+            "Help me design a scalable authentication system",
+        ],
     ),
     consultation_type: str = Field(
         "quick",
         description="Type of consultation: 'quick' (single-turn expert opinion), 'deep' (multi-turn analysis), 'delegate' (task completion), 'brainstorm' (creative exploration)",
-        examples=["quick", "deep", "delegate", "brainstorm"]
+        examples=["quick", "deep", "delegate", "brainstorm"],
     ),
     target_model: str | None = Field(
         None,
         description="Specific model to consult with. Auto-selected if not provided. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o') or model name for local models (e.g. 'qwen3-4b-mlx').",
-        examples=["anthropic/claude-3-5-sonnet", "openai/gpt-4o-mini", "google/gemini-pro-1.5", "qwen3-4b-mlx"]
+        examples=[
+            "anthropic/claude-3-5-sonnet",
+            "openai/gpt-4o-mini",
+            "google/gemini-pro-1.5",
+            "qwen3-4b-mlx",
+        ],
     ),
     session_id: str | None = Field(
         None,
         description="Continue existing consultation session (for multi-turn). Use the session ID from a previous consultation to continue the conversation.",
-        examples=["abc123-session-id"]
+        examples=["abc123-session-id"],
     ),
     max_turns: int = Field(
         3,
         description="Maximum conversation turns for multi-turn consultations (1-5). Only applies to 'deep' and 'brainstorm' types.",
         ge=1,
         le=5,
-        examples=[1, 3, 5]
+        examples=[1, 3, 5],
     ),
     context: str | None = Field(
         None,
         description="Additional context about the task domain for better model routing and consultation quality.",
-        examples=["coding task", "system architecture", "performance optimization", "creative writing"]
+        examples=[
+            "coding task",
+            "system architecture",
+            "performance optimization",
+            "creative writing",
+        ],
     ),
     cost_limit: float | None = Field(
         None,
         description="Maximum cost limit for this consultation in USD. Defaults vary by consultation type: delegate ($0.10), deep ($0.50), others ($0.25).",
         examples=[0.10, 0.25, 0.50],
         ge=0.01,
-        le=10.00
+        le=10.00,
     ),
 ) -> str:
     """
@@ -992,7 +1177,7 @@ async def consult(
 
     CONSULTATION TYPES:
     - **quick**: Single-turn expert opinion with focused advice
-    - **deep**: Multi-turn comprehensive analysis and problem exploration  
+    - **deep**: Multi-turn comprehensive analysis and problem exploration
     - **delegate**: Task completion using cost-effective models (60-80% savings)
     - **brainstorm**: Creative collaborative exploration with multiple perspectives
 
@@ -1071,11 +1256,15 @@ async def consult(
         consult_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: __import__('.tools.consult', package=__package__, fromlist=['consult_tool']).consult_tool,
+            lambda: __import__(
+                ".tools.consult", package=__package__, fromlist=["consult_tool"]
+            ).consult_tool,
             # Strategy 2: Absolute import
-            lambda: __import__('second_opinion.mcp.tools.consult', fromlist=['consult_tool']).consult_tool,
+            lambda: __import__(
+                "second_opinion.mcp.tools.consult", fromlist=["consult_tool"]
+            ).consult_tool,
             # Strategy 3: Direct module import
-            lambda: __import__('second_opinion.mcp.tools.consult').consult_tool,
+            lambda: __import__("second_opinion.mcp.tools.consult").consult_tool,
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
@@ -1090,17 +1279,23 @@ async def consult(
 
         if consult_tool is None:
             # Final fallback: manual importlib approach
-            logger.info("All import strategies failed, trying manual step-by-step import...")
+            logger.info(
+                "All import strategies failed, trying manual step-by-step import..."
+            )
             try:
                 import importlib
-                module = importlib.import_module('second_opinion.mcp.tools.consult')
+
+                module = importlib.import_module("second_opinion.mcp.tools.consult")
                 consult_tool = module.consult_tool
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")
                 import traceback
+
                 logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(f"Unable to import consult_tool after trying multiple strategies. Last error: {final_error}")
+                raise ImportError(
+                    f"Unable to import consult_tool after trying multiple strategies. Last error: {final_error}"
+                )
 
         if consult_tool is None:
             raise ImportError("consult_tool is None after all import attempts")
@@ -1108,7 +1303,9 @@ async def consult(
         # Call the tool implementation
         logger.info("Calling consult_tool implementation...")
         logger.info(f"Tool function type: {type(consult_tool)}")
-        logger.info(f"Tool function module: {getattr(consult_tool, '__module__', 'unknown')}")
+        logger.info(
+            f"Tool function module: {getattr(consult_tool, '__module__', 'unknown')}"
+        )
 
         result = await consult_tool(
             query=query,
@@ -1128,7 +1325,7 @@ async def consult(
             prompt=query,
             primary_model=target_model or "auto-selected",
             comparison_models=[],  # Consultation uses single model
-            result_summary=f"Consultation ({consultation_type}) completed successfully"
+            result_summary=f"Consultation ({consultation_type}) completed successfully",
         )
 
         return result
@@ -1136,6 +1333,7 @@ async def consult(
     except Exception as e:
         # Log comprehensive error information
         import traceback
+
         error_details = traceback.format_exc()
         logger.error("=== Error in consult MCP tool ===")
         logger.error(f"Error type: {type(e).__name__}")
@@ -1149,7 +1347,7 @@ async def consult(
             prompt=query,
             primary_model=target_model or "unknown",
             comparison_models=[],
-            result_summary=f"Error: {str(e)}"
+            result_summary=f"Error: {str(e)}",
         )
 
         # Return user-friendly error message
@@ -1225,12 +1423,13 @@ if __name__ == "__main__":
     # Configure logging for standalone mode
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
     # Update our MCP logger setup
     logger = setup_mcp_logging(debug=args.debug)
 
-    logger.info(f"Starting Second Opinion MCP server in standalone mode (debug={'on' if args.debug else 'off'})")
+    logger.info(
+        f"Starting Second Opinion MCP server in standalone mode (debug={'on' if args.debug else 'off'})"
+    )
     mcp.run()

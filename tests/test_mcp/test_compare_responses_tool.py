@@ -15,7 +15,7 @@ from .conftest import (
     SAMPLE_CODE_PROMPT,
     SAMPLE_CODE_RESPONSE,
     SAMPLE_SHELL_PROMPT,
-    SAMPLE_SHELL_RESPONSE
+    SAMPLE_SHELL_RESPONSE,
 )
 
 
@@ -45,7 +45,7 @@ The `ls` command is the most commonly used.
 
 class TestCompareResponsesTool:
     """Test the MCP compare_responses tool."""
-    
+
     @pytest.mark.asyncio
     async def test_basic_comparison_functionality(self):
         """Test basic comparison functionality with two responses."""
@@ -55,9 +55,9 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-5-sonnet",
             model_b="openai/gpt-4o-mini",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         # Should return a formatted comparison report
         assert isinstance(result, str)
         assert "# ⚖️ Response Comparison: Side-by-Side Analysis" in result
@@ -67,10 +67,10 @@ class TestCompareResponsesTool:
         assert "Cost & Model Analysis" in result
         assert "Actionable Recommendations" in result
         assert "Next Steps" in result
-        
+
         # Should not contain error messages
         assert "❌" not in result
-        
+
         # Should contain model information
         assert "anthropic/claude-3-5-sonnet" in result
         assert "openai/gpt-4o-mini" in result
@@ -82,9 +82,9 @@ class TestCompareResponsesTool:
             response_a=SAMPLE_CODE_RESPONSE,
             response_b=SAMPLE_CODE_RESPONSE_B,
             task=SAMPLE_CODE_PROMPT,
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         # Should still work with unknown models
         assert isinstance(result, str)
         assert "# ⚖️ Response Comparison: Side-by-Side Analysis" in result
@@ -101,9 +101,9 @@ class TestCompareResponsesTool:
             task=SAMPLE_SHELL_PROMPT,
             model_a="qwen3-4b-mlx",
             model_b="anthropic/claude-3-haiku",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         # Should handle shell commands without security issues
         assert isinstance(result, str)
         assert "# ⚖️ Response Comparison: Side-by-Side Analysis" in result
@@ -121,13 +121,13 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="qwen3-4b-mlx",  # Local model
             model_b="anthropic/claude-3-5-sonnet",  # Cloud model
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         assert isinstance(result, str)
         assert "qwen3-4b-mlx" in result
         assert "anthropic/claude-3-5-sonnet" in result
-        
+
         # Should mention cost differences
         assert "$0.00" in result or "zero" in result.lower()  # Local model cost
         assert "cost" in result.lower()
@@ -142,9 +142,9 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-5-sonnet",
             model_b="openai/gpt-4o",
-            cost_limit=0.001  # Very low limit
+            cost_limit=0.001,  # Very low limit
         )
-        
+
         # Should either work (if within limit) or show budget error
         assert isinstance(result, str)
         # Should not crash, either works or shows budget error
@@ -160,9 +160,9 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="invalid-model-name-123",
             model_b="another-invalid-model",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         # Should return error with helpful suggestions
         assert isinstance(result, str)
         if "❌" in result:
@@ -178,9 +178,9 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-haiku",
             model_b="openai/gpt-4o-mini",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         # Should handle empty responses gracefully
         assert isinstance(result, str)
         # Should either work or provide meaningful error
@@ -196,9 +196,9 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-5-sonnet",
             model_b="openai/gpt-4o",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         assert isinstance(result, str)
         if "❌" not in result:
             # Should include quality analysis
@@ -216,9 +216,9 @@ class TestCompareResponsesTool:
             task="What is 2 + 2?",
             model_a="anthropic/claude-3-haiku",
             model_b="openai/gpt-4o-mini",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         assert isinstance(simple_result, str)
         if "❌" not in simple_result:
             assert "# ⚖️ Response Comparison: Side-by-Side Analysis" in simple_result
@@ -232,17 +232,23 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-opus",  # Expensive model
             model_b="anthropic/claude-3-haiku",  # Budget model
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         assert isinstance(result, str)
         if "❌" not in result:
             # Should mention cost considerations
             assert "cost" in result.lower() or "$" in result
             # Should provide recommendations (including fallback scenarios)
-            assert any(keyword in result for keyword in [
-                "RECOMMENDED", "CONSIDER", "CLOSE CALL", "Choose based on"
-            ])
+            assert any(
+                keyword in result
+                for keyword in [
+                    "RECOMMENDED",
+                    "CONSIDER",
+                    "CLOSE CALL",
+                    "Choose based on",
+                ]
+            )
 
     @pytest.mark.asyncio
     async def test_response_filtering(self):
@@ -257,16 +263,16 @@ class TestCompareResponsesTool:
                 return n
             return fibonacci(n-1) + fibonacci(n-2)
         """
-        
+
         result = await compare_responses_tool(
             response_a=response_with_think,
             response_b=SAMPLE_CODE_RESPONSE_B,
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-5-sonnet",
             model_b="openai/gpt-4o",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         assert isinstance(result, str)
         # Think tags should be filtered out
         assert "<think>" not in result
@@ -281,15 +287,22 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-5-sonnet",
             model_b="openai/gpt-4o",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         assert isinstance(result, str)
         if "❌" not in result:
             # Should declare a winner or tie
-            assert any(keyword in result for keyword in [
-                "WINS", "TIE", "Close Competition", "RECOMMENDED", "CONSIDER"
-            ])
+            assert any(
+                keyword in result
+                for keyword in [
+                    "WINS",
+                    "TIE",
+                    "Close Competition",
+                    "RECOMMENDED",
+                    "CONSIDER",
+                ]
+            )
 
     @pytest.mark.asyncio
     async def test_actionable_recommendations(self):
@@ -300,16 +313,16 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-5-sonnet",
             model_b="anthropic/claude-3-haiku",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         assert isinstance(result, str)
         if "❌" not in result:
             # Should include next steps and recommendations
             assert "Next Steps" in result
-            assert any(keyword in result for keyword in [
-                "Use", "Test", "Consider", "Monitor"
-            ])
+            assert any(
+                keyword in result for keyword in ["Use", "Test", "Consider", "Monitor"]
+            )
 
     @pytest.mark.asyncio
     async def test_tier_analysis(self):
@@ -320,15 +333,13 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-opus",  # Premium tier
             model_b="anthropic/claude-3-haiku",  # Budget tier
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         assert isinstance(result, str)
         if "❌" not in result:
             # Should mention tiers
-            assert any(tier in result.lower() for tier in [
-                "premium", "budget", "tier"
-            ])
+            assert any(tier in result.lower() for tier in ["premium", "budget", "tier"])
 
     @pytest.mark.asyncio
     async def test_zero_cost_analysis(self):
@@ -339,9 +350,9 @@ class TestCompareResponsesTool:
             task=SAMPLE_CODE_PROMPT,
             model_a="anthropic/claude-3-5-sonnet",
             model_b="openai/gpt-4o",
-            cost_limit=0.25
+            cost_limit=0.25,
         )
-        
+
         assert isinstance(result, str)
         if "❌" not in result:
             # Should indicate low analysis cost

@@ -260,10 +260,7 @@ class TestCLICommands:
         assert result.exit_code != 0
         # Error message appears in stderr for typer
         error_output = (result.stdout + result.stderr).lower()
-        assert (
-            "primary-model" in error_output
-            or "missing" in error_output
-        )
+        assert "primary-model" in error_output or "missing" in error_output
 
     @patch("second_opinion.cli.main.execute_second_opinion")
     def test_second_opinion_with_context(
@@ -386,7 +383,11 @@ class TestAsyncExecution:
     @patch("second_opinion.cli.main.get_client_for_model")
     @patch("second_opinion.cli.main.create_client_from_config")
     async def test_execute_second_opinion_cost_limit_exceeded(
-        self, mock_create_client_from_config, mock_get_client_for_model, mock_get_cost_guard, mock_sanitize_prompt
+        self,
+        mock_create_client_from_config,
+        mock_get_client_for_model,
+        mock_get_cost_guard,
+        mock_sanitize_prompt,
     ):
         """Test cost limit exceeded error."""
         from second_opinion.cli.main import execute_second_opinion

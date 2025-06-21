@@ -108,7 +108,9 @@ async def should_upgrade_tool(
         # Input validation and sanitization
 
         # Sanitize inputs with user context (most permissive for code/technical content)
-        clean_current_response = sanitize_prompt(current_response, SecurityContext.USER_PROMPT)
+        clean_current_response = sanitize_prompt(
+            current_response, SecurityContext.USER_PROMPT
+        )
         clean_task = sanitize_prompt(task, SecurityContext.USER_PROMPT)
 
         # Validate and normalize model name if provided
@@ -117,12 +119,16 @@ async def should_upgrade_tool(
                 current_model = validate_model_name(current_model)
             except Exception as e:
                 suggestions = get_model_name_suggestions(current_model, "upgrade")
-                suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                suggestion_text = (
+                    f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                )
                 return f"❌ **Invalid Current Model**: {str(e)}{suggestion_text}"
 
         # Validate upgrade candidates if provided
         try:
-            validated_upgrade_candidates = validate_model_candidates(upgrade_candidates, "upgrade")
+            validated_upgrade_candidates = validate_model_candidates(
+                upgrade_candidates, "upgrade"
+            )
         except Exception as e:
             return f"❌ **Invalid Upgrade Candidates**: {str(e)}"
 
@@ -133,13 +139,17 @@ async def should_upgrade_tool(
             # Get default from configuration (higher default for upgrade testing)
             try:
                 # For now, use a default since tool-specific config isn't implemented yet
-                cost_limit_decimal = Decimal("0.50")  # Higher default for upgrade testing
+                cost_limit_decimal = Decimal(
+                    "0.50"
+                )  # Higher default for upgrade testing
             except Exception:
                 # Use higher default for upgrade testing
                 cost_limit_decimal = Decimal("0.50")
 
-        logger.info(f"Starting should_upgrade tool: response length={len(clean_current_response)}, "
-                   f"current_model={current_model}, include_premium={include_premium}")
+        logger.info(
+            f"Starting should_upgrade tool: response length={len(clean_current_response)}, "
+            f"current_model={current_model}, include_premium={include_premium}"
+        )
         logger.info(f"Custom upgrade candidates: {validated_upgrade_candidates}")
         logger.info(f"Cost limit: ${cost_limit_decimal:.2f}")
 
@@ -171,7 +181,7 @@ async def should_upgrade_tool(
             upgrade_candidates = _select_upgrade_candidates(
                 current_model=current_model,
                 include_premium=include_premium,
-                task_complexity=task_complexity
+                task_complexity=task_complexity,
             )
             logger.info(f"Auto-selected upgrade candidates: {upgrade_candidates}")
 
@@ -186,13 +196,16 @@ async def should_upgrade_tool(
                 request = ModelRequest(
                     model=model,
                     messages=[Message(role="user", content=clean_task)],
-                    max_tokens=len(clean_current_response.split()) * 2,  # Estimate based on current response
+                    max_tokens=len(clean_current_response.split())
+                    * 2,  # Estimate based on current response
                     temperature=0.1,
-                    system_prompt=""
+                    system_prompt="",
                 )
                 model_cost = await client.estimate_cost(request)
                 estimated_cost += model_cost
-                logger.info(f"Upgrade candidate {model} cost estimate: ${model_cost:.4f}")
+                logger.info(
+                    f"Upgrade candidate {model} cost estimate: ${model_cost:.4f}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to estimate cost for {model}: {e}")
                 # Premium models get conservative estimate
@@ -205,7 +218,10 @@ async def should_upgrade_tool(
         # Check budget
         try:
             budget_check = await cost_guard.check_and_reserve_budget(
-                estimated_cost, "should_upgrade", current_model, per_request_override=cost_limit_decimal
+                estimated_cost,
+                "should_upgrade",
+                current_model,
+                per_request_override=cost_limit_decimal,
             )
             reservation_id = budget_check.reservation_id
         except Exception as e:
@@ -226,7 +242,7 @@ async def should_upgrade_tool(
                     messages=[Message(role="user", content=clean_task)],
                     max_tokens=len(clean_current_response.split()) * 2,
                     temperature=0.1,
-                    system_prompt=""
+                    system_prompt="",
                 )
                 response = await client.complete(request)
                 upgrade_responses.append(response)
@@ -236,12 +252,13 @@ async def should_upgrade_tool(
                 logger.error(f"Failed to get response from {model}: {e}")
                 # Create error response for consistency
                 from ...core.models import ModelResponse, TokenUsage
+
                 error_response = ModelResponse(
                     content=f"Error: Failed to get response from {model}: {str(e)}",
                     model=model,
                     usage=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0),
                     cost_estimate=Decimal("0.0"),
-                    provider=detect_model_provider(model)
+                    provider=detect_model_provider(model),
                 )
                 upgrade_responses.append(error_response)
                 upgrade_costs.append(Decimal("0.0"))
@@ -259,7 +276,7 @@ async def should_upgrade_tool(
                 messages=[Message(role="user", content=clean_task)],
                 max_tokens=len(clean_current_response.split()) * 2,
                 temperature=0.1,
-                system_prompt=""
+                system_prompt="",
             )
             current_cost_estimate = await current_client.estimate_cost(current_request)
         except Exception:
@@ -273,6 +290,7 @@ async def should_upgrade_tool(
                 current_cost_estimate = Decimal("0.03")
 
         from ...core.models import ModelResponse, TokenUsage
+
         estimated_input_tokens = int(len(clean_task.split()) * 1.3)
         estimated_output_tokens = int(len(clean_current_response.split()) * 1.3)
         total_tokens = estimated_input_tokens + estimated_output_tokens
@@ -282,31 +300,33 @@ async def should_upgrade_tool(
             usage=TokenUsage(
                 input_tokens=estimated_input_tokens,
                 output_tokens=estimated_output_tokens,
-                total_tokens=total_tokens
+                total_tokens=total_tokens,
             ),
             cost_estimate=current_cost_estimate,
-            provider=current_provider
+            provider=current_provider,
         )
 
         # Compare each upgrade candidate against current response
         try:
             logger.info("Performing upgrade evaluation")
             evaluation_criteria = EvaluationCriteria(
-                accuracy_weight=0.3,     # Balanced weights for comprehensive quality assessment
+                accuracy_weight=0.3,  # Balanced weights for comprehensive quality assessment
                 completeness_weight=0.3,
                 clarity_weight=0.2,
-                usefulness_weight=0.2
+                usefulness_weight=0.2,
             )
 
-            evaluator_model = "openai/gpt-4o-mini"  # Use cost-effective model for evaluation
+            evaluator_model = (
+                "openai/gpt-4o-mini"  # Use cost-effective model for evaluation
+            )
 
             for response in upgrade_responses:
                 try:
                     if response.content.startswith("Error:"):
                         fallback_result = {
-                            'overall_winner': 'current',
-                            'overall_score': 0.0,
-                            'reasoning': f"Upgrade candidate {response.model} failed to respond."
+                            "overall_winner": "current",
+                            "overall_score": 0.0,
+                            "reasoning": f"Upgrade candidate {response.model} failed to respond.",
                         }
                         evaluation_results.append((response.model, fallback_result))
                         continue
@@ -317,15 +337,19 @@ async def should_upgrade_tool(
                         current_model_response,  # current as comparison
                         original_task=clean_task,
                         criteria=evaluation_criteria,
-                        evaluator_model=evaluator_model
+                        evaluator_model=evaluator_model,
                     )
 
                     # Convert to dict and adjust for upgrade context
                     result_dict = {
-                        'overall_winner': 'upgrade' if result.winner == 'primary' else 'current',
-                        'overall_score': result.overall_score,
-                        'reasoning': result.reasoning,
-                        'quality_improvement': calculate_quality_assessment(result.overall_score, "upgrade")
+                        "overall_winner": (
+                            "upgrade" if result.winner == "primary" else "current"
+                        ),
+                        "overall_score": result.overall_score,
+                        "reasoning": result.reasoning,
+                        "quality_improvement": calculate_quality_assessment(
+                            result.overall_score, "upgrade"
+                        ),
                     }
                     evaluation_results.append((response.model, result_dict))
                     evaluation_cost_actual += Decimal("0.005")  # Small evaluation cost
@@ -333,10 +357,10 @@ async def should_upgrade_tool(
                 except Exception as e:
                     logger.warning(f"Evaluation failed for {response.model}: {e}")
                     fallback_result = {
-                        'overall_winner': 'current',
-                        'overall_score': 5.0,
-                        'reasoning': f"Evaluation failed for {response.model}: {str(e)}",
-                        'quality_improvement': 'unknown'
+                        "overall_winner": "current",
+                        "overall_score": 5.0,
+                        "reasoning": f"Evaluation failed for {response.model}: {str(e)}",
+                        "quality_improvement": "unknown",
                     }
                     evaluation_results.append((response.model, fallback_result))
 
@@ -345,16 +369,22 @@ async def should_upgrade_tool(
         except Exception as e:
             logger.error(f"Evaluation system failed: {e}")
             evaluation_results = [
-                (model, {
-                    'overall_winner': 'current',
-                    'overall_score': 5.0,
-                    'reasoning': 'Evaluation unavailable',
-                    'quality_improvement': 'unknown'
-                }) for model in upgrade_candidates
+                (
+                    model,
+                    {
+                        "overall_winner": "current",
+                        "overall_score": 5.0,
+                        "reasoning": "Evaluation unavailable",
+                        "quality_improvement": "unknown",
+                    },
+                )
+                for model in upgrade_candidates
             ]
 
         # Record actual cost
-        await cost_guard.record_actual_cost(reservation_id, actual_cost, current_model, "should_upgrade")
+        await cost_guard.record_actual_cost(
+            reservation_id, actual_cost, current_model, "should_upgrade"
+        )
         logger.info(f"Total operation cost: ${actual_cost:.4f}")
 
         # Generate quality enhancement report
@@ -370,7 +400,7 @@ async def should_upgrade_tool(
             task_complexity=task_complexity,
             actual_cost=actual_cost,
             cost_limit=cost_limit_decimal,
-            include_premium=include_premium
+            include_premium=include_premium,
         )
 
     except Exception as e:
@@ -382,7 +412,7 @@ def _select_upgrade_candidates(
     current_model: str,
     include_premium: bool,
     task_complexity: TaskComplexity,
-    max_candidates: int = 3
+    max_candidates: int = 3,
 ) -> list[str]:
     """
     Select premium alternative models for upgrade testing.
@@ -397,11 +427,9 @@ def _select_upgrade_candidates(
     if include_premium:
         if current_tier in ["local", "budget"]:
             # Major upgrade to premium tier
-            candidates.extend([
-                "anthropic/claude-3-opus",
-                "openai/gpt-4o",
-                "google/gemini-pro-1.5"
-            ])
+            candidates.extend(
+                ["anthropic/claude-3-opus", "openai/gpt-4o", "google/gemini-pro-1.5"]
+            )
         elif current_tier == "mid-tier":
             # Upgrade to top premium models
             if "claude" not in current_lower:
@@ -414,11 +442,9 @@ def _select_upgrade_candidates(
     # Add tier-appropriate upgrades based on current model
     if current_tier == "local":
         # Upgrade from local to any cloud model
-        candidates.extend([
-            "anthropic/claude-3-5-sonnet",
-            "openai/gpt-4o-mini",
-            "google/gemini-pro"
-        ])
+        candidates.extend(
+            ["anthropic/claude-3-5-sonnet", "openai/gpt-4o-mini", "google/gemini-pro"]
+        )
     elif current_tier == "budget":
         # Upgrade from budget to mid-tier
         if "claude" not in current_lower:
@@ -461,7 +487,7 @@ async def _format_upgrade_report(
     task_complexity: TaskComplexity,
     actual_cost: Decimal,
     cost_limit: Decimal,
-    include_premium: bool
+    include_premium: bool,
 ) -> str:
     """Format the upgrade analysis report for MCP client display."""
 
@@ -484,7 +510,9 @@ async def _format_upgrade_report(
     report.append("## 🎯 Current Response Quality")
     report.append(f"**Model**: {current_model}")
     report.append("")
-    report.append(current_response[:800] + ("..." if len(current_response) > 800 else ""))
+    report.append(
+        current_response[:800] + ("..." if len(current_response) > 800 else "")
+    )
     report.append("")
 
     # Upgrade candidates analysis
@@ -494,8 +522,12 @@ async def _format_upgrade_report(
     best_upgrade_score = 0.0
     premium_options = []
 
-    for (model, response, cost, (_, eval_result)) in zip(
-        upgrade_candidates, upgrade_responses, upgrade_costs, evaluation_results, strict=False
+    for model, response, cost, (_, eval_result) in zip(
+        upgrade_candidates,
+        upgrade_responses,
+        upgrade_costs,
+        evaluation_results,
+        strict=False,
     ):
         tier = get_model_tier(model)
         is_premium = tier == "premium"
@@ -503,12 +535,12 @@ async def _format_upgrade_report(
         if is_premium:
             premium_options.append(model)
 
-        score = eval_result.get('overall_score', 0.0)
-        quality_improvement = eval_result.get('quality_improvement', 'unknown')
-        winner = eval_result.get('overall_winner', 'current')
-        reasoning = eval_result.get('reasoning', 'No analysis available')
+        score = eval_result.get("overall_score", 0.0)
+        quality_improvement = eval_result.get("quality_improvement", "unknown")
+        winner = eval_result.get("overall_winner", "current")
+        reasoning = eval_result.get("reasoning", "No analysis available")
 
-        if score > best_upgrade_score and winner == 'upgrade':
+        if score > best_upgrade_score and winner == "upgrade":
             best_upgrade = model
             best_upgrade_score = score
 
@@ -519,7 +551,9 @@ async def _format_upgrade_report(
 
         report.append(f"### {model}")
         report.append(f"**Cost**: ${cost:.4f} | **Change**: {cost_description}")
-        report.append(f"**Quality vs Current**: {score:.1f}/10 ({quality_improvement} improvement)")
+        report.append(
+            f"**Quality vs Current**: {score:.1f}/10 ({quality_improvement} improvement)"
+        )
         report.append(f"**Winner**: {winner}")
         report.append("")
 
@@ -559,10 +593,16 @@ async def _format_upgrade_report(
     report.append(f"- Current: ${monthly_current:.2f}")
 
     if best_upgrade:
-        best_upgrade_cost = next(c for m, c in zip(upgrade_candidates, upgrade_costs, strict=False) if m == best_upgrade)
+        best_upgrade_cost = next(
+            c
+            for m, c in zip(upgrade_candidates, upgrade_costs, strict=False)
+            if m == best_upgrade
+        )
         monthly_upgrade = best_upgrade_cost * 100
         monthly_diff = monthly_upgrade - monthly_current
-        report.append(f"- With {best_upgrade}: ${monthly_upgrade:.2f} (+${monthly_diff:.2f}/month)")
+        report.append(
+            f"- With {best_upgrade}: ${monthly_upgrade:.2f} (+${monthly_diff:.2f}/month)"
+        )
 
     report.append("")
 
@@ -571,11 +611,20 @@ async def _format_upgrade_report(
 
     should_upgrade, reasoning = should_recommend_change(
         best_upgrade_score if best_upgrade else 0,
-        next(c for m, c in zip(upgrade_candidates, upgrade_costs, strict=False) if m == best_upgrade) - current_cost_estimate if best_upgrade else Decimal("0"),
+        (
+            next(
+                c
+                for m, c in zip(upgrade_candidates, upgrade_costs, strict=False)
+                if m == best_upgrade
+            )
+            - current_cost_estimate
+            if best_upgrade
+            else Decimal("0")
+        ),
         current_cost_estimate,
         is_upgrade=True,
         quality_threshold=7.0,
-        cost_ratio_threshold=3.0
+        cost_ratio_threshold=3.0,
     )
 
     if should_upgrade and best_upgrade:
@@ -583,22 +632,33 @@ async def _format_upgrade_report(
         tier = get_model_tier(best_upgrade)
         cost_diff, cost_pct, cost_desc = format_cost_comparison(
             current_cost_estimate,
-            next(c for m, c in zip(upgrade_candidates, upgrade_costs, strict=False) if m == best_upgrade),
-            is_upgrade=True
+            next(
+                c
+                for m, c in zip(upgrade_candidates, upgrade_costs, strict=False)
+                if m == best_upgrade
+            ),
+            is_upgrade=True,
         )
 
         report.append(f"**✅ UPGRADE to {best_upgrade}** ({tier.title()} Model)")
         report.append(f"Quality score: {best_upgrade_score:.1f}/10 with {cost_desc}")
         report.append("The quality improvement justifies the additional cost.")
-    elif premium_options and any(eval_result.get('overall_score', 0) >= 6.5 for _, eval_result in evaluation_results):
+    elif premium_options and any(
+        eval_result.get("overall_score", 0) >= 6.5
+        for _, eval_result in evaluation_results
+    ):
         # Premium options with reasonable improvement
         report.append("**💡 CONSIDER premium models for critical tasks**")
         report.append("Premium models show quality improvements for complex tasks.")
-        report.append(f"Keep {current_model} for routine work, upgrade for important tasks.")
+        report.append(
+            f"Keep {current_model} for routine work, upgrade for important tasks."
+        )
     else:
         # No clear upgrade benefit
         report.append(f"**✅ KEEP {current_model}**")
-        report.append("Premium alternatives don't provide sufficient quality improvement.")
+        report.append(
+            "Premium alternatives don't provide sufficient quality improvement."
+        )
         report.append("The current model appears well-suited for this task complexity.")
 
     report.append("")
@@ -621,10 +681,14 @@ async def _format_upgrade_report(
         report.append("3. **Test premium models** for mission-critical work")
 
     if premium_options:
-        report.append("4. **Consider task-based model selection** (budget for drafts, premium for finals)")
+        report.append(
+            "4. **Consider task-based model selection** (budget for drafts, premium for finals)"
+        )
 
     report.append("")
     report.append("---")
-    report.append("*Quality enhancement analysis complete - Invest in quality when it matters! 🚀*")
+    report.append(
+        "*Quality enhancement analysis complete - Invest in quality when it matters! 🚀*"
+    )
 
     return "\n".join(report)

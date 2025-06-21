@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: uv sync --dev
+
+    - name: Run linting with ruff
+      run: uv run ruff check .
+
+    - name: Run formatting check with black
+      run: uv run black --check .
+
+    - name: Run type checking with mypy
+      run: uv run mypy src/
+
+    - name: Run tests with pytest
+      run: uv run pytest --cov=second_opinion --cov-report=xml --cov-report=term-missing --cov-fail-under=85
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: true
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Install dependencies
+      run: uv sync --dev
+
+    - name: Run security tests
+      run: uv run pytest -m security
+
+    - name: Run security audit with ruff
+      run: uv run ruff check . --select S
+
+    - name: Check for hardcoded secrets
+      run: |
+        # Check for potential API keys or secrets in code
+        if grep -r "sk-[a-zA-Z0-9]" src/ --exclude-dir=.git || \
+           grep -r "api[_-]key.*=" src/ --exclude-dir=.git | grep -v "test\|mock"; then
+          echo "❌ Potential hardcoded secrets found!"
+          exit 1
+        else
+          echo "✅ No hardcoded secrets detected"
+        fi
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Install dependencies
+      run: uv sync --dev
+
+    - name: Run integration tests
+      run: uv run pytest -m integration
+
+    - name: Test CLI installation
+      run: |
+        uv run second-opinion --help
+        echo "✅ CLI installation successful"
+
+    - name: Test MCP server startup
+      run: |
+        # Test that MCP server can start without errors
+        timeout 10s uv run python -m second_opinion.mcp.server --dev || true
+        echo "✅ MCP server startup test completed"

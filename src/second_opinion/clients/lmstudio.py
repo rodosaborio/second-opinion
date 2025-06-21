@@ -267,9 +267,7 @@ class LMStudioClient(BaseClient):
             ClientError: For permanent errors
         """
         try:
-            response = await self._http_client.post(
-                "/chat/completions", json=payload
-            )
+            response = await self._http_client.post("/chat/completions", json=payload)
             await self._handle_http_error(response)
             return response
 

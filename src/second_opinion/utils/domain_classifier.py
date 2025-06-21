@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 # Cache for repeated domain classifications
 _classification_cache: dict[str, tuple[str, float]] = {}
 
+
 class DomainClassifier:
     """Intelligent domain classification using small language models."""
 
@@ -82,9 +83,7 @@ Where confidence is a number between 0.0 and 1.0 indicating classification certa
 Query: """
 
     async def classify_domain(
-        self,
-        query: str,
-        context: str | None = None
+        self, query: str, context: str | None = None
     ) -> tuple[str, float]:
         """
         Classify domain for a consultation query.
@@ -123,7 +122,7 @@ Query: """
                 messages=[Message(role="user", content=full_prompt)],
                 max_tokens=50,  # Small response needed
                 temperature=0.1,  # Low temperature for consistency
-                system_prompt="You are a precise domain classifier. Always respond with valid JSON."
+                system_prompt="You are a precise domain classifier. Always respond with valid JSON.",
             )
 
             # Get classification
@@ -138,7 +137,9 @@ Query: """
                 # Validate domain
                 valid_domains = {"coding", "performance", "creative", "general"}
                 if domain not in valid_domains:
-                    logger.warning(f"Invalid domain '{domain}' from classifier, using 'general'")
+                    logger.warning(
+                        f"Invalid domain '{domain}' from classifier, using 'general'"
+                    )
                     domain = "general"
                     confidence = 0.5
 
@@ -148,7 +149,9 @@ Query: """
                 # Cache the result
                 _classification_cache[cache_key] = (domain, confidence)
 
-                logger.debug(f"Classified '{query[:50]}...' as '{domain}' (confidence: {confidence:.2f})")
+                logger.debug(
+                    f"Classified '{query[:50]}...' as '{domain}' (confidence: {confidence:.2f})"
+                )
                 return domain, confidence
 
             except (json.JSONDecodeError, KeyError, ValueError) as e:
@@ -160,10 +163,7 @@ Query: """
             return "general", 0.5
 
     async def get_domain_with_fallback(
-        self,
-        query: str,
-        context: str | None = None,
-        confidence_threshold: float = 0.7
+        self, query: str, context: str | None = None, confidence_threshold: float = 0.7
     ) -> str:
         """
         Get domain classification with confidence-based fallback.
@@ -180,7 +180,9 @@ Query: """
 
         # If confidence is low and domain isn't general, fall back to general
         if confidence < confidence_threshold and domain != "general":
-            logger.info(f"Low confidence ({confidence:.2f}) for '{domain}', using 'general'")
+            logger.info(
+                f"Low confidence ({confidence:.2f}) for '{domain}', using 'general'"
+            )
             return "general"
 
         return domain
@@ -189,6 +191,7 @@ Query: """
 # Global classifier instance
 _classifier: DomainClassifier | None = None
 
+
 def get_domain_classifier() -> DomainClassifier:
     """Get global domain classifier instance."""
     global _classifier
@@ -196,10 +199,8 @@ def get_domain_classifier() -> DomainClassifier:
         _classifier = DomainClassifier()
     return _classifier
 
-async def classify_consultation_domain(
-    query: str,
-    context: str | None = None
-) -> str:
+
+async def classify_consultation_domain(query: str, context: str | None = None) -> str:
     """
     Convenience function for domain classification.
 
@@ -213,11 +214,13 @@ async def classify_consultation_domain(
     classifier = get_domain_classifier()
     return await classifier.get_domain_with_fallback(query, context)
 
+
 def clear_classification_cache() -> None:
     """Clear the domain classification cache (useful for testing)."""
     global _classification_cache
     _classification_cache.clear()
     logger.debug("Domain classification cache cleared")
+
 
 @lru_cache(maxsize=128)
 def get_domain_specialized_model(domain: str) -> str | None:

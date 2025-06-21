@@ -39,11 +39,9 @@ class TestOpenRouterClient:
         """Create a sample model request."""
         return ModelRequest(
             model="openai/gpt-3.5-turbo",
-            messages=[
-                Message(role="user", content="Hello, world!")
-            ],
+            messages=[Message(role="user", content="Hello, world!")],
             max_tokens=100,
-            temperature=0.7
+            temperature=0.7,
         )
 
     @pytest.fixture
@@ -56,17 +54,11 @@ class TestOpenRouterClient:
             "id": "chatcmpl-test123",
             "choices": [
                 {
-                    "message": {
-                        "content": "Hello! How can I help you today?"
-                    },
-                    "finish_reason": "stop"
+                    "message": {"content": "Hello! How can I help you today?"},
+                    "finish_reason": "stop",
                 }
             ],
-            "usage": {
-                "prompt_tokens": 10,
-                "completion_tokens": 8,
-                "total_tokens": 18
-            }
+            "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18},
         }
         mock_client.post.return_value = mock_response
         mock_client.get.return_value = mock_response
@@ -86,7 +78,7 @@ class TestOpenRouterClient:
 
     def test_client_initialization_wrong_format(self):
         """Test client initialization with wrong key format shows warning."""
-        with patch('src.second_opinion.clients.openrouter.logger') as mock_logger:
+        with patch("src.second_opinion.clients.openrouter.logger") as mock_logger:
             OpenRouterClient(api_key="invalid-key")
             mock_logger.warning.assert_called_once()
 
@@ -113,7 +105,7 @@ class TestOpenRouterClient:
         request = ModelRequest(
             model="openai/gpt-4",
             messages=[Message(role="user", content="Hello")],
-            system_prompt="You are a helpful assistant."
+            system_prompt="You are a helpful assistant.",
         )
 
         await client.complete(request)
@@ -134,10 +126,7 @@ class TestOpenRouterClient:
         mock_response = MagicMock()
         mock_response.status_code = 401
         mock_response.json.return_value = {
-            "error": {
-                "message": "Invalid API key",
-                "code": 401
-            }
+            "error": {"message": "Invalid API key", "code": 401}
         }
 
         client._http_client = AsyncMock()
@@ -153,10 +142,7 @@ class TestOpenRouterClient:
         mock_response.status_code = 429
         mock_response.headers = {"retry-after": "60"}
         mock_response.json.return_value = {
-            "error": {
-                "message": "Rate limit exceeded",
-                "code": 429
-            }
+            "error": {"message": "Rate limit exceeded", "code": 429}
         }
 
         client._http_client = AsyncMock()
@@ -171,10 +157,7 @@ class TestOpenRouterClient:
         mock_response = MagicMock()
         mock_response.status_code = 402
         mock_response.json.return_value = {
-            "error": {
-                "message": "Insufficient credits",
-                "code": 402
-            }
+            "error": {"message": "Insufficient credits", "code": 402}
         }
 
         client._http_client = AsyncMock()
@@ -189,10 +172,7 @@ class TestOpenRouterClient:
         mock_response = MagicMock()
         mock_response.status_code = 403
         mock_response.json.return_value = {
-            "error": {
-                "message": "Content flagged by moderation",
-                "code": 403
-            }
+            "error": {"message": "Content flagged by moderation", "code": 403}
         }
 
         client._http_client = AsyncMock()
@@ -207,10 +187,7 @@ class TestOpenRouterClient:
         mock_response = MagicMock()
         mock_response.status_code = 502
         mock_response.json.return_value = {
-            "error": {
-                "message": "Bad gateway",
-                "code": 502
-            }
+            "error": {"message": "Bad gateway", "code": 502}
         }
 
         client._http_client = AsyncMock()
@@ -226,16 +203,19 @@ class TestOpenRouterClient:
         """Test cost estimation for known model."""
         # Mock pricing manager to return realistic costs
         mock_pricing_manager = MagicMock()
-        mock_pricing_manager.estimate_cost.return_value = (Decimal("0.00025"), "pricing_data")
+        mock_pricing_manager.estimate_cost.return_value = (
+            Decimal("0.00025"),
+            "pricing_data",
+        )
         mock_get_pricing_manager.return_value = mock_pricing_manager
-        
+
         # Create client after mock is set up
         client = OpenRouterClient(api_key="sk-or-test123")
-        
+
         request = ModelRequest(
             model="gpt-3.5-turbo",
             messages=[Message(role="user", content="Hello" * 100)],  # ~100 tokens
-            max_tokens=50
+            max_tokens=50,
         )
 
         cost = await client.estimate_cost(request)
@@ -256,7 +236,9 @@ class TestOpenRouterClient:
         cost = await client.estimate_cost(request)
 
         # Pricing manager now provides conservative fallback based on model tier
-        assert cost == Decimal("0.02")  # Conservative fallback for low-tier unknown models
+        assert cost == Decimal(
+            "0.02"
+        )  # Conservative fallback for low-tier unknown models
 
     @pytest.mark.asyncio
     async def test_get_available_models_success(self, client):
@@ -268,27 +250,21 @@ class TestOpenRouterClient:
                 {
                     "id": "openai/gpt-3.5-turbo",
                     "description": "GPT-3.5 Turbo",
-                    "pricing": {
-                        "prompt": "0.0015",
-                        "completion": "0.002"
-                    },
+                    "pricing": {"prompt": "0.0015", "completion": "0.002"},
                     "context_length": 4096,
-                    "top_provider": {
-                        "max_completion_tokens": 4096
-                    }
+                    "top_provider": {"max_completion_tokens": 4096},
                 },
                 {
                     "id": "anthropic/claude-3-haiku",
                     "description": "Claude 3 Haiku",
-                    "pricing": {
-                        "prompt": "0.00025",
-                        "completion": "0.00125"
-                    },
-                    "context_length": 200000
-                }
+                    "pricing": {"prompt": "0.00025", "completion": "0.00125"},
+                    "context_length": 200000,
+                },
             ]
         }
-        mock_response.raise_for_status.return_value = None  # Explicitly set to avoid AsyncMock issues
+        mock_response.raise_for_status.return_value = (
+            None  # Explicitly set to avoid AsyncMock issues
+        )
 
         client._http_client = AsyncMock()
         client._http_client.get.return_value = mock_response
@@ -324,9 +300,7 @@ class TestOpenRouterClient:
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            message="Internal Server Error",
-            request=MagicMock(),
-            response=mock_response
+            message="Internal Server Error", request=MagicMock(), response=mock_response
         )
 
         client._http_client = AsyncMock()
@@ -335,7 +309,6 @@ class TestOpenRouterClient:
         with pytest.raises(ClientError, match="Failed to retrieve models"):
             await client.get_available_models()
 
-
     def test_estimate_input_tokens(self, client):
         """Test input token estimation."""
         request = ModelRequest(
@@ -343,9 +316,9 @@ class TestOpenRouterClient:
             messages=[
                 Message(role="user", content="Hello"),
                 Message(role="assistant", content="Hi there!"),
-                Message(role="user", content="How are you?")
+                Message(role="user", content="How are you?"),
             ],
-            system_prompt="You are helpful."
+            system_prompt="You are helpful.",
         )
 
         tokens = client._estimate_input_tokens(request)
@@ -361,7 +334,7 @@ class TestOpenRouterClient:
         # Test with malicious input
         malicious_request = ModelRequest(
             model="<script>alert('xss')</script>",
-            messages=[Message(role="user", content="sk-test-api-key-here")]
+            messages=[Message(role="user", content="sk-test-api-key-here")],
         )
 
         with pytest.raises((ValidationError, SecurityError)):
@@ -373,14 +346,9 @@ class TestOpenRouterClient:
 
         expected_request = {
             "model": "openai/gpt-3.5-turbo",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Hello, world!"
-                }
-            ],
+            "messages": [{"role": "user", "content": "Hello, world!"}],
             "max_tokens": 100,
-            "temperature": 0.7
+            "temperature": 0.7,
         }
 
         assert openrouter_request == expected_request
@@ -392,7 +360,7 @@ class TestOpenRouterClient:
             assert client.provider_name == "openrouter"
 
         # Should clean up HTTP client
-        assert hasattr(client, '_http_client')
+        assert hasattr(client, "_http_client")
 
 
 class TestOpenRouterClientSecurity:
@@ -422,7 +390,7 @@ class TestOpenRouterClientSecurity:
         """Test that malicious model names are blocked."""
         malicious_request = ModelRequest(
             model="<script>alert('xss')</script>",
-            messages=[Message(role="user", content="Hello")]
+            messages=[Message(role="user", content="Hello")],
         )
 
         with pytest.raises(SecurityError):
@@ -434,7 +402,9 @@ class TestOpenRouterClientSecurity:
         """Test that API keys in message content are blocked."""
         malicious_request = ModelRequest(
             model="gpt-3.5-turbo",
-            messages=[Message(role="user", content="My API key is sk-test-1234567890abcdef")]
+            messages=[
+                Message(role="user", content="My API key is sk-test-1234567890abcdef")
+            ],
         )
 
         with pytest.raises(SecurityError):
@@ -455,13 +425,13 @@ class TestOpenRouterClientSecurity:
         # These should be sanitized (whitespace/length normalization only)
         sanitized_attempts = [
             "Hello world!   ",  # Basic whitespace normalization
-            "What is 2+2?",     # Normal content
+            "What is 2+2?",  # Normal content
         ]
 
         for injection in blocked_attempts:
             malicious_request = ModelRequest(
                 model="gpt-3.5-turbo",
-                messages=[Message(role="user", content=injection)]
+                messages=[Message(role="user", content=injection)],
             )
 
             with pytest.raises(SecurityError):
@@ -470,7 +440,7 @@ class TestOpenRouterClientSecurity:
         for injection in sanitized_attempts:
             malicious_request = ModelRequest(
                 model="gpt-3.5-turbo",
-                messages=[Message(role="user", content=injection)]
+                messages=[Message(role="user", content=injection)],
             )
 
             # These should be sanitized but not blocked
@@ -493,10 +463,14 @@ class TestOpenRouterClientIntegration:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "id": "chatcmpl-test",
-            "choices": [{"message": {"content": "Test response"}, "finish_reason": "stop"}],
-            "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7}
+            "choices": [
+                {"message": {"content": "Test response"}, "finish_reason": "stop"}
+            ],
+            "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7},
         }
-        mock_response.raise_for_status.return_value = None  # Explicitly set to avoid AsyncMock issues
+        mock_response.raise_for_status.return_value = (
+            None  # Explicitly set to avoid AsyncMock issues
+        )
 
         # Mock models response for get_available_models
         mock_models_response = MagicMock()
@@ -510,7 +484,7 @@ class TestOpenRouterClientIntegration:
 
         request = ModelRequest(
             model="openai/gpt-3.5-turbo",
-            messages=[Message(role="user", content="Test")]
+            messages=[Message(role="user", content="Test")],
         )
 
         # Test cost estimation

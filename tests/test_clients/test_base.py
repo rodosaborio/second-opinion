@@ -64,7 +64,7 @@ class TestModelInfo:
             input_cost_per_1k=Decimal("0.03"),
             output_cost_per_1k=Decimal("0.06"),
             max_tokens=4096,
-            context_window=8192
+            context_window=8192,
         )
 
         assert model.name == "gpt-4"
@@ -83,7 +83,7 @@ class TestModelInfo:
                 name="invalid<script>name",
                 provider="test",
                 input_cost_per_1k=Decimal("0.01"),
-                output_cost_per_1k=Decimal("0.02")
+                output_cost_per_1k=Decimal("0.02"),
             )
 
     def test_model_info_repr(self):
@@ -92,7 +92,7 @@ class TestModelInfo:
             name="claude-3",
             provider="anthropic",
             input_cost_per_1k=Decimal("0.015"),
-            output_cost_per_1k=Decimal("0.075")
+            output_cost_per_1k=Decimal("0.075"),
         )
 
         repr_str = repr(model)
@@ -131,7 +131,7 @@ class TestClientErrors:
             "Cost limit exceeded",
             "test-provider",
             estimated_cost=Decimal("5.00"),
-            cost_limit=Decimal("1.00")
+            cost_limit=Decimal("1.00"),
         )
         assert isinstance(error, ClientError)
         assert error.estimated_cost == Decimal("5.00")
@@ -164,9 +164,9 @@ class TestBaseClient:
             model="  gpt-4  ",
             messages=[
                 Message(role="user", content="  What is AI?  "),
-                Message(role="assistant", content="AI is artificial intelligence.")
+                Message(role="assistant", content="AI is artificial intelligence."),
             ],
-            system_prompt="  You are a helpful assistant.  "
+            system_prompt="  You are a helpful assistant.  ",
         )
 
         validated = await self.client.validate_request(request)
@@ -181,7 +181,7 @@ class TestBaseClient:
         """Test request validation with malicious content."""
         request = ModelRequest(
             model="gpt-4",
-            messages=[Message(role="user", content="<script>alert('xss')</script>")]
+            messages=[Message(role="user", content="<script>alert('xss')</script>")],
         )
 
         with pytest.raises(SecurityError):
@@ -192,7 +192,11 @@ class TestBaseClient:
         """Test request validation with potential API key."""
         request = ModelRequest(
             model="gpt-4",
-            messages=[Message(role="user", content="My key is sk-1234567890abcdef1234567890abcdef")]
+            messages=[
+                Message(
+                    role="user", content="My key is sk-1234567890abcdef1234567890abcdef"
+                )
+            ],
         )
 
         with pytest.raises(SecurityError):
@@ -203,7 +207,7 @@ class TestBaseClient:
         """Test checking model availability."""
         mock_models = [
             ModelInfo("gpt-4", "openai", Decimal("0.03"), Decimal("0.06")),
-            ModelInfo("claude-3", "anthropic", Decimal("0.015"), Decimal("0.075"))
+            ModelInfo("claude-3", "anthropic", Decimal("0.015"), Decimal("0.075")),
         ]
         self.client.get_available_models_mock.return_value = mock_models
 
@@ -213,7 +217,9 @@ class TestBaseClient:
     @pytest.mark.asyncio
     async def test_check_model_availability_error(self):
         """Test checking model availability with client error."""
-        self.client.get_available_models_mock.side_effect = ClientError("API error", "test")
+        self.client.get_available_models_mock.side_effect = ClientError(
+            "API error", "test"
+        )
 
         result = await self.client.check_model_availability("gpt-4")
         assert result is False
@@ -223,7 +229,7 @@ class TestBaseClient:
         """Test getting model information."""
         mock_models = [
             ModelInfo("gpt-4", "openai", Decimal("0.03"), Decimal("0.06")),
-            ModelInfo("claude-3", "anthropic", Decimal("0.015"), Decimal("0.075"))
+            ModelInfo("claude-3", "anthropic", Decimal("0.015"), Decimal("0.075")),
         ]
         self.client.get_available_models_mock.return_value = mock_models
 
@@ -258,6 +264,7 @@ class TestBaseClient:
     @pytest.mark.asyncio
     async def test_retry_with_backoff_success(self):
         """Test successful retry operation."""
+
         async def mock_operation():
             return "success"
 
@@ -287,6 +294,7 @@ class TestBaseClient:
     @pytest.mark.asyncio
     async def test_retry_with_backoff_exhausted(self):
         """Test retry with exhausted attempts."""
+
         async def mock_operation():
             raise RetryableError("Persistent error", "test")
 
@@ -300,6 +308,7 @@ class TestBaseClient:
     @pytest.mark.asyncio
     async def test_retry_with_backoff_non_retryable(self):
         """Test retry with non-retryable error."""
+
         async def mock_operation():
             raise AuthenticationError("Auth failed", "test")
 
@@ -311,7 +320,10 @@ class TestBaseClient:
         model_info = ModelInfo("gpt-4", "openai", Decimal("0.03"), Decimal("0.06"))
 
         cost = self.client._calculate_token_cost(1000, 500, model_info)
-        expected = Decimal("1000") * Decimal("0.03") / 1000 + Decimal("500") * Decimal("0.06") / 1000
+        expected = (
+            Decimal("1000") * Decimal("0.03") / 1000
+            + Decimal("500") * Decimal("0.06") / 1000
+        )
         assert cost == expected
         assert cost == Decimal("0.06")  # 0.03 + 0.03
 
@@ -329,8 +341,7 @@ class TestBaseClient:
     def test_create_error_response(self):
         """Test error response creation."""
         request = ModelRequest(
-            model="gpt-4",
-            messages=[Message(role="user", content="test")]
+            model="gpt-4", messages=[Message(role="user", content="test")]
         )
         error = Exception("Test error")
 
@@ -339,7 +350,7 @@ class TestBaseClient:
         assert response.model == "gpt-4"
         assert response.provider == "mock-provider"
         assert "Error: Test error" in response.content
-        assert response.cost_estimate == Decimal('0')
+        assert response.cost_estimate == Decimal("0")
         assert response.metadata["error"] is True
         assert response.metadata["error_type"] == "Exception"
 
@@ -361,7 +372,7 @@ class TestBaseClient:
 
         cost = self.client._calculate_token_cost(1000, 500, model_info)
         expected_input = Decimal("1000") * Decimal("0.03") / 1000  # $0.03
-        expected_output = Decimal("500") * Decimal("0.06") / 1000   # $0.03
+        expected_output = Decimal("500") * Decimal("0.06") / 1000  # $0.03
         expected_total = expected_input + expected_output
 
         assert cost == expected_total
@@ -378,8 +389,7 @@ class TestBaseClient:
     def test_create_error_response(self):
         """Test error response creation method."""
         request = ModelRequest(
-            model="gpt-4",
-            messages=[Message(role="user", content="test message")]
+            model="gpt-4", messages=[Message(role="user", content="test message")]
         )
         error = Exception("Test error occurred")
 
@@ -388,7 +398,7 @@ class TestBaseClient:
         assert response.model == "gpt-4"
         assert response.provider == "mock-provider"
         assert "Error: Test error occurred" in response.content
-        assert response.cost_estimate == Decimal('0')
+        assert response.cost_estimate == Decimal("0")
         assert response.usage.total_tokens == 0
         assert response.metadata["error"] is True
         assert response.metadata["error_type"] == "Exception"
@@ -428,13 +438,12 @@ class TestClientIntegration:
             model="gpt-4",
             usage=TokenUsage(input_tokens=10, output_tokens=15, total_tokens=25),
             cost_estimate=Decimal("0.001"),
-            provider="mock-provider"
+            provider="mock-provider",
         )
         client.complete_mock.return_value = mock_response
 
         request = ModelRequest(
-            model="gpt-4",
-            messages=[Message(role="user", content="What is AI?")]
+            model="gpt-4", messages=[Message(role="user", content="What is AI?")]
         )
 
         # Validate request first
@@ -456,7 +465,7 @@ class TestClientIntegration:
 
         request = ModelRequest(
             model="gpt-4",
-            messages=[Message(role="user", content="Long prompt that costs money")]
+            messages=[Message(role="user", content="Long prompt that costs money")],
         )
 
         cost = await client.estimate_cost(request)
@@ -472,7 +481,7 @@ class TestClientIntegration:
         # Request with potential security issue
         malicious_request = ModelRequest(
             model="gpt-4",
-            messages=[Message(role="user", content="<script>alert('xss')</script>")]
+            messages=[Message(role="user", content="<script>alert('xss')</script>")],
         )
 
         with pytest.raises(SecurityError):
@@ -486,7 +495,12 @@ class TestClientIntegration:
 
         request_with_key = ModelRequest(
             model="gpt-4",
-            messages=[Message(role="user", content="My API key is sk-1234567890abcdef1234567890abcdef")]
+            messages=[
+                Message(
+                    role="user",
+                    content="My API key is sk-1234567890abcdef1234567890abcdef",
+                )
+            ],
         )
 
         with pytest.raises(SecurityError):

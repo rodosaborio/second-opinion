@@ -22,7 +22,11 @@ from second_opinion.clients import detect_model_provider
 from second_opinion.utils.client_factory import create_client_from_config
 from second_opinion.config.model_configs import model_config_manager
 from second_opinion.config.settings import get_settings
-from second_opinion.core.evaluator import TaskComplexity, get_evaluator, get_client_for_model
+from second_opinion.core.evaluator import (
+    TaskComplexity,
+    get_evaluator,
+    get_client_for_model,
+)
 from second_opinion.core.models import EvaluationCriteria, Message, ModelRequest
 from second_opinion.utils.cost_tracking import get_cost_guard
 from second_opinion.utils.sanitization import SecurityContext, sanitize_prompt
@@ -48,53 +52,53 @@ class CLIError(Exception):
 def filter_think_tags(text: str) -> str:
     """
     Remove thinking tags from response text.
-    
+
     Filters out <think>, <thinking>, and similar tags that some models use
     for internal reasoning that shouldn't be shown to users.
-    
+
     Args:
         text: Response text potentially containing think tags
-        
+
     Returns:
         Text with think tags removed
     """
     if not text or not text.strip():
         return text or ""
-    
+
     # Patterns for various thinking tag formats
     think_patterns = [
         # Complete tags with content
-        r'<think>.*?</think>',
-        r'<thinking>.*?</thinking>',
-        r'<thought>.*?</thought>', 
-        r'<reasoning>.*?</reasoning>',
-        r'<internal>.*?</internal>',
-        r'<analysis>.*?</analysis>',
-        
+        r"<think>.*?</think>",
+        r"<thinking>.*?</thinking>",
+        r"<thought>.*?</thought>",
+        r"<reasoning>.*?</reasoning>",
+        r"<internal>.*?</internal>",
+        r"<analysis>.*?</analysis>",
         # Handle unclosed tags - remove everything from tag to end
-        r'<think>.*?(?=\n\n|$)',
-        r'<thinking>.*?(?=\n\n|$)',
-        r'<thought>.*?(?=\n\n|$)',
-        r'<reasoning>.*?(?=\n\n|$)',
-        r'<internal>.*?(?=\n\n|$)',
-        r'<analysis>.*?(?=\n\n|$)',
-        
+        r"<think>.*?(?=\n\n|$)",
+        r"<thinking>.*?(?=\n\n|$)",
+        r"<thought>.*?(?=\n\n|$)",
+        r"<reasoning>.*?(?=\n\n|$)",
+        r"<internal>.*?(?=\n\n|$)",
+        r"<analysis>.*?(?=\n\n|$)",
         # Handle cases where tags are at the very beginning or end
-        r'^\s*</?think[^>]*>.*?(?=\n[A-Za-z]|\n\n|$)',
-        r'^\s*</?thinking[^>]*>.*?(?=\n[A-Za-z]|\n\n|$)',
+        r"^\s*</?think[^>]*>.*?(?=\n[A-Za-z]|\n\n|$)",
+        r"^\s*</?thinking[^>]*>.*?(?=\n[A-Za-z]|\n\n|$)",
     ]
-    
+
     filtered_text = text
     for pattern in think_patterns:
         # Remove matched patterns
-        filtered_text = re.sub(pattern, '', filtered_text, flags=re.DOTALL | re.IGNORECASE)
-    
+        filtered_text = re.sub(
+            pattern, "", filtered_text, flags=re.DOTALL | re.IGNORECASE
+        )
+
     # Clean up extra whitespace left by removed tags
-    filtered_text = re.sub(r'\n\s*\n\s*\n+', '\n\n', filtered_text)  # Multiple newlines
-    filtered_text = re.sub(r'^\s*\n+', '', filtered_text)  # Leading newlines
-    filtered_text = re.sub(r'\n+\s*$', '', filtered_text)  # Trailing newlines
+    filtered_text = re.sub(r"\n\s*\n\s*\n+", "\n\n", filtered_text)  # Multiple newlines
+    filtered_text = re.sub(r"^\s*\n+", "", filtered_text)  # Leading newlines
+    filtered_text = re.sub(r"\n+\s*$", "", filtered_text)  # Trailing newlines
     filtered_text = filtered_text.strip()
-    
+
     return filtered_text
 
 
@@ -171,14 +175,14 @@ class ComparisonModelSelector:
         """Smart comparison model selection based on task complexity and model tier."""
         try:
             from ..clients import detect_model_provider
-            
+
             config = self.model_config.config
             if not config:
                 return self._get_default_models(primary_model, max_models)
 
             # Check if primary is local or cloud
             primary_provider = detect_model_provider(primary_model)
-            
+
             # Get primary model tier
             primary_tier = self._get_model_tier(primary_model, config)
 
@@ -216,15 +220,19 @@ class ComparisonModelSelector:
             # For expert/complex tasks, prefer higher-tier models
             if task_complexity in [TaskComplexity.EXPERT, TaskComplexity.COMPLEX]:
                 # Keep local models for cost analysis but prioritize capable models
-                local_models = [m for m in candidates if detect_model_provider(m) == "lmstudio"]
-                cloud_models = [m for m in candidates if detect_model_provider(m) == "openrouter"]
-                
+                local_models = [
+                    m for m in candidates if detect_model_provider(m) == "lmstudio"
+                ]
+                cloud_models = [
+                    m for m in candidates if detect_model_provider(m) == "openrouter"
+                ]
+
                 cloud_models = sorted(
                     cloud_models,
                     key=lambda m: self._get_model_capability_score(m),
                     reverse=True,
                 )
-                
+
                 # Combine: prioritize capable models but keep one local option
                 candidates = cloud_models + local_models[:1]
 
@@ -269,10 +277,10 @@ class ComparisonModelSelector:
     def _get_default_models(self, primary_model: str, max_models: int) -> list[str]:
         """Get default comparison models when configuration is unavailable."""
         from ..clients import detect_model_provider
-        
+
         # Determine if primary is local or cloud
         primary_provider = detect_model_provider(primary_model)
-        
+
         if primary_provider == "lmstudio":
             # Primary is local, compare against cloud alternatives
             default_models = [
@@ -285,8 +293,8 @@ class ComparisonModelSelector:
             # Primary is cloud, include local cost-effective alternatives
             default_models = [
                 "anthropic/claude-3-5-sonnet",
-                "openai/gpt-4o", 
-                "qwen3-4b-mlx",        # Cost-effective local alternative
+                "openai/gpt-4o",
+                "qwen3-4b-mlx",  # Cost-effective local alternative
                 "anthropic/claude-3-haiku",
                 "openai/gpt-4o-mini",
             ]
@@ -320,8 +328,6 @@ class ComparisonModelSelector:
             any(pattern in model_lower for pattern in local_patterns)
             and "/" not in model
         )
-
-
 
 
 def run_async(coro):
@@ -403,7 +409,9 @@ async def execute_second_opinion(
 
     # Check budget for models (skip primary if existing response provided)
     total_estimated_cost = Decimal("0")
-    models_to_run = comparison_models if existing_response else [primary_model] + comparison_models
+    models_to_run = (
+        comparison_models if existing_response else [primary_model] + comparison_models
+    )
 
     for model in models_to_run:
         try:
@@ -432,7 +440,9 @@ async def execute_second_opinion(
         # Execute primary model request or use existing response
         if existing_response:
             # Sanitize the existing response
-            sanitized_existing_response = sanitize_prompt(existing_response, SecurityContext.USER_PROMPT)
+            sanitized_existing_response = sanitize_prompt(
+                existing_response, SecurityContext.USER_PROMPT
+            )
 
             # Create a mock ModelResponse for existing response
             from datetime import datetime
@@ -446,12 +456,12 @@ async def execute_second_opinion(
                 usage=TokenUsage(
                     input_tokens=0,  # No tokens used for existing response
                     output_tokens=0,
-                    total_tokens=0
+                    total_tokens=0,
                 ),
                 cost_estimate=Decimal("0.00"),  # No cost for existing response
                 provider="existing",
                 request_id=str(uuid4()),
-                timestamp=datetime.now(UTC)
+                timestamp=datetime.now(UTC),
             )
         else:
             # Execute normal primary model request
@@ -486,7 +496,7 @@ async def execute_second_opinion(
             clarity_weight=0.2,
             usefulness_weight=0.2,
         )
-        
+
         for comp_response in comparison_responses:
             try:
                 evaluation = await evaluator.compare_responses(
@@ -553,13 +563,20 @@ def second_opinion_command(
         2, "--max-comparisons", help="Maximum number of comparison models to use"
     ),
     verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show full responses instead of truncated summaries"
+        False,
+        "--verbose",
+        "-v",
+        help="Show full responses instead of truncated summaries",
     ),
     existing_response: str | None = typer.Option(
-        None, "--existing-response", help="Provide existing primary model response to save API calls"
+        None,
+        "--existing-response",
+        help="Provide existing primary model response to save API calls",
     ),
     evaluator_model: str | None = typer.Option(
-        None, "--evaluator-model", help="Model to use for evaluation (defaults to primary model)"
+        None,
+        "--evaluator-model",
+        help="Model to use for evaluation (defaults to primary model)",
     ),
 ):
     """Get a second opinion on a prompt using multiple models."""
@@ -569,15 +586,18 @@ def second_opinion_command(
         try:
             # Try to get from model configuration first
             from second_opinion.config.model_configs import model_config_manager
+
             tool_config = model_config_manager.get_tool_config("second_opinion")
             cost_limit = float(tool_config.cost_limit_per_request)
         except Exception:
             # Fall back to settings default
             settings = get_settings()
             cost_limit = float(settings.cost_management.default_per_request_limit)
-    
+
     # Show operation info
-    existing_info = "\nUsing existing response (no API call)" if existing_response else ""
+    existing_info = (
+        "\nUsing existing response (no API call)" if existing_response else ""
+    )
     console.print(
         Panel.fit(
             f"[bold]Second Opinion Analysis[/bold]\n"
@@ -598,12 +618,15 @@ def second_opinion_command(
         task_complexity=None,  # Will be detected in async function
         max_models=max_comparisons,
     )
-    
+
     # Get evaluator model from config if not specified
     if evaluator_model is None:
         try:
             from second_opinion.config.model_configs import model_config_manager
-            config_evaluator = model_config_manager.get_tool_config("second_opinion").evaluator_model
+
+            config_evaluator = model_config_manager.get_tool_config(
+                "second_opinion"
+            ).evaluator_model
             if config_evaluator:
                 evaluator_model = config_evaluator
         except Exception:
@@ -652,8 +675,12 @@ def display_results(result: dict, verbose: bool = False):
 
     # Cost summary and task info (always shown)
     task_complexity = result.get("task_complexity")
-    complexity_text = f"\n[dim]Task Complexity: {task_complexity.value}[/dim]" if task_complexity else ""
-    
+    complexity_text = (
+        f"\n[dim]Task Complexity: {task_complexity.value}[/dim]"
+        if task_complexity
+        else ""
+    )
+
     cost_panel = Panel.fit(
         f"[bold]Total Cost:[/bold] ${total_cost:.4f}\n"
         f"[dim]Estimated: ${result['estimated_cost']:.4f}[/dim]{complexity_text}",
@@ -669,10 +696,12 @@ def display_results(result: dict, verbose: bool = False):
         for evaluation in evaluations:
             if hasattr(evaluation, "recommendations") and evaluation.recommendations:
                 all_recommendations.extend(evaluation.recommendations)
-        
+
         # Deduplicate recommendations
-        unique_recommendations = list(dict.fromkeys(all_recommendations))  # Preserves order
-        
+        unique_recommendations = list(
+            dict.fromkeys(all_recommendations)
+        )  # Preserves order
+
         if unique_recommendations:
             for recommendation in unique_recommendations:
                 console.print(f"• {recommendation}")
@@ -718,7 +747,7 @@ def _display_summary_results(result: dict):
 
         # Filter think tags from comparison response
         filtered_comparison = filter_think_tags(comp_response.content)
-        
+
         table.add_row(
             comp_response.model,
             (
@@ -740,12 +769,14 @@ def _display_verbose_results(result: dict):
     evaluations = result["evaluations"]
 
     # Display primary response (with think tag filtering)
-    console.print(Panel.fit(
-        f"[bold cyan]{primary_response.model} (Primary Model)[/bold cyan]\n"
-        f"[dim]Cost: ${primary_response.cost_estimate:.4f}[/dim]",
-        title="Primary Response",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold cyan]{primary_response.model} (Primary Model)[/bold cyan]\n"
+            f"[dim]Cost: ${primary_response.cost_estimate:.4f}[/dim]",
+            title="Primary Response",
+            border_style="blue",
+        )
+    )
     filtered_primary_verbose = filter_think_tags(primary_response.content)
     console.print(f"\n{filtered_primary_verbose}\n")
 
@@ -757,12 +788,14 @@ def _display_verbose_results(result: dict):
             if hasattr(eval_result, "quality_score"):
                 quality_info = f" | Quality: {eval_result.quality_score:.1f}/10"
 
-        console.print(Panel.fit(
-            f"[bold cyan]{comp_response.model}[/bold cyan]\n"
-            f"[dim]Cost: ${comp_response.cost_estimate:.4f}{quality_info}[/dim]",
-            title=f"Comparison Response {i + 1}",
-            border_style="green"
-        ))
+        console.print(
+            Panel.fit(
+                f"[bold cyan]{comp_response.model}[/bold cyan]\n"
+                f"[dim]Cost: ${comp_response.cost_estimate:.4f}{quality_info}[/dim]",
+                title=f"Comparison Response {i + 1}",
+                border_style="green",
+            )
+        )
         # Filter think tags from comparison response in verbose mode
         filtered_comparison_verbose = filter_think_tags(comp_response.content)
         console.print(f"\n{filtered_comparison_verbose}\n")

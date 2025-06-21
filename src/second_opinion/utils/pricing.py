@@ -34,12 +34,18 @@ class ModelPricingInfo(BaseModel):
     """Pricing information for a specific model."""
 
     model_name: str = Field(..., description="Model identifier")
-    input_cost_per_1k_tokens: Decimal = Field(..., description="Cost per 1000 input tokens")
-    output_cost_per_1k_tokens: Decimal = Field(..., description="Cost per 1000 output tokens")
+    input_cost_per_1k_tokens: Decimal = Field(
+        ..., description="Cost per 1000 input tokens"
+    )
+    output_cost_per_1k_tokens: Decimal = Field(
+        ..., description="Cost per 1000 output tokens"
+    )
     max_tokens: int | None = Field(None, description="Maximum token limit")
     provider: str | None = Field(None, description="Model provider")
     mode: str | None = Field(None, description="Model mode (chat, embedding, etc.)")
-    supports_function_calling: bool | None = Field(None, description="Function calling support")
+    supports_function_calling: bool | None = Field(
+        None, description="Function calling support"
+    )
 
 
 class PricingCache(BaseModel):
@@ -47,7 +53,9 @@ class PricingCache(BaseModel):
 
     data: dict[str, ModelPricingInfo] = Field(default_factory=dict)
     last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    source: str = Field(default="unknown", description="Data source (network, backup, etc.)")
+    source: str = Field(
+        default="unknown", description="Data source (network, backup, etc.)"
+    )
 
     def is_expired(self, ttl_hours: int = DEFAULT_CACHE_TTL_HOURS) -> bool:
         """Check if cache has expired."""
@@ -58,7 +66,7 @@ class PricingCache(BaseModel):
 class PricingManager:
     """
     Manages dynamic pricing data for AI models.
-    
+
     Features:
     - Fetches latest pricing from LiteLLM repository
     - Local caching with TTL expiration
@@ -72,11 +80,11 @@ class PricingManager:
         cache_file: Path | None = None,
         backup_file: Path | None = None,
         cache_ttl_hours: int | None = None,
-        fetch_timeout: float | None = None
+        fetch_timeout: float | None = None,
     ):
         """
         Initialize pricing manager.
-        
+
         Args:
             cache_file: Path to cache file (default: data/pricing_cache.json)
             backup_file: Path to backup pricing file (default: data/pricing_backup.json)
@@ -117,6 +125,7 @@ class PricingManager:
         # Schedule automatic update if enabled
         if self.auto_update_enabled and self.pricing_enabled:
             import asyncio
+
             try:
                 # Try to get current event loop
                 loop = asyncio.get_running_loop()
@@ -133,7 +142,9 @@ class PricingManager:
             if success:
                 logger.info("Successfully updated pricing data on startup")
             else:
-                logger.warning("Failed to update pricing data on startup, using cached/backup data")
+                logger.warning(
+                    "Failed to update pricing data on startup, using cached/backup data"
+                )
         except Exception as e:
             logger.warning(f"Error during background pricing update: {e}")
 
@@ -148,16 +159,18 @@ class PricingManager:
 
                     # Convert to PricingCache object
                     pricing_data = {}
-                    for model_name, raw_info in cache_data.get('data', {}).items():
+                    for model_name, raw_info in cache_data.get("data", {}).items():
                         pricing_data[model_name] = ModelPricingInfo(**raw_info)
 
                     self._cache = PricingCache(
                         data=pricing_data,
-                        last_updated=datetime.fromisoformat(cache_data['last_updated']),
-                        source=cache_data.get('source', 'cache')
+                        last_updated=datetime.fromisoformat(cache_data["last_updated"]),
+                        source=cache_data.get("source", "cache"),
                     )
 
-                    logger.info(f"Loaded pricing cache with {len(pricing_data)} models from cache file")
+                    logger.info(
+                        f"Loaded pricing cache with {len(pricing_data)} models from cache file"
+                    )
                     return
 
                 except Exception as e:
@@ -166,7 +179,9 @@ class PricingManager:
             # Fallback to backup file
             if self.backup_file.exists():
                 try:
-                    logger.info(f"Loading pricing data from backup file: {self.backup_file}")
+                    logger.info(
+                        f"Loading pricing data from backup file: {self.backup_file}"
+                    )
                     with open(self.backup_file) as f:
                         backup_data = json.load(f)
 
@@ -174,33 +189,35 @@ class PricingManager:
                     self._cache = PricingCache(
                         data=pricing_data,
                         last_updated=datetime.now(UTC),
-                        source='backup'
+                        source="backup",
                     )
 
-                    logger.info(f"Successfully loaded backup pricing data with {len(pricing_data)} models")
-                    
+                    logger.info(
+                        f"Successfully loaded backup pricing data with {len(pricing_data)} models"
+                    )
+
                     # Log some sample models for debugging
                     sample_models = list(pricing_data.keys())[:5]
                     logger.debug(f"Sample models loaded: {sample_models}")
-                    
+
                     # Check for specific models the user is using
                     test_models = [
                         "anthropic/claude-sonnet-4",
-                        "openrouter/anthropic/claude-sonnet-4", 
+                        "openrouter/anthropic/claude-sonnet-4",
                         "claude-sonnet-4",
                         "anthropic/claude-3-haiku",
-                        "openrouter/anthropic/claude-3-haiku"
+                        "openrouter/anthropic/claude-3-haiku",
                     ]
                     found_models = [m for m in test_models if m in pricing_data]
                     logger.debug(f"Test models found in pricing data: {found_models}")
-                    
+
                     return
 
                 except Exception as e:
                     logger.error(f"Failed to load backup pricing data: {e}")
 
             # Initialize empty cache
-            self._cache = PricingCache(source='empty')
+            self._cache = PricingCache(source="empty")
             logger.error("No pricing data available, using empty cache")
 
     def _save_cache(self) -> None:
@@ -211,16 +228,16 @@ class PricingManager:
         try:
             # Convert to serializable format
             cache_data = {
-                'data': {
+                "data": {
                     model_name: info.model_dump()
                     for model_name, info in self._cache.data.items()
                 },
-                'last_updated': self._cache.last_updated.isoformat(),
-                'source': 'cache'  # Always mark as cache when saving to cache file
+                "last_updated": self._cache.last_updated.isoformat(),
+                "source": "cache",  # Always mark as cache when saving to cache file
             }
 
             # Write to cache file
-            with open(self.cache_file, 'w') as f:
+            with open(self.cache_file, "w") as f:
                 json.dump(cache_data, f, indent=2, default=str)
 
             logger.debug(f"Saved pricing cache with {len(self._cache.data)} models")
@@ -228,25 +245,29 @@ class PricingManager:
         except Exception as e:
             logger.warning(f"Failed to save pricing cache: {e}")
 
-    def _parse_litellm_data(self, raw_data: dict[str, Any]) -> dict[str, ModelPricingInfo]:
+    def _parse_litellm_data(
+        self, raw_data: dict[str, Any]
+    ) -> dict[str, ModelPricingInfo]:
         """Parse raw LiteLLM pricing data into ModelPricingInfo objects."""
         pricing_data = {}
 
         for model_name, model_info in raw_data.items():
             try:
                 # Extract pricing information
-                input_cost = model_info.get('input_cost_per_token', 0)
-                output_cost = model_info.get('output_cost_per_token', 0)
+                input_cost = model_info.get("input_cost_per_token", 0)
+                output_cost = model_info.get("output_cost_per_token", 0)
 
                 # Convert to per-1k-token pricing
                 input_cost_per_1k = Decimal(str(input_cost)) * 1000
                 output_cost_per_1k = Decimal(str(output_cost)) * 1000
 
                 # Extract other metadata
-                max_tokens = model_info.get('max_tokens')
-                provider = model_info.get('litellm_provider')
-                mode = model_info.get('mode', 'chat')
-                supports_function_calling = model_info.get('supports_function_calling', False)
+                max_tokens = model_info.get("max_tokens")
+                provider = model_info.get("litellm_provider")
+                mode = model_info.get("mode", "chat")
+                supports_function_calling = model_info.get(
+                    "supports_function_calling", False
+                )
 
                 pricing_info = ModelPricingInfo(
                     model_name=model_name,
@@ -255,7 +276,7 @@ class PricingManager:
                     max_tokens=max_tokens,
                     provider=provider,
                     mode=mode,
-                    supports_function_calling=supports_function_calling
+                    supports_function_calling=supports_function_calling,
                 )
 
                 pricing_data[model_name] = pricing_info
@@ -269,16 +290,20 @@ class PricingManager:
     async def fetch_latest_pricing(self, force: bool = False) -> bool:
         """
         Fetch latest pricing data from LiteLLM.
-        
+
         Args:
             force: Force fetch even if cache is not expired
-            
+
         Returns:
             True if fetch was successful, False otherwise
         """
         with self._lock:
             # Check if fetch is needed
-            if not force and self._cache and not self._cache.is_expired(self.cache_ttl_hours):
+            if (
+                not force
+                and self._cache
+                and not self._cache.is_expired(self.cache_ttl_hours)
+            ):
                 logger.debug("Pricing cache is still fresh, skipping fetch")
                 return True
 
@@ -296,13 +321,15 @@ class PricingManager:
                     self._cache = PricingCache(
                         data=pricing_data,
                         last_updated=datetime.now(UTC),
-                        source='network'
+                        source="network",
                     )
 
                     # Save to cache file
                     self._save_cache()
 
-                logger.info(f"Successfully fetched pricing for {len(pricing_data)} models")
+                logger.info(
+                    f"Successfully fetched pricing for {len(pricing_data)} models"
+                )
                 return True
 
         except Exception as e:
@@ -312,10 +339,10 @@ class PricingManager:
     def get_model_pricing(self, model_name: str) -> ModelPricingInfo | None:
         """
         Get pricing information for a specific model.
-        
+
         Args:
             model_name: Model identifier (e.g., "gpt-4", "claude-3-sonnet")
-            
+
         Returns:
             ModelPricingInfo if found, None otherwise
         """
@@ -333,37 +360,43 @@ class PricingManager:
 
             # Generate comprehensive variations to try
             variations_to_try = self._generate_model_variations(model_name)
-            
+
             # Try each variation
             for variation in variations_to_try:
                 if variation in self._cache.data:
-                    logger.debug(f"Found pricing for {model_name} using variation: {variation}")
+                    logger.debug(
+                        f"Found pricing for {model_name} using variation: {variation}"
+                    )
                     return self._cache.data[variation]
 
             # Fallback: fuzzy matching for partial matches
             best_match = self._fuzzy_match_model(model_name)
             if best_match:
-                logger.debug(f"Found pricing for {model_name} using fuzzy match: {best_match}")
+                logger.debug(
+                    f"Found pricing for {model_name} using fuzzy match: {best_match}"
+                )
                 return self._cache.data[best_match]
 
-            logger.debug(f"No pricing found for {model_name} (tried {len(variations_to_try)} variations)")
+            logger.debug(
+                f"No pricing found for {model_name} (tried {len(variations_to_try)} variations)"
+            )
             return None
 
     def _generate_model_variations(self, model_name: str) -> list[str]:
         """Generate common model name variations for lookup."""
         variations = [model_name]  # Always try original first
-        
+
         # For cloud models, try OpenRouter prefixed versions first
         if "/" in model_name and not model_name.startswith("openrouter/"):
             variations.append(f"openrouter/{model_name}")
-        
+
         # Try without provider prefix
         if "/" in model_name:
             base_name = model_name.split("/")[-1]
             variations.append(base_name)
             # Also try openrouter prefix with base name
             variations.append(f"openrouter/{base_name}")
-        
+
         # Try with anthropic/ prefix for anthropic models
         if "claude" in model_name.lower() and not model_name.startswith("anthropic/"):
             if "/" in model_name:
@@ -373,9 +406,11 @@ class PricingManager:
             else:
                 variations.append(f"anthropic/{model_name}")
                 variations.append(f"openrouter/anthropic/{model_name}")
-        
+
         # Try common OpenAI variations
-        if any(term in model_name.lower() for term in ["gpt", "o1", "o3"]) and not model_name.startswith("openai/"):
+        if any(
+            term in model_name.lower() for term in ["gpt", "o1", "o3"]
+        ) and not model_name.startswith("openai/"):
             if "/" in model_name:
                 base_name = model_name.split("/")[-1]
                 variations.append(f"openai/{base_name}")
@@ -383,7 +418,7 @@ class PricingManager:
             else:
                 variations.append(f"openai/{model_name}")
                 variations.append(f"openrouter/openai/{model_name}")
-        
+
         # Try Google variations
         if "gemini" in model_name.lower() and not model_name.startswith("google/"):
             if "/" in model_name:
@@ -393,7 +428,7 @@ class PricingManager:
             else:
                 variations.append(f"google/{model_name}")
                 variations.append(f"openrouter/google/{model_name}")
-        
+
         # Try basic underscore/dash variations
         if "_" in model_name:
             dash_version = model_name.replace("_", "-")
@@ -401,7 +436,7 @@ class PricingManager:
         if "-" in model_name:
             underscore_version = model_name.replace("-", "_")
             variations.append(underscore_version)
-        
+
         # Remove duplicates while preserving order
         seen = set()
         unique_variations = []
@@ -409,7 +444,7 @@ class PricingManager:
             if var not in seen:
                 seen.add(var)
                 unique_variations.append(var)
-        
+
         return unique_variations
 
     def _fuzzy_match_model(self, model_name: str) -> str | None:
@@ -417,7 +452,7 @@ class PricingManager:
         model_lower = model_name.lower()
         best_match = None
         best_score = 0
-        
+
         # Extract key terms from the target model name
         key_terms = []
         if "claude" in model_lower:
@@ -432,76 +467,86 @@ class PricingManager:
             key_terms.append("gpt")
         elif "gemini" in model_lower:
             key_terms.append("gemini")
-        
+
         if not key_terms:
             return None
-        
+
         # Score each cached model
         for cached_name in self._cache.data.keys():
             cached_lower = cached_name.lower()
             score = 0
-            
+
             # Score based on key terms present
             for term in key_terms:
                 if term in cached_lower:
                     score += 10
-            
+
             # Prefer openrouter versions for cloud models
             if "openrouter" in cached_lower and "/" in model_name:
                 score += 5
-            
+
             # Prefer exact provider matches
             if "/" in model_name and "/" in cached_name:
                 requested_provider = model_name.split("/")[0].lower()
                 if requested_provider in cached_lower:
                     score += 3
-            
-            if score > best_score and score >= 10:  # Require at least one key term match
+
+            if (
+                score > best_score and score >= 10
+            ):  # Require at least one key term match
                 best_score = score
                 best_match = cached_name
-        
+
         return best_match
 
     def estimate_cost(
-        self,
-        model_name: str,
-        input_tokens: int,
-        output_tokens: int = 0
+        self, model_name: str, input_tokens: int, output_tokens: int = 0
     ) -> tuple[Decimal, str]:
         """
         Estimate cost for a model request.
-        
+
         Args:
             model_name: Model identifier
             input_tokens: Number of input tokens
             output_tokens: Number of output tokens
-            
+
         Returns:
-            Tuple of (estimated_cost, source) where source indicates 
+            Tuple of (estimated_cost, source) where source indicates
             how the pricing was determined
         """
         pricing_info = self.get_model_pricing(model_name)
 
         if pricing_info:
-            input_cost = (Decimal(input_tokens) * pricing_info.input_cost_per_1k_tokens) / 1000
-            output_cost = (Decimal(output_tokens) * pricing_info.output_cost_per_1k_tokens) / 1000
+            input_cost = (
+                Decimal(input_tokens) * pricing_info.input_cost_per_1k_tokens
+            ) / 1000
+            output_cost = (
+                Decimal(output_tokens) * pricing_info.output_cost_per_1k_tokens
+            ) / 1000
             total_cost = input_cost + output_cost
 
-            return total_cost, f"pricing_data_{self._cache.source if self._cache else 'unknown'}"
+            return (
+                total_cost,
+                f"pricing_data_{self._cache.source if self._cache else 'unknown'}",
+            )
 
         # Conservative fallback estimate
-        logger.warning(f"No pricing data for model {model_name}, using conservative estimate")
+        logger.warning(
+            f"No pricing data for model {model_name}, using conservative estimate"
+        )
 
         # Use conservative estimates based on model tier
-        if any(tier in model_name.lower() for tier in ['gpt-4', 'claude-3', 'opus']):
+        if any(tier in model_name.lower() for tier in ["gpt-4", "claude-3", "opus"]):
             # High-tier models
-            fallback_cost = Decimal('0.15')
-        elif any(tier in model_name.lower() for tier in ['gpt-3.5', 'claude-2', 'sonnet']):
+            fallback_cost = Decimal("0.15")
+        elif any(
+            tier in model_name.lower() for tier in ["gpt-3.5", "claude-2", "sonnet"]
+        ):
             # Mid-tier models
-            fallback_cost = Decimal('0.05')
+            fallback_cost = Decimal("0.05")
         else:
             # Low-tier models
-            fallback_cost = Decimal('0.02')
+            fallback_cost = Decimal("0.02")
 
         return fallback_cost, "conservative_fallback"
 
@@ -517,7 +562,7 @@ class PricingManager:
                 "last_updated": self._cache.last_updated.isoformat(),
                 "source": self._cache.source,
                 "is_expired": self._cache.is_expired(self.cache_ttl_hours),
-                "cache_ttl_hours": self.cache_ttl_hours
+                "cache_ttl_hours": self.cache_ttl_hours,
             }
 
     def list_supported_models(self) -> dict[str, str]:
@@ -561,7 +606,9 @@ async def update_pricing_data(force: bool = False) -> bool:
     return await manager.fetch_latest_pricing(force=force)
 
 
-def estimate_model_cost(model_name: str, input_tokens: int, output_tokens: int = 0) -> tuple[Decimal, str]:
+def estimate_model_cost(
+    model_name: str, input_tokens: int, output_tokens: int = 0
+) -> tuple[Decimal, str]:
     """Estimate cost using the global pricing manager."""
     manager = get_pricing_manager()
     return manager.estimate_cost(model_name, input_tokens, output_tokens)

@@ -1,8 +1,22 @@
 [project]
 name = "second-opinion"
-version = "0.1.0"
+version = "1.0.0"
 description = "AI tool for getting second opinions and optimizing model usage via MCP"
 readme = "README.md"
+license = "Apache-2.0"
+authors = [{name = "rodosaborio"}]
+repository = "https://github.com/rodosaborio/second-opinion"
+homepage = "https://github.com/rodosaborio/second-opinion"
+keywords = ["ai", "llm", "model-comparison", "mcp", "cost-optimization"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=0.1.0",

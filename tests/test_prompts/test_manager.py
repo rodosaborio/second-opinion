@@ -27,9 +27,7 @@ def temp_templates_dir():
         templates_dir = Path(tmpdir)
 
         # Create test templates
-        (templates_dir / "basic.txt").write_text(
-            "Hello {name}, welcome to {service}!"
-        )
+        (templates_dir / "basic.txt").write_text("Hello {name}, welcome to {service}!")
 
         (templates_dir / "complex.txt").write_text(
             """Task: {task}
@@ -40,9 +38,7 @@ Context: {context}
 Your response should consider {criteria} when evaluating."""
         )
 
-        (templates_dir / "no_params.txt").write_text(
-            "This template has no parameters."
-        )
+        (templates_dir / "no_params.txt").write_text("This template has no parameters.")
 
         (templates_dir / "empty.txt").write_text("")
 
@@ -62,7 +58,7 @@ class TestPromptTemplate:
             name="test",
             content="Hello {name}",
             parameters=["name"],
-            description="Test template"
+            description="Test template",
         )
 
         assert template.name == "test"
@@ -79,8 +75,8 @@ class TestPromptTemplate:
             parameters=["text"],
             model_optimizations={
                 "gpt-4": "GPT-4 optimized: {text}",
-                "claude-3": "Claude optimized: {text}"
-            }
+                "claude-3": "Claude optimized: {text}",
+            },
         )
 
         assert "gpt-4" in template.model_optimizations
@@ -175,8 +171,7 @@ class TestPromptManager:
     async def test_render_prompt_basic(self, prompt_manager):
         """Test rendering a basic prompt."""
         result = await prompt_manager.render_prompt(
-            "basic",
-            {"name": "Alice", "service": "SecondOpinion"}
+            "basic", {"name": "Alice", "service": "SecondOpinion"}
         )
 
         assert result == "Hello Alice, welcome to SecondOpinion!"
@@ -191,12 +186,7 @@ class TestPromptManager:
     async def test_render_prompt_extra_parameters(self, prompt_manager):
         """Test rendering with extra parameters (should be okay)."""
         result = await prompt_manager.render_prompt(
-            "basic",
-            {
-                "name": "Alice",
-                "service": "SecondOpinion",
-                "extra": "ignored"
-            }
+            "basic", {"name": "Alice", "service": "SecondOpinion", "extra": "ignored"}
         )
 
         assert result == "Hello Alice, welcome to SecondOpinion!"
@@ -212,17 +202,13 @@ class TestPromptManager:
                 "basic",
                 {
                     "name": "Alice<script>alert('xss')</script>",
-                    "service": "SecondOpinion"
-                }
+                    "service": "SecondOpinion",
+                },
             )
 
         # Test with clean input - should work fine
         result = await prompt_manager.render_prompt(
-            "basic",
-            {
-                "name": "Alice",
-                "service": "SecondOpinion"
-            }
+            "basic", {"name": "Alice", "service": "SecondOpinion"}
         )
 
         assert "Alice" in result
@@ -240,26 +226,21 @@ class TestPromptManager:
     async def test_validate_parameters_valid(self, prompt_manager):
         """Test parameter validation with valid parameters."""
         valid = await prompt_manager.validate_parameters(
-            "basic",
-            {"name": "Alice", "service": "SecondOpinion"}
+            "basic", {"name": "Alice", "service": "SecondOpinion"}
         )
         assert valid is True
 
     @pytest.mark.asyncio
     async def test_validate_parameters_missing(self, prompt_manager):
         """Test parameter validation with missing parameters."""
-        valid = await prompt_manager.validate_parameters(
-            "basic",
-            {"name": "Alice"}
-        )
+        valid = await prompt_manager.validate_parameters("basic", {"name": "Alice"})
         assert valid is False
 
     @pytest.mark.asyncio
     async def test_validate_parameters_extra(self, prompt_manager):
         """Test parameter validation with extra parameters."""
         valid = await prompt_manager.validate_parameters(
-            "basic",
-            {"name": "Alice", "service": "SecondOpinion", "extra": "value"}
+            "basic", {"name": "Alice", "service": "SecondOpinion", "extra": "value"}
         )
         assert valid is True  # Extra parameters are okay
 
@@ -338,8 +319,7 @@ class TestGlobalPromptManager:
 
         # Test render_template convenience function
         result = await render_template(
-            "basic",
-            {"name": "Alice", "service": "SecondOpinion"}
+            "basic", {"name": "Alice", "service": "SecondOpinion"}
         )
         assert result == "Hello Alice, welcome to SecondOpinion!"
 
@@ -357,14 +337,14 @@ class TestSecurityContexts:
         result1 = await prompt_manager.render_prompt(
             "basic",
             {"name": "Alice", "service": "SecondOpinion"},
-            security_context=SecurityContext.USER_PROMPT
+            security_context=SecurityContext.USER_PROMPT,
         )
 
         # Test with SYSTEM_PROMPT context
         result2 = await prompt_manager.render_prompt(
             "basic",
             {"name": "Alice", "service": "SecondOpinion"},
-            security_context=SecurityContext.SYSTEM_PROMPT
+            security_context=SecurityContext.SYSTEM_PROMPT,
         )
 
         # Both should work (actual sanitization behavior depends on sanitization module)
@@ -406,10 +386,7 @@ class TestErrorHandling:
 
         # But rendering should fail
         with pytest.raises(ValueError, match="Failed to render template"):
-            await prompt_manager.render_prompt(
-                "invalid_format",
-                {"name": "Alice"}
-            )
+            await prompt_manager.render_prompt("invalid_format", {"name": "Alice"})
 
 
 @pytest.mark.asyncio
@@ -420,9 +397,7 @@ async def test_model_specific_optimization(temp_templates_dir):
 
     # For now, just test that the model parameter is accepted
     result = await manager.render_prompt(
-        "basic",
-        {"name": "Alice", "service": "SecondOpinion"},
-        model="gpt-4"
+        "basic", {"name": "Alice", "service": "SecondOpinion"}, model="gpt-4"
     )
 
     assert result == "Hello Alice, welcome to SecondOpinion!"

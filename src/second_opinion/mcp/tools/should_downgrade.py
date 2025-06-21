@@ -100,7 +100,9 @@ async def should_downgrade_tool(
         # Input validation and sanitization
 
         # Sanitize inputs with user context (most permissive for code/technical content)
-        clean_current_response = sanitize_prompt(current_response, SecurityContext.USER_PROMPT)
+        clean_current_response = sanitize_prompt(
+            current_response, SecurityContext.USER_PROMPT
+        )
         clean_task = sanitize_prompt(task, SecurityContext.USER_PROMPT)
 
         # Validate and normalize model name if provided
@@ -109,7 +111,9 @@ async def should_downgrade_tool(
                 current_model = validate_model_name(current_model)
             except Exception as e:
                 suggestions = _get_model_name_suggestions(current_model)
-                suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                suggestion_text = (
+                    f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                )
                 return f"❌ **Invalid Current Model**: {str(e)}{suggestion_text}"
 
         # Validate downgrade candidates if provided
@@ -122,7 +126,11 @@ async def should_downgrade_tool(
                     validated_downgrade_candidates.append(validated_model)
                 except Exception as e:
                     suggestions = _get_model_name_suggestions(model)
-                    suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                    suggestion_text = (
+                        f"\n\n**Suggested formats:**\n{suggestions}"
+                        if suggestions
+                        else ""
+                    )
                     return f"❌ **Invalid Downgrade Candidate #{i+1}** ({model}): {str(e)}{suggestion_text}"
 
         # Validate cost limit
@@ -132,13 +140,17 @@ async def should_downgrade_tool(
             # Get default from configuration (lower default for downgrade testing)
             try:
                 # For now, use a default since tool-specific config isn't implemented yet
-                cost_limit_decimal = Decimal("0.15")  # Lower default for downgrade testing
+                cost_limit_decimal = Decimal(
+                    "0.15"
+                )  # Lower default for downgrade testing
             except Exception:
                 # Use lower default for downgrade testing
                 cost_limit_decimal = Decimal("0.15")
 
-        logger.info(f"Starting should_downgrade tool: response length={len(clean_current_response)}, "
-                   f"current_model={current_model}, test_local={test_local}")
+        logger.info(
+            f"Starting should_downgrade tool: response length={len(clean_current_response)}, "
+            f"current_model={current_model}, test_local={test_local}"
+        )
         logger.info(f"Custom downgrade candidates: {validated_downgrade_candidates}")
         logger.info(f"Cost limit: ${cost_limit_decimal:.2f}")
 
@@ -170,7 +182,7 @@ async def should_downgrade_tool(
             downgrade_candidates = _select_downgrade_candidates(
                 current_model=current_model,
                 test_local=test_local,
-                task_complexity=task_complexity
+                task_complexity=task_complexity,
             )
             logger.info(f"Auto-selected downgrade candidates: {downgrade_candidates}")
 
@@ -185,20 +197,25 @@ async def should_downgrade_tool(
                 request = ModelRequest(
                     model=model,
                     messages=[Message(role="user", content=clean_task)],
-                    max_tokens=len(clean_current_response.split()) * 2,  # Estimate based on current response
+                    max_tokens=len(clean_current_response.split())
+                    * 2,  # Estimate based on current response
                     temperature=0.1,
-                    system_prompt=""
+                    system_prompt="",
                 )
                 model_cost = await client.estimate_cost(request)
                 estimated_cost += model_cost
-                logger.info(f"Downgrade candidate {model} cost estimate: ${model_cost:.4f}")
+                logger.info(
+                    f"Downgrade candidate {model} cost estimate: ${model_cost:.4f}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to estimate cost for {model}: {e}")
                 # Local models have zero cost, cloud models get conservative estimate
                 if detect_model_provider(model) == "lmstudio":
                     estimated_cost += Decimal("0.0")
                 else:
-                    estimated_cost += Decimal("0.02")  # Conservative budget model estimate
+                    estimated_cost += Decimal(
+                        "0.02"
+                    )  # Conservative budget model estimate
 
         # Add evaluation cost (small model for comparison)
         evaluation_cost = Decimal("0.01") * len(downgrade_candidates)
@@ -207,7 +224,10 @@ async def should_downgrade_tool(
         # Check budget
         try:
             budget_check = await cost_guard.check_and_reserve_budget(
-                estimated_cost, "should_downgrade", current_model, per_request_override=cost_limit_decimal
+                estimated_cost,
+                "should_downgrade",
+                current_model,
+                per_request_override=cost_limit_decimal,
             )
             reservation_id = budget_check.reservation_id
         except Exception as e:
@@ -228,7 +248,7 @@ async def should_downgrade_tool(
                     messages=[Message(role="user", content=clean_task)],
                     max_tokens=len(clean_current_response.split()) * 2,
                     temperature=0.1,
-                    system_prompt=""
+                    system_prompt="",
                 )
                 response = await client.complete(request)
                 downgrade_responses.append(response)
@@ -238,12 +258,13 @@ async def should_downgrade_tool(
                 logger.error(f"Failed to get response from {model}: {e}")
                 # Create error response for consistency
                 from ...core.models import ModelResponse, TokenUsage
+
                 error_response = ModelResponse(
                     content=f"Error: Failed to get response from {model}: {str(e)}",
                     model=model,
                     usage=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0),
                     cost_estimate=Decimal("0.0"),
-                    provider=detect_model_provider(model)
+                    provider=detect_model_provider(model),
                 )
                 downgrade_responses.append(error_response)
                 downgrade_costs.append(Decimal("0.0"))
@@ -261,47 +282,54 @@ async def should_downgrade_tool(
                 messages=[Message(role="user", content=clean_task)],
                 max_tokens=len(clean_current_response.split()) * 2,
                 temperature=0.1,
-                system_prompt=""
+                system_prompt="",
             )
             current_cost_estimate = await current_client.estimate_cost(current_request)
         except Exception:
-            current_cost_estimate = Decimal("0.05")  # Conservative estimate for expensive models
+            current_cost_estimate = Decimal(
+                "0.05"
+            )  # Conservative estimate for expensive models
 
         from ...core.models import ModelResponse, TokenUsage
+
         estimated_input_tokens = int(len(clean_task.split()) * 1.3)
         estimated_output_tokens = int(len(clean_current_response.split()) * 1.3)
-        total_tokens = estimated_input_tokens + estimated_output_tokens  # Ensure exact sum
+        total_tokens = (
+            estimated_input_tokens + estimated_output_tokens
+        )  # Ensure exact sum
         current_model_response = ModelResponse(
             content=clean_current_response,
             model=current_model,
             usage=TokenUsage(
                 input_tokens=estimated_input_tokens,
                 output_tokens=estimated_output_tokens,
-                total_tokens=total_tokens
+                total_tokens=total_tokens,
             ),
             cost_estimate=current_cost_estimate,
-            provider=current_provider
+            provider=current_provider,
         )
 
         # Compare each downgrade candidate against current response
         try:
             logger.info("Performing downgrade evaluation")
             evaluation_criteria = EvaluationCriteria(
-                accuracy_weight=0.35,    # Higher weight on accuracy for downgrade decisions
+                accuracy_weight=0.35,  # Higher weight on accuracy for downgrade decisions
                 completeness_weight=0.25,
                 clarity_weight=0.2,
-                usefulness_weight=0.2
+                usefulness_weight=0.2,
             )
 
-            evaluator_model = "openai/gpt-4o-mini"  # Use cost-effective model for evaluation
+            evaluator_model = (
+                "openai/gpt-4o-mini"  # Use cost-effective model for evaluation
+            )
 
             for response in downgrade_responses:
                 try:
                     if response.content.startswith("Error:"):
                         fallback_result = {
-                            'overall_winner': 'current',
-                            'overall_score': 0.0,
-                            'reasoning': f"Downgrade candidate {response.model} failed to respond."
+                            "overall_winner": "current",
+                            "overall_score": 0.0,
+                            "reasoning": f"Downgrade candidate {response.model} failed to respond.",
                         }
                         evaluation_results.append((response.model, fallback_result))
                         continue
@@ -312,15 +340,17 @@ async def should_downgrade_tool(
                         current_model_response,  # current as comparison
                         original_task=clean_task,
                         criteria=evaluation_criteria,
-                        evaluator_model=evaluator_model
+                        evaluator_model=evaluator_model,
                     )
 
                     # Convert to dict and adjust for downgrade context
                     result_dict = {
-                        'overall_winner': 'downgrade' if result.winner == 'primary' else 'current',
-                        'overall_score': result.overall_score,
-                        'reasoning': result.reasoning,
-                        'quality_drop': _calculate_quality_drop(result.overall_score)
+                        "overall_winner": (
+                            "downgrade" if result.winner == "primary" else "current"
+                        ),
+                        "overall_score": result.overall_score,
+                        "reasoning": result.reasoning,
+                        "quality_drop": _calculate_quality_drop(result.overall_score),
                     }
                     evaluation_results.append((response.model, result_dict))
                     evaluation_cost_actual += Decimal("0.005")  # Small evaluation cost
@@ -328,10 +358,10 @@ async def should_downgrade_tool(
                 except Exception as e:
                     logger.warning(f"Evaluation failed for {response.model}: {e}")
                     fallback_result = {
-                        'overall_winner': 'current',
-                        'overall_score': 5.0,
-                        'reasoning': f"Evaluation failed for {response.model}: {str(e)}",
-                        'quality_drop': 'unknown'
+                        "overall_winner": "current",
+                        "overall_score": 5.0,
+                        "reasoning": f"Evaluation failed for {response.model}: {str(e)}",
+                        "quality_drop": "unknown",
                     }
                     evaluation_results.append((response.model, fallback_result))
 
@@ -340,16 +370,22 @@ async def should_downgrade_tool(
         except Exception as e:
             logger.error(f"Evaluation system failed: {e}")
             evaluation_results = [
-                (model, {
-                    'overall_winner': 'current',
-                    'overall_score': 5.0,
-                    'reasoning': 'Evaluation unavailable',
-                    'quality_drop': 'unknown'
-                }) for model in downgrade_candidates
+                (
+                    model,
+                    {
+                        "overall_winner": "current",
+                        "overall_score": 5.0,
+                        "reasoning": "Evaluation unavailable",
+                        "quality_drop": "unknown",
+                    },
+                )
+                for model in downgrade_candidates
             ]
 
         # Record actual cost
-        await cost_guard.record_actual_cost(reservation_id, actual_cost, current_model, "should_downgrade")
+        await cost_guard.record_actual_cost(
+            reservation_id, actual_cost, current_model, "should_downgrade"
+        )
         logger.info(f"Total operation cost: ${actual_cost:.4f}")
 
         # Generate cost optimization report
@@ -359,13 +395,15 @@ async def should_downgrade_tool(
             current_model=current_model,
             current_cost_estimate=current_cost_estimate,
             downgrade_candidates=downgrade_candidates,
-            downgrade_responses=[filter_think_tags(r.content) for r in downgrade_responses],
+            downgrade_responses=[
+                filter_think_tags(r.content) for r in downgrade_responses
+            ],
             downgrade_costs=downgrade_costs,
             evaluation_results=evaluation_results,
             task_complexity=task_complexity,
             actual_cost=actual_cost,
             cost_limit=cost_limit_decimal,
-            test_local=test_local
+            test_local=test_local,
         )
 
     except Exception as e:
@@ -377,7 +415,7 @@ def _select_downgrade_candidates(
     current_model: str,
     test_local: bool,
     task_complexity: TaskComplexity,
-    max_candidates: int = 3
+    max_candidates: int = 3,
 ) -> list[str]:
     """
     Select cheaper alternative models for downgrade testing.
@@ -412,7 +450,7 @@ def _select_downgrade_candidates(
         budget_options = [
             "anthropic/claude-3-haiku",
             "openai/gpt-4o-mini",
-            "google/gemini-flash-1.5"
+            "google/gemini-flash-1.5",
         ]
         for option in budget_options:
             if option not in candidates and option.lower() not in current_lower:
@@ -457,7 +495,7 @@ async def _format_downgrade_report(
     task_complexity: TaskComplexity,
     actual_cost: Decimal,
     cost_limit: Decimal,
-    test_local: bool
+    test_local: bool,
 ) -> str:
     """Format the downgrade analysis report for MCP client display."""
 
@@ -480,7 +518,9 @@ async def _format_downgrade_report(
     report.append("## 🎯 Current Response Quality")
     report.append(f"**Model**: {current_model}")
     report.append("")
-    report.append(current_response[:800] + ("..." if len(current_response) > 800 else ""))
+    report.append(
+        current_response[:800] + ("..." if len(current_response) > 800 else "")
+    )
     report.append("")
 
     # Downgrade candidates analysis
@@ -490,8 +530,12 @@ async def _format_downgrade_report(
     best_downgrade_score = 0.0
     local_options = []
 
-    for (model, response, cost, (_, eval_result)) in zip(
-        downgrade_candidates, downgrade_responses, downgrade_costs, evaluation_results, strict=False
+    for model, response, cost, (_, eval_result) in zip(
+        downgrade_candidates,
+        downgrade_responses,
+        downgrade_costs,
+        evaluation_results,
+        strict=False,
     ):
         provider = detect_model_provider(model)
         is_local = provider == "lmstudio"
@@ -499,12 +543,12 @@ async def _format_downgrade_report(
         if is_local:
             local_options.append(model)
 
-        score = eval_result.get('overall_score', 0.0)
-        quality_drop = eval_result.get('quality_drop', 'unknown')
-        winner = eval_result.get('overall_winner', 'current')
-        reasoning = eval_result.get('reasoning', 'No analysis available')
+        score = eval_result.get("overall_score", 0.0)
+        quality_drop = eval_result.get("quality_drop", "unknown")
+        winner = eval_result.get("overall_winner", "current")
+        reasoning = eval_result.get("reasoning", "No analysis available")
 
-        if score > best_downgrade_score and winner != 'current':
+        if score > best_downgrade_score and winner != "current":
             best_downgrade = model
             best_downgrade_score = score
 
@@ -514,11 +558,19 @@ async def _format_downgrade_report(
             savings_percent_str = "100%"
         else:
             cost_savings = current_cost_estimate - cost
-            savings_percent_str = f"{(cost_savings / current_cost_estimate * 100):.0f}%" if current_cost_estimate > 0 else "N/A"
+            savings_percent_str = (
+                f"{(cost_savings / current_cost_estimate * 100):.0f}%"
+                if current_cost_estimate > 0
+                else "N/A"
+            )
 
         report.append(f"### {model}")
-        report.append(f"**Cost**: ${cost:.4f} ({'FREE' if is_local else f'${cost:.4f}'}) | **Savings**: {savings_percent_str}")
-        report.append(f"**Quality vs Current**: {score:.1f}/10 ({quality_drop} degradation)")
+        report.append(
+            f"**Cost**: ${cost:.4f} ({'FREE' if is_local else f'${cost:.4f}'}) | **Savings**: {savings_percent_str}"
+        )
+        report.append(
+            f"**Quality vs Current**: {score:.1f}/10 ({quality_drop} degradation)"
+        )
         report.append(f"**Winner**: {winner}")
         report.append("")
 
@@ -537,11 +589,19 @@ async def _format_downgrade_report(
     if local_options:
         report.append("**Local Models Cost**: $0.00 (100% savings)")
     if downgrade_costs:
-        cheapest_cloud_cost = min([c for c in downgrade_costs if c > 0] or [Decimal("0")])
+        cheapest_cloud_cost = min(
+            [c for c in downgrade_costs if c > 0] or [Decimal("0")]
+        )
         if cheapest_cloud_cost > 0:
             cloud_savings = current_cost_estimate - cheapest_cloud_cost
-            cloud_savings_percent = (cloud_savings / current_cost_estimate * 100) if current_cost_estimate > 0 else 0
-            report.append(f"**Cheapest Cloud Alternative**: ${cheapest_cloud_cost:.4f} ({cloud_savings_percent:.0f}% savings)")
+            cloud_savings_percent = (
+                (cloud_savings / current_cost_estimate * 100)
+                if current_cost_estimate > 0
+                else 0
+            )
+            report.append(
+                f"**Cheapest Cloud Alternative**: ${cheapest_cloud_cost:.4f} ({cloud_savings_percent:.0f}% savings)"
+            )
 
     report.append(f"**Testing Cost**: ${actual_cost:.4f}")
 
@@ -563,17 +623,34 @@ async def _format_downgrade_report(
         provider = detect_model_provider(best_downgrade)
         if provider == "lmstudio":
             report.append(f"**✅ DOWNGRADE to {best_downgrade}** (Local Model)")
-            report.append(f"Quality score: {best_downgrade_score:.1f}/10 with 100% cost savings")
+            report.append(
+                f"Quality score: {best_downgrade_score:.1f}/10 with 100% cost savings"
+            )
             report.append("This local model provides acceptable quality at zero cost.")
         else:
-            cost_savings = current_cost_estimate - next(c for m, c in zip(downgrade_candidates, downgrade_costs, strict=False) if m == best_downgrade)
-            savings_percent = (cost_savings / current_cost_estimate * 100) if current_cost_estimate > 0 else 0
+            cost_savings = current_cost_estimate - next(
+                c
+                for m, c in zip(downgrade_candidates, downgrade_costs, strict=False)
+                if m == best_downgrade
+            )
+            savings_percent = (
+                (cost_savings / current_cost_estimate * 100)
+                if current_cost_estimate > 0
+                else 0
+            )
             report.append(f"**💡 CONSIDER downgrading to {best_downgrade}**")
-            report.append(f"Quality score: {best_downgrade_score:.1f}/10 with {savings_percent:.0f}% cost savings")
-    elif local_options and any(eval_result.get('overall_score', 0) >= 5.0 for _, eval_result in evaluation_results):
+            report.append(
+                f"Quality score: {best_downgrade_score:.1f}/10 with {savings_percent:.0f}% cost savings"
+            )
+    elif local_options and any(
+        eval_result.get("overall_score", 0) >= 5.0
+        for _, eval_result in evaluation_results
+    ):
         # Local options with reasonable quality
         report.append("**💰 CONSIDER local models for development/testing**")
-        report.append("Local models show reasonable quality for this task type at zero cost.")
+        report.append(
+            "Local models show reasonable quality for this task type at zero cost."
+        )
         report.append(f"Keep {current_model} for production, use local for iteration.")
     else:
         # No good downgrade options
@@ -589,13 +666,19 @@ async def _format_downgrade_report(
     if best_downgrade:
         provider = detect_model_provider(best_downgrade)
         if provider == "lmstudio":
-            report.append(f"1. **Test {best_downgrade}** for similar tasks in development")
+            report.append(
+                f"1. **Test {best_downgrade}** for similar tasks in development"
+            )
             report.append("2. **Compare outputs** on your specific use cases")
-            report.append(f"3. **Use for iteration**, keep {current_model} for final outputs")
+            report.append(
+                f"3. **Use for iteration**, keep {current_model} for final outputs"
+            )
         else:
             report.append(f"1. **Trial {best_downgrade}** for similar tasks")
             report.append("2. **Monitor quality** vs cost trade-offs")
-            report.append("3. **Switch gradually** for tasks where quality is acceptable")
+            report.append(
+                "3. **Switch gradually** for tasks where quality is acceptable"
+            )
     else:
         report.append(f"1. **Continue using {current_model}** for this task type")
         report.append("2. **Test local models** for simpler tasks")
@@ -606,7 +689,9 @@ async def _format_downgrade_report(
 
     report.append("")
     report.append("---")
-    report.append("*Cost optimization analysis complete - Every penny saved is a penny earned! 💰*")
+    report.append(
+        "*Cost optimization analysis complete - Every penny saved is a penny earned! 💰*"
+    )
 
     return "\n".join(report)
 
@@ -616,7 +701,9 @@ def _get_model_name_suggestions(invalid_model: str) -> str:
     suggestions = []
 
     suggestions.append("**Expensive Models (for comparison baseline):**")
-    suggestions.append("- Claude: `anthropic/claude-3-5-sonnet`, `anthropic/claude-3-opus`")
+    suggestions.append(
+        "- Claude: `anthropic/claude-3-5-sonnet`, `anthropic/claude-3-opus`"
+    )
     suggestions.append("- ChatGPT: `openai/gpt-4o`, `openai/gpt-4`")
     suggestions.append("- Gemini: `google/gemini-pro-1.5`")
     suggestions.append("")

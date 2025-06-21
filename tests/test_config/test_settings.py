@@ -26,7 +26,13 @@ from second_opinion.config.settings import (
 def reset_config():
     """Reset global configuration before each test."""
     # Clear any environment variables from previous tests
-    env_vars_to_clear = [key for key in os.environ.keys() if key.startswith(('OPENROUTER_', 'ANTHROPIC_', 'OPENAI_', 'GOOGLE_', 'DATABASE_', 'APP_'))]
+    env_vars_to_clear = [
+        key
+        for key in os.environ.keys()
+        if key.startswith(
+            ("OPENROUTER_", "ANTHROPIC_", "OPENAI_", "GOOGLE_", "DATABASE_", "APP_")
+        )
+    ]
     for var in env_vars_to_clear:
         os.environ.pop(var, None)
 
@@ -43,7 +49,7 @@ class TestCostManagementConfig:
         config = CostManagementConfig(
             default_per_request_limit=Decimal("0.10"),
             daily_limit=Decimal("5.00"),
-            monthly_limit=Decimal("50.00")
+            monthly_limit=Decimal("50.00"),
         )
         assert config.default_per_request_limit == Decimal("0.10")
         assert config.daily_limit == Decimal("5.00")
@@ -59,10 +65,7 @@ class TestCostManagementConfig:
 class TestSecurityConfig:
     def test_valid_config(self):
         """Test creating valid security config."""
-        config = SecurityConfig(
-            rate_limit_per_minute=100,
-            max_concurrent_requests=10
-        )
+        config = SecurityConfig(rate_limit_per_minute=100, max_concurrent_requests=10)
         assert config.rate_limit_per_minute == 100
         assert config.max_concurrent_requests == 10
         assert config.input_sanitization is True
@@ -94,7 +97,9 @@ class TestAppSettings:
 
     def test_api_key_validation_production(self):
         """Test that API keys are required in production."""
-        with pytest.raises(ValidationError, match="OpenRouter API key must be configured"):
+        with pytest.raises(
+            ValidationError, match="OpenRouter API key must be configured"
+        ):
             AppSettings(environment="production")
 
     def test_api_key_validation_with_key(self):
@@ -102,26 +107,26 @@ class TestAppSettings:
         settings = AppSettings(
             environment="production",
             openrouter_api_key="sk-or-test-key",
-            database_encryption_key="test-encryption-key-32-chars-long"
+            database_encryption_key="test-encryption-key-32-chars-long",
         )
         assert settings.environment == "production"
         assert settings.openrouter_api_key == "sk-or-test-key"
 
     def test_encryption_key_validation(self):
         """Test that encryption key is required when encryption enabled."""
-        with pytest.raises(ValidationError, match="Database encryption key is required"):
+        with pytest.raises(
+            ValidationError, match="Database encryption key is required"
+        ):
             AppSettings(
                 environment="production",
                 database_encryption_key=None,
-                openrouter_api_key="sk-or-test"  # Satisfy API key requirement
+                openrouter_api_key="sk-or-test",  # Satisfy API key requirement
                 # Database encryption is enabled by default
             )
 
     def test_get_api_key(self):
         """Test getting API keys for providers."""
-        settings = AppSettings(
-            openrouter_api_key="sk-or-test"
-        )
+        settings = AppSettings(openrouter_api_key="sk-or-test")
 
         # All providers use OpenRouter API key
         assert settings.get_api_key("openrouter") == "sk-or-test"
@@ -135,7 +140,7 @@ class TestAppSettings:
         # All providers use OpenRouter API key
         assert settings.has_api_key("openrouter") is True
         assert settings.has_api_key("anthropic") is True  # Uses OpenRouter key
-        
+
         # Test with no API key
         settings_no_key = AppSettings()
         assert settings_no_key.has_api_key("openrouter") is False
@@ -143,10 +148,7 @@ class TestAppSettings:
 
     def test_path_helpers(self):
         """Test path helper methods."""
-        settings = AppSettings(
-            data_dir="./test_data",
-            config_dir="./test_config"
-        )
+        settings = AppSettings(data_dir="./test_data", config_dir="./test_config")
 
         data_path = settings.get_data_path("test.db")
         assert data_path == Path("./test_data/test.db")
@@ -166,15 +168,10 @@ class TestConfigurationManager:
     def sample_config(self):
         """Sample configuration data."""
         return {
-            'app_name': 'Test App',
-            'environment': 'development',
-            'cost_management': {
-                'daily_limit': '10.00',
-                'monthly_limit': '100.00'
-            },
-            'security': {
-                'rate_limit_per_minute': 120
-            }
+            "app_name": "Test App",
+            "environment": "development",
+            "cost_management": {"daily_limit": "10.00", "monthly_limit": "100.00"},
+            "security": {"rate_limit_per_minute": 120},
         }
 
     def test_load_default_configuration(self):
@@ -188,7 +185,7 @@ class TestConfigurationManager:
     def test_load_yaml_configuration(self, temp_config_dir, sample_config):
         """Test loading configuration from YAML file."""
         config_file = temp_config_dir / "config.yaml"
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(sample_config, f)
 
         manager = ConfigurationManager()
@@ -201,13 +198,12 @@ class TestConfigurationManager:
     def test_environment_override(self, temp_config_dir, sample_config):
         """Test that environment variables work with config files."""
         config_file = temp_config_dir / "config.yaml"
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(sample_config, f)
 
         manager = ConfigurationManager()
         settings = manager.load_configuration(
-            config_path=config_file,
-            override_env={'APP_NAME': 'Overridden App'}
+            config_path=config_file, override_env={"APP_NAME": "Overridden App"}
         )
 
         # Environment variables take precedence in direct AppSettings usage
@@ -218,7 +214,7 @@ class TestConfigurationManager:
     def test_invalid_yaml_configuration(self, temp_config_dir):
         """Test handling of invalid YAML configuration."""
         config_file = temp_config_dir / "invalid.yaml"
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             f.write("invalid: yaml: content: [")
 
         manager = ConfigurationManager()
@@ -237,7 +233,7 @@ class TestConfigurationManager:
         manager = ConfigurationManager()
         settings = manager.load_configuration()
 
-        manager.update_setting('cost_management.daily_limit', Decimal("15.00"))
+        manager.update_setting("cost_management.daily_limit", Decimal("15.00"))
         assert settings.cost_management.daily_limit == Decimal("15.00")
 
     def test_export_config_template(self, temp_config_dir):
@@ -251,9 +247,9 @@ class TestConfigurationManager:
         with open(template_file) as f:
             template_data = yaml.safe_load(f)
 
-        assert template_data['app_name'] == 'Second Opinion'
-        assert 'cost_management' in template_data
-        assert 'security' in template_data
+        assert template_data["app_name"] == "Second Opinion"
+        assert "cost_management" in template_data
+        assert "security" in template_data
 
 
 @pytest.mark.security
@@ -263,10 +259,12 @@ class TestSecurityValidation:
     def test_api_key_format_validation(self, capsys):
         """Test API key format validation warnings."""
         manager = ConfigurationManager()
-        settings = manager.load_configuration(override_env={
-            'OPENROUTER_API_KEY': 'invalid-key-format',
-            'ANTHROPIC_API_KEY': 'sk-ant-valid-format'
-        })
+        settings = manager.load_configuration(
+            override_env={
+                "OPENROUTER_API_KEY": "invalid-key-format",
+                "ANTHROPIC_API_KEY": "sk-ant-valid-format",
+            }
+        )
 
         captured = capsys.readouterr()
         assert "Warning: OpenRouter API key should start with 'sk-or-'" in captured.out
@@ -274,38 +272,43 @@ class TestSecurityValidation:
     def test_directory_creation_security(self):
         """Test that directories are created with appropriate permissions."""
         manager = ConfigurationManager()
-        settings = manager.load_configuration(override_env={
-            'DATA_DIR': './test_secure_data',
-            'CONFIG_DIR': './test_secure_config'
-        })
+        settings = manager.load_configuration(
+            override_env={
+                "DATA_DIR": "./test_secure_data",
+                "CONFIG_DIR": "./test_secure_config",
+            }
+        )
 
         # Directories should be created
-        assert Path('./test_secure_data').exists()
-        assert Path('./test_secure_config').exists()
+        assert Path("./test_secure_data").exists()
+        assert Path("./test_secure_config").exists()
 
         # Clean up
         import shutil
-        shutil.rmtree('./test_secure_data', ignore_errors=True)
-        shutil.rmtree('./test_secure_config', ignore_errors=True)
+
+        shutil.rmtree("./test_secure_data", ignore_errors=True)
+        shutil.rmtree("./test_secure_config", ignore_errors=True)
 
     def test_sensitive_data_not_logged(self):
         """Test that sensitive configuration data is not exposed."""
         manager = ConfigurationManager()
-        settings = manager.load_configuration(override_env={
-            'OPENROUTER_API_KEY': 'sk-or-secret-key',
-            'DATABASE_ENCRYPTION_KEY': 'super-secret-encryption-key'
-        })
+        settings = manager.load_configuration(
+            override_env={
+                "OPENROUTER_API_KEY": "sk-or-secret-key",
+                "DATABASE_ENCRYPTION_KEY": "super-secret-encryption-key",
+            }
+        )
 
         # Settings string representation should not contain keys
         settings_str = str(settings)
-        assert 'sk-or-secret-key' not in settings_str
-        assert 'super-secret-encryption-key' not in settings_str
+        assert "sk-or-secret-key" not in settings_str
+        assert "super-secret-encryption-key" not in settings_str
 
     def test_cost_limit_validation(self):
         """Test that cost limits prevent runaway spending."""
         config = CostManagementConfig(
             default_per_request_limit=Decimal("100.00"),  # Very high limit
-            daily_limit=Decimal("1000.00")
+            daily_limit=Decimal("1000.00"),
         )
 
         # Should accept high limits but warn user through application logic

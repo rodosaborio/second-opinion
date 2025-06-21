@@ -30,7 +30,7 @@ class ModelInfo:
         supports_system_messages: bool = True,
         supports_streaming: bool = False,
         context_window: int | None = None,
-        description: str | None = None
+        description: str | None = None,
     ):
         self.name = validate_model_name(name)
         self.provider = provider
@@ -49,7 +49,13 @@ class ModelInfo:
 class ClientError(Exception):
     """Base exception for client errors."""
 
-    def __init__(self, message: str, provider: str, model: str | None = None, details: dict | None = None):
+    def __init__(
+        self,
+        message: str,
+        provider: str,
+        model: str | None = None,
+        details: dict | None = None,
+    ):
         self.message = message
         self.provider = provider
         self.model = model
@@ -65,26 +71,37 @@ class ClientError(Exception):
 
 class AuthenticationError(ClientError):
     """Authentication failed with provider."""
+
     pass
 
 
 class RateLimitError(ClientError):
     """Rate limit exceeded."""
 
-    def __init__(self, message: str, provider: str, retry_after: int | None = None, **kwargs):
+    def __init__(
+        self, message: str, provider: str, retry_after: int | None = None, **kwargs
+    ):
         super().__init__(message, provider, **kwargs)
         self.retry_after = retry_after
 
 
 class ModelNotFoundError(ClientError):
     """Requested model not found or unavailable."""
+
     pass
 
 
 class CostLimitExceededError(ClientError):
     """Request would exceed cost limits."""
 
-    def __init__(self, message: str, provider: str, estimated_cost: Decimal, cost_limit: Decimal, **kwargs):
+    def __init__(
+        self,
+        message: str,
+        provider: str,
+        estimated_cost: Decimal,
+        cost_limit: Decimal,
+        **kwargs,
+    ):
         super().__init__(message, provider, **kwargs)
         self.estimated_cost = estimated_cost
         self.cost_limit = cost_limit
@@ -92,13 +109,14 @@ class CostLimitExceededError(ClientError):
 
 class RetryableError(ClientError):
     """Error that can be retried."""
+
     pass
 
 
 class BaseClient(ABC):
     """
     Abstract base client for all model providers.
-    
+
     This defines the standard interface that all provider-specific clients
     must implement to ensure consistent behavior across the application.
     """
@@ -111,10 +129,10 @@ class BaseClient(ABC):
         self._cache_ttl = 300  # 5 minutes
 
         # Configuration from kwargs
-        self.timeout = kwargs.get('timeout', 60)
-        self.max_retries = kwargs.get('max_retries', 3)
-        self.base_delay = kwargs.get('base_delay', 1.0)
-        self.max_delay = kwargs.get('max_delay', 60.0)
+        self.timeout = kwargs.get("timeout", 60)
+        self.max_retries = kwargs.get("max_retries", 3)
+        self.base_delay = kwargs.get("base_delay", 1.0)
+        self.max_delay = kwargs.get("max_delay", 60.0)
 
         logger.info(f"Initialized {self.provider_name} client")
 
@@ -122,13 +140,13 @@ class BaseClient(ABC):
     async def complete(self, request: ModelRequest) -> ModelResponse:
         """
         Execute model completion with standardized interface.
-        
+
         Args:
             request: Standardized model request
-            
+
         Returns:
             Standardized model response
-            
+
         Raises:
             ClientError: Provider-specific errors
             ValidationError: Invalid request parameters
@@ -140,13 +158,13 @@ class BaseClient(ABC):
     async def estimate_cost(self, request: ModelRequest) -> Decimal:
         """
         Estimate cost before making request.
-        
+
         Args:
             request: Standardized model request
-            
+
         Returns:
             Estimated cost in USD
-            
+
         Raises:
             ModelNotFoundError: Model not found or pricing unavailable
         """
@@ -156,10 +174,10 @@ class BaseClient(ABC):
     async def get_available_models(self) -> list[ModelInfo]:
         """
         Get list of available models with capabilities.
-        
+
         Returns:
             List of available models with metadata
-            
+
         Raises:
             ClientError: Provider API errors
         """
@@ -168,13 +186,13 @@ class BaseClient(ABC):
     async def validate_request(self, request: ModelRequest) -> ModelRequest:
         """
         Validate and sanitize request before processing.
-        
+
         Args:
             request: Model request to validate
-            
+
         Returns:
             Validated and sanitized request
-            
+
         Raises:
             ValidationError: Invalid request parameters
         """
@@ -186,31 +204,37 @@ class BaseClient(ABC):
         for message in request.messages:
             sanitized_content = sanitize_prompt(
                 message.content,
-                SecurityContext.API_REQUEST  # Use strict validation for all client API requests
+                SecurityContext.API_REQUEST,  # Use strict validation for all client API requests
             )
-            sanitized_messages.append(message.model_copy(update={"content": sanitized_content}))
+            sanitized_messages.append(
+                message.model_copy(update={"content": sanitized_content})
+            )
 
         # Sanitize system prompt if present
         system_prompt = None
         if request.system_prompt:
-            system_prompt = sanitize_prompt(request.system_prompt, SecurityContext.API_REQUEST)
+            system_prompt = sanitize_prompt(
+                request.system_prompt, SecurityContext.API_REQUEST
+            )
 
         # Create validated request
-        validated_request = request.model_copy(update={
-            "model": model_name,
-            "messages": sanitized_messages,
-            "system_prompt": system_prompt
-        })
+        validated_request = request.model_copy(
+            update={
+                "model": model_name,
+                "messages": sanitized_messages,
+                "system_prompt": system_prompt,
+            }
+        )
 
         return validated_request
 
     async def check_model_availability(self, model_name: str) -> bool:
         """
         Check if a model is available from this provider.
-        
+
         Args:
             model_name: Name of the model to check
-            
+
         Returns:
             True if model is available
         """
@@ -223,10 +247,10 @@ class BaseClient(ABC):
     async def get_model_info(self, model_name: str) -> ModelInfo | None:
         """
         Get detailed information about a specific model.
-        
+
         Args:
             model_name: Name of the model
-            
+
         Returns:
             Model information if available, None otherwise
         """
@@ -241,9 +265,12 @@ class BaseClient(ABC):
 
     async def _get_cached_models(self) -> list[ModelInfo] | None:
         """Get models from cache if still valid."""
-        if (self._models_cache is None or
-            self._cache_timestamp is None or
-            (datetime.now(UTC) - self._cache_timestamp).total_seconds() > self._cache_ttl):
+        if (
+            self._models_cache is None
+            or self._cache_timestamp is None
+            or (datetime.now(UTC) - self._cache_timestamp).total_seconds()
+            > self._cache_ttl
+        ):
             return None
         return self._models_cache
 
@@ -255,14 +282,14 @@ class BaseClient(ABC):
     async def retry_with_backoff(self, operation, *args, **kwargs):
         """
         Execute operation with exponential backoff retry logic.
-        
+
         Args:
             operation: Async function to execute
             *args, **kwargs: Arguments to pass to operation
-            
+
         Returns:
             Result of successful operation
-            
+
         Raises:
             ClientError: If all retries are exhausted
         """
@@ -277,7 +304,7 @@ class BaseClient(ABC):
                     break
 
                 # Calculate delay with exponential backoff and jitter
-                delay = min(self.base_delay * (2 ** attempt), self.max_delay)
+                delay = min(self.base_delay * (2**attempt), self.max_delay)
                 jitter = delay * 0.1  # 10% jitter
                 actual_delay = delay + (jitter * (2 * hash(str(e)) / 2**32 - 1))
 
@@ -294,19 +321,16 @@ class BaseClient(ABC):
         raise last_exception
 
     def _calculate_token_cost(
-        self,
-        input_tokens: int,
-        output_tokens: int,
-        model_info: ModelInfo
+        self, input_tokens: int, output_tokens: int, model_info: ModelInfo
     ) -> Decimal:
         """
         Calculate cost for given token usage.
-        
+
         Args:
             input_tokens: Number of input tokens
             output_tokens: Number of output tokens
             model_info: Model pricing information
-            
+
         Returns:
             Total cost in USD
         """
@@ -317,13 +341,13 @@ class BaseClient(ABC):
     def _estimate_tokens(self, text: str) -> int:
         """
         Rough estimation of token count for text.
-        
+
         This is a fallback method. Providers should implement more accurate
         token counting if available.
-        
+
         Args:
             text: Text to estimate tokens for
-            
+
         Returns:
             Estimated token count
         """
@@ -331,17 +355,15 @@ class BaseClient(ABC):
         return max(1, len(text) // 4)
 
     def _create_error_response(
-        self,
-        error: Exception,
-        request: ModelRequest
+        self, error: Exception, request: ModelRequest
     ) -> ModelResponse:
         """
         Create a standardized error response.
-        
+
         Args:
             error: The exception that occurred
             request: Original request
-            
+
         Returns:
             Error response with minimal cost
         """
@@ -349,9 +371,9 @@ class BaseClient(ABC):
             content=f"Error: {str(error)}",
             model=request.model,
             usage=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0),
-            cost_estimate=Decimal('0'),
+            cost_estimate=Decimal("0"),
             provider=self.provider_name,
-            metadata={"error": True, "error_type": type(error).__name__}
+            metadata={"error": True, "error_type": type(error).__name__},
         )
 
     async def __aenter__(self):

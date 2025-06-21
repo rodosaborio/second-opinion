@@ -1,5 +1,9 @@
 # Second Opinion
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 An AI tool that provides "second opinion" functionality for AI responses via MCP (Model Context Protocol). Get smarter AI usage by comparing responses across different models, finding cost-effective alternatives, and tracking your usage patterns.
 
 ## Quick Start
@@ -13,7 +17,7 @@ An AI tool that provides "second opinion" functionality for AI responses via MCP
 
 1. **Clone and install**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/rodosaborio/second-opinion.git
    cd second-opinion
    uv sync --dev
    ```
@@ -378,7 +382,7 @@ analytics:
 
 ## License
 
-[Add your license information here]
+Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 ---
 

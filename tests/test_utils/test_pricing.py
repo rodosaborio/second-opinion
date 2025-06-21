@@ -37,7 +37,7 @@ class TestModelPricingInfo:
             max_tokens=8192,
             provider="openai",
             mode="chat",
-            supports_function_calling=True
+            supports_function_calling=True,
         )
 
         assert info.model_name == "gpt-4"
@@ -53,7 +53,7 @@ class TestModelPricingInfo:
         info = ModelPricingInfo(
             model_name="simple-model",
             input_cost_per_1k_tokens=Decimal("0.01"),
-            output_cost_per_1k_tokens=Decimal("0.02")
+            output_cost_per_1k_tokens=Decimal("0.02"),
         )
 
         assert info.model_name == "simple-model"
@@ -71,14 +71,11 @@ class TestPricingCache:
             "gpt-4": ModelPricingInfo(
                 model_name="gpt-4",
                 input_cost_per_1k_tokens=Decimal("0.03"),
-                output_cost_per_1k_tokens=Decimal("0.06")
+                output_cost_per_1k_tokens=Decimal("0.06"),
             )
         }
 
-        cache = PricingCache(
-            data=pricing_data,
-            source="test"
-        )
+        cache = PricingCache(data=pricing_data, source="test")
 
         assert len(cache.data) == 1
         assert "gpt-4" in cache.data
@@ -100,7 +97,6 @@ class TestPricingCache:
 class TestPricingManager:
     """Test PricingManager class."""
 
-
     @pytest.fixture
     def sample_litellm_data(self):
         """Sample LiteLLM pricing data for testing."""
@@ -111,7 +107,7 @@ class TestPricingManager:
                 "max_tokens": 8192,
                 "litellm_provider": "openai",
                 "mode": "chat",
-                "supports_function_calling": True
+                "supports_function_calling": True,
             },
             "claude-3-sonnet": {
                 "input_cost_per_token": 0.000003,
@@ -119,15 +115,15 @@ class TestPricingManager:
                 "max_tokens": 200000,
                 "litellm_provider": "anthropic",
                 "mode": "chat",
-                "supports_function_calling": True
+                "supports_function_calling": True,
             },
             "gpt-3.5-turbo": {
                 "input_cost_per_token": 0.0000015,
                 "output_cost_per_token": 0.000002,
                 "max_tokens": 4096,
                 "litellm_provider": "openai",
-                "mode": "chat"
-            }
+                "mode": "chat",
+            },
         }
 
     @pytest.fixture
@@ -137,14 +133,14 @@ class TestPricingManager:
         backup_file = isolated_temp_dir / "pricing_backup.json"
 
         # Create backup file with sample data
-        with open(backup_file, 'w') as f:
+        with open(backup_file, "w") as f:
             json.dump(sample_litellm_data, f)
 
         return PricingManager(
             cache_file=cache_file,
             backup_file=backup_file,
             cache_ttl_hours=1,
-            fetch_timeout=10.0
+            fetch_timeout=10.0,
         )
 
     def test_initialization(self, isolated_temp_dir):
@@ -156,7 +152,7 @@ class TestPricingManager:
             cache_file=cache_file,
             backup_file=backup_file,
             cache_ttl_hours=2,
-            fetch_timeout=15.0
+            fetch_timeout=15.0,
         )
 
         assert manager.cache_file == cache_file
@@ -190,10 +186,7 @@ class TestPricingManager:
     def test_get_model_pricing_normalization(self, pricing_manager):
         """Test model name normalization for pricing lookup."""
         # Should match gpt-3.5-turbo
-        variations = [
-            "gpt-3.5-turbo",
-            "openai/gpt-3.5-turbo"
-        ]
+        variations = ["gpt-3.5-turbo", "openai/gpt-3.5-turbo"]
 
         for variation in variations:
             pricing_info = pricing_manager.get_model_pricing(variation)
@@ -230,7 +223,7 @@ class TestPricingManager:
         # High-tier models (use model names that won't match existing data)
         cost_high, _ = pricing_manager.estimate_cost("unknown-opus-xl", 1000, 1000)
 
-        # Mid-tier models  
+        # Mid-tier models
         cost_mid, _ = pricing_manager.estimate_cost("unknown-sonnet-pro", 1000, 1000)
 
         # Low-tier models
@@ -238,23 +231,30 @@ class TestPricingManager:
 
         # High-tier should be most expensive, low-tier least expensive
         assert cost_high >= cost_mid >= cost_low
-        
+
         # Check expected fallback values
         assert cost_high == Decimal("0.15")  # High-tier
-        assert cost_mid == Decimal("0.05")   # Mid-tier  
-        assert cost_low == Decimal("0.02")   # Low-tier
+        assert cost_mid == Decimal("0.05")  # Mid-tier
+        assert cost_low == Decimal("0.02")  # Low-tier
 
     @pytest.mark.asyncio
-    async def test_fetch_latest_pricing_success(self, pricing_manager, sample_litellm_data):
+    async def test_fetch_latest_pricing_success(
+        self, pricing_manager, sample_litellm_data
+    ):
         """Test successful pricing data fetch."""
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             from unittest.mock import MagicMock
-            mock_response = MagicMock()  # Use MagicMock instead of AsyncMock for sync methods
+
+            mock_response = (
+                MagicMock()
+            )  # Use MagicMock instead of AsyncMock for sync methods
             mock_response.json.return_value = sample_litellm_data
             mock_response.raise_for_status.return_value = None
             mock_response.status_code = 200
 
-            mock_client.return_value.__aenter__.return_value.get.return_value = mock_response
+            mock_client.return_value.__aenter__.return_value.get.return_value = (
+                mock_response
+            )
 
             success = await pricing_manager.fetch_latest_pricing(force=True)
 
@@ -264,8 +264,10 @@ class TestPricingManager:
     @pytest.mark.asyncio
     async def test_fetch_latest_pricing_failure(self, pricing_manager):
         """Test pricing data fetch failure."""
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get.side_effect = httpx.RequestError("Network error")
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get.side_effect = (
+                httpx.RequestError("Network error")
+            )
 
             success = await pricing_manager.fetch_latest_pricing(force=True)
 
@@ -277,7 +279,7 @@ class TestPricingManager:
     async def test_fetch_respects_cache_ttl(self, pricing_manager):
         """Test that fetch respects cache TTL."""
         # Fresh cache should not fetch
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             success = await pricing_manager.fetch_latest_pricing(force=False)
 
             assert success  # Returns True without fetching
@@ -298,7 +300,7 @@ class TestPricingManager:
         new_manager = PricingManager(
             cache_file=pricing_manager.cache_file,
             backup_file=empty_backup,
-            cache_ttl_hours=1
+            cache_ttl_hours=1,
         )
 
         # Should load from cache
@@ -359,16 +361,16 @@ class TestPricingManager:
             "valid-model": {
                 "input_cost_per_token": 0.001,
                 "output_cost_per_token": 0.002,
-                "max_tokens": 1000
+                "max_tokens": 1000,
             },
             "invalid-model-1": {
                 "input_cost_per_token": "invalid",  # Invalid type
-                "output_cost_per_token": 0.002
+                "output_cost_per_token": 0.002,
             },
             "invalid-model-2": {
                 # Missing required fields
                 "max_tokens": 1000
-            }
+            },
         }
 
         parsed_data = pricing_manager._parse_litellm_data(invalid_data)
@@ -381,8 +383,8 @@ class TestPricingManager:
         assert "invalid-model-2" in parsed_data  # Missing fields get defaults
 
         # Check that invalid-model-2 has default values
-        assert parsed_data["invalid-model-2"].input_cost_per_1k_tokens == Decimal('0')
-        assert parsed_data["invalid-model-2"].output_cost_per_1k_tokens == Decimal('0')
+        assert parsed_data["invalid-model-2"].input_cost_per_1k_tokens == Decimal("0")
+        assert parsed_data["invalid-model-2"].output_cost_per_1k_tokens == Decimal("0")
 
 
 class TestGlobalPricingManager:
@@ -399,7 +401,7 @@ class TestGlobalPricingManager:
         """Test setting custom pricing manager."""
         custom_manager = PricingManager(
             cache_file=tmp_path / "custom_cache.json",
-            backup_file=tmp_path / "custom_backup.json"
+            backup_file=tmp_path / "custom_backup.json",
         )
 
         set_pricing_manager(custom_manager)
@@ -416,7 +418,7 @@ class TestGlobalPricingManager:
     @pytest.mark.asyncio
     async def test_update_pricing_data_global(self):
         """Test global pricing data update function."""
-        with patch.object(get_pricing_manager(), 'fetch_latest_pricing') as mock_fetch:
+        with patch.object(get_pricing_manager(), "fetch_latest_pricing") as mock_fetch:
             mock_fetch.return_value = True
 
             success = await update_pricing_data(force=True)
@@ -426,7 +428,7 @@ class TestGlobalPricingManager:
 
     def test_estimate_model_cost_global(self):
         """Test global cost estimation function."""
-        with patch.object(get_pricing_manager(), 'estimate_cost') as mock_estimate:
+        with patch.object(get_pricing_manager(), "estimate_cost") as mock_estimate:
             mock_estimate.return_value = (Decimal("0.05"), "test_source")
 
             cost, source = estimate_model_cost("test-model", 1000, 500)
@@ -437,11 +439,11 @@ class TestGlobalPricingManager:
 
     def test_get_model_pricing_info_global(self):
         """Test global model pricing info function."""
-        with patch.object(get_pricing_manager(), 'get_model_pricing') as mock_get:
+        with patch.object(get_pricing_manager(), "get_model_pricing") as mock_get:
             mock_info = ModelPricingInfo(
                 model_name="test-model",
                 input_cost_per_1k_tokens=Decimal("0.01"),
-                output_cost_per_1k_tokens=Decimal("0.02")
+                output_cost_per_1k_tokens=Decimal("0.02"),
             )
             mock_get.return_value = mock_info
 
@@ -464,7 +466,7 @@ class TestPricingManagerSecurity:
                 "max_tokens": 8192,
                 "litellm_provider": "openai",
                 "mode": "chat",
-                "supports_function_calling": True
+                "supports_function_calling": True,
             },
             "claude-3-sonnet": {
                 "input_cost_per_token": 0.000003,
@@ -472,15 +474,15 @@ class TestPricingManagerSecurity:
                 "max_tokens": 200000,
                 "litellm_provider": "anthropic",
                 "mode": "chat",
-                "supports_function_calling": True
+                "supports_function_calling": True,
             },
             "gpt-3.5-turbo": {
                 "input_cost_per_token": 0.0000015,
                 "output_cost_per_token": 0.000002,
                 "max_tokens": 4096,
                 "litellm_provider": "openai",
-                "mode": "chat"
-            }
+                "mode": "chat",
+            },
         }
 
     @pytest.fixture
@@ -490,14 +492,14 @@ class TestPricingManagerSecurity:
         backup_file = isolated_temp_dir / "pricing_backup.json"
 
         # Create backup file with sample data
-        with open(backup_file, 'w') as f:
+        with open(backup_file, "w") as f:
             json.dump(sample_litellm_data, f)
 
         return PricingManager(
             cache_file=cache_file,
             backup_file=backup_file,
             cache_ttl_hours=1,
-            fetch_timeout=10.0
+            fetch_timeout=10.0,
         )
 
     @pytest.mark.security
@@ -507,7 +509,7 @@ class TestPricingManagerSecurity:
         dangerous_paths = [
             isolated_temp_dir / "../../../etc/passwd",
             isolated_temp_dir / "..\\..\\windows\\system32\\config",
-            isolated_temp_dir / "normal_file.json"
+            isolated_temp_dir / "normal_file.json",
         ]
 
         for path in dangerous_paths:
@@ -526,16 +528,17 @@ class TestPricingManagerSecurity:
         malicious_data = {
             "normal-model": {
                 "input_cost_per_token": 0.001,
-                "output_cost_per_token": 0.002
+                "output_cost_per_token": 0.002,
             },
             "': __import__('os').system('rm -rf /')#": {  # Code injection attempt
                 "input_cost_per_token": 0.001,
-                "output_cost_per_token": 0.002
+                "output_cost_per_token": 0.002,
             },
-            "a" * 10000: {  # Extremely long key
+            "a"
+            * 10000: {  # Extremely long key
                 "input_cost_per_token": 0.001,
-                "output_cost_per_token": 0.002
-            }
+                "output_cost_per_token": 0.002,
+            },
         }
 
         # Should parse safely without executing malicious code
@@ -550,13 +553,16 @@ class TestPricingManagerSecurity:
     async def test_network_request_safety(self, pricing_manager):
         """Test network request safety."""
         # Test with malicious URL redirect
-        with patch('httpx.AsyncClient') as mock_client:
+        with patch("httpx.AsyncClient") as mock_client:
             from unittest.mock import MagicMock
+
             mock_response = MagicMock()  # Use MagicMock for sync methods
             mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "", 0)
             mock_response.raise_for_status.return_value = None
 
-            mock_client.return_value.__aenter__.return_value.get.return_value = mock_response
+            mock_client.return_value.__aenter__.return_value.get.return_value = (
+                mock_response
+            )
 
             # Should handle JSON errors gracefully
             success = await pricing_manager.fetch_latest_pricing(force=True)
@@ -575,13 +581,18 @@ class TestPricingManagerSecurity:
 
         for model_name, input_tokens, output_tokens in extreme_cases:
             try:
-                cost, source = pricing_manager.estimate_cost(model_name, input_tokens, output_tokens)
+                cost, source = pricing_manager.estimate_cost(
+                    model_name, input_tokens, output_tokens
+                )
                 # Should return reasonable values, not crash
                 assert cost >= 0
                 assert isinstance(source, str)
             except Exception as e:
                 # Should only fail for legitimate validation reasons
-                assert any(keyword in str(e).lower() for keyword in ["negative", "invalid", "too large"])
+                assert any(
+                    keyword in str(e).lower()
+                    for keyword in ["negative", "invalid", "too large"]
+                )
 
 
 class TestPricingManagerEdgeCases:
@@ -597,7 +608,7 @@ class TestPricingManagerEdgeCases:
                 "max_tokens": 8192,
                 "litellm_provider": "openai",
                 "mode": "chat",
-                "supports_function_calling": True
+                "supports_function_calling": True,
             },
             "claude-3-sonnet": {
                 "input_cost_per_token": 0.000003,
@@ -605,15 +616,15 @@ class TestPricingManagerEdgeCases:
                 "max_tokens": 200000,
                 "litellm_provider": "anthropic",
                 "mode": "chat",
-                "supports_function_calling": True
+                "supports_function_calling": True,
             },
             "gpt-3.5-turbo": {
                 "input_cost_per_token": 0.0000015,
                 "output_cost_per_token": 0.000002,
                 "max_tokens": 4096,
                 "litellm_provider": "openai",
-                "mode": "chat"
-            }
+                "mode": "chat",
+            },
         }
 
     @pytest.fixture
@@ -623,14 +634,14 @@ class TestPricingManagerEdgeCases:
         backup_file = isolated_temp_dir / "pricing_backup.json"
 
         # Create backup file with sample data
-        with open(backup_file, 'w') as f:
+        with open(backup_file, "w") as f:
             json.dump(sample_litellm_data, f)
 
         return PricingManager(
             cache_file=cache_file,
             backup_file=backup_file,
             cache_ttl_hours=1,
-            fetch_timeout=10.0
+            fetch_timeout=10.0,
         )
 
     def test_empty_backup_file(self, isolated_temp_dir):
@@ -639,8 +650,7 @@ class TestPricingManagerEdgeCases:
         empty_backup.write_text("{}")
 
         manager = PricingManager(
-            cache_file=isolated_temp_dir / "cache.json",
-            backup_file=empty_backup
+            cache_file=isolated_temp_dir / "cache.json", backup_file=empty_backup
         )
 
         # Should handle empty backup gracefully
@@ -653,8 +663,7 @@ class TestPricingManagerEdgeCases:
         corrupted_backup.write_text("{ invalid json }")
 
         manager = PricingManager(
-            cache_file=isolated_temp_dir / "cache.json",
-            backup_file=corrupted_backup
+            cache_file=isolated_temp_dir / "cache.json", backup_file=corrupted_backup
         )
 
         # Should handle corrupted backup gracefully
@@ -665,7 +674,7 @@ class TestPricingManagerEdgeCases:
         """Test handling of missing backup file."""
         manager = PricingManager(
             cache_file=isolated_temp_dir / "cache.json",
-            backup_file=isolated_temp_dir / "nonexistent.json"
+            backup_file=isolated_temp_dir / "nonexistent.json",
         )
 
         # Should handle missing backup gracefully
@@ -680,8 +689,7 @@ class TestPricingManagerEdgeCases:
 
         try:
             manager = PricingManager(
-                cache_file=cache_file,
-                backup_file=isolated_temp_dir / "backup.json"
+                cache_file=cache_file, backup_file=isolated_temp_dir / "backup.json"
             )
 
             # Should handle read-only cache file
@@ -697,8 +705,10 @@ class TestPricingManagerEdgeCases:
     @pytest.mark.asyncio
     async def test_network_timeout(self, pricing_manager):
         """Test network timeout handling."""
-        with patch('httpx.AsyncClient') as mock_client:
-            mock_client.return_value.__aenter__.return_value.get.side_effect = httpx.TimeoutException("Timeout")
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.get.side_effect = (
+                httpx.TimeoutException("Timeout")
+            )
 
             success = await pricing_manager.fetch_latest_pricing(force=True)
 
@@ -712,16 +722,15 @@ class TestPricingManagerEdgeCases:
             large_data[f"model-{i}"] = {
                 "input_cost_per_token": 0.001,
                 "output_cost_per_token": 0.002,
-                "max_tokens": 1000
+                "max_tokens": 1000,
             }
 
         backup_file = isolated_temp_dir / "large_backup.json"
-        with open(backup_file, 'w') as f:
+        with open(backup_file, "w") as f:
             json.dump(large_data, f)
 
         manager = PricingManager(
-            cache_file=isolated_temp_dir / "cache.json",
-            backup_file=backup_file
+            cache_file=isolated_temp_dir / "cache.json", backup_file=backup_file
         )
 
         # Should handle large dataset
@@ -729,6 +738,7 @@ class TestPricingManagerEdgeCases:
 
         # Lookup should still be fast
         import time
+
         start_time = time.time()
         info = manager.get_model_pricing("model-500")
         end_time = time.time()

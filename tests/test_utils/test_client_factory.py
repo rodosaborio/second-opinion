@@ -23,7 +23,7 @@ from src.second_opinion.utils.client_factory import (
 class TestClientFactory:
     """Test client factory functionality."""
 
-    @patch('src.second_opinion.utils.client_factory.get_settings')
+    @patch("src.second_opinion.utils.client_factory.get_settings")
     def test_create_client_from_config_openrouter(self, mock_get_settings):
         """Test creating OpenRouter client from config."""
         # Mock settings
@@ -41,14 +41,16 @@ class TestClientFactory:
         assert client.api_key == "sk-or-test123"
         mock_settings.get_api_key.assert_called_once_with("openrouter")
 
-    @patch('src.second_opinion.utils.client_factory.get_settings')
+    @patch("src.second_opinion.utils.client_factory.get_settings")
     def test_create_client_from_config_missing_key(self, mock_get_settings):
         """Test creating client with missing API key."""
         mock_settings = MagicMock()
         mock_settings.get_api_key.return_value = None
         mock_get_settings.return_value = mock_settings
 
-        with pytest.raises(ClientFactoryError, match="OpenRouter API key not configured"):
+        with pytest.raises(
+            ClientFactoryError, match="OpenRouter API key not configured"
+        ):
             create_client_from_config("openrouter")
 
     def test_create_client_from_config_unsupported_provider(self):
@@ -56,7 +58,7 @@ class TestClientFactory:
         with pytest.raises(ClientFactoryError, match="Unsupported provider"):
             create_client_from_config("unsupported")
 
-    @patch('src.second_opinion.utils.client_factory.get_settings')
+    @patch("src.second_opinion.utils.client_factory.get_settings")
     def test_create_client_from_config_with_overrides(self, mock_get_settings):
         """Test creating client with configuration overrides."""
         mock_settings = MagicMock()
@@ -66,10 +68,7 @@ class TestClientFactory:
         mock_settings.api.max_backoff = 60
         mock_get_settings.return_value = mock_settings
 
-        overrides = {
-            "api_key": "sk-or-override",
-            "timeout": 60
-        }
+        overrides = {"api_key": "sk-or-override", "timeout": 60}
 
         client = create_client_from_config("openrouter", overrides)
 
@@ -77,7 +76,7 @@ class TestClientFactory:
         assert client.api_key == "sk-or-override"  # Should use override
         assert client.timeout == 60  # Should use override
 
-    @patch('src.second_opinion.utils.client_factory.create_client_from_config')
+    @patch("src.second_opinion.utils.client_factory.create_client_from_config")
     def test_create_openrouter_client_convenience(self, mock_create):
         """Test convenience function for creating OpenRouter client."""
         mock_client = MagicMock()
@@ -86,12 +85,11 @@ class TestClientFactory:
         client = create_openrouter_client(api_key="sk-or-test123", timeout=45)
 
         mock_create.assert_called_once_with(
-            "openrouter",
-            {"api_key": "sk-or-test123", "timeout": 45}
+            "openrouter", {"api_key": "sk-or-test123", "timeout": 45}
         )
         assert client == mock_client
 
-    @patch('src.second_opinion.utils.client_factory.create_client_from_config')
+    @patch("src.second_opinion.utils.client_factory.create_client_from_config")
     def test_create_openrouter_client_no_overrides(self, mock_create):
         """Test convenience function without overrides."""
         mock_client = MagicMock()
@@ -102,7 +100,7 @@ class TestClientFactory:
         mock_create.assert_called_once_with("openrouter", {})
         assert client == mock_client
 
-    @patch('src.second_opinion.utils.client_factory.get_settings')
+    @patch("src.second_opinion.utils.client_factory.get_settings")
     def test_create_client_from_config_lmstudio(self, mock_get_settings):
         """Test creating LM Studio client from config."""
         mock_settings = MagicMock()
@@ -118,21 +116,22 @@ class TestClientFactory:
         assert client.provider_name == "lmstudio"
         assert client.base_url == "http://localhost:1234/v1"
 
-    @patch('src.second_opinion.utils.client_factory.create_client_from_config')
+    @patch("src.second_opinion.utils.client_factory.create_client_from_config")
     def test_create_lmstudio_client_convenience(self, mock_create):
         """Test convenience function for creating LM Studio client."""
         mock_client = MagicMock()
         mock_create.return_value = mock_client
 
-        client = create_lmstudio_client(base_url="http://192.168.1.100:1234", timeout=45)
+        client = create_lmstudio_client(
+            base_url="http://192.168.1.100:1234", timeout=45
+        )
 
         mock_create.assert_called_once_with(
-            "lmstudio",
-            {"base_url": "http://192.168.1.100:1234", "timeout": 45}
+            "lmstudio", {"base_url": "http://192.168.1.100:1234", "timeout": 45}
         )
         assert client == mock_client
 
-    @patch('src.second_opinion.utils.client_factory.create_client_from_config')
+    @patch("src.second_opinion.utils.client_factory.create_client_from_config")
     def test_create_lmstudio_client_no_overrides(self, mock_create):
         """Test convenience function without overrides."""
         mock_client = MagicMock()
@@ -172,7 +171,9 @@ class TestProviderConfig:
         mock_settings = MagicMock()
         mock_settings.get_api_key.return_value = None
 
-        with pytest.raises(ClientFactoryError, match="OpenRouter API key not configured"):
+        with pytest.raises(
+            ClientFactoryError, match="OpenRouter API key not configured"
+        ):
             _get_provider_config("openrouter", mock_settings)
 
     def test_get_provider_config_lmstudio(self):
@@ -206,7 +207,7 @@ class TestProviderConfig:
 class TestProviderValidation:
     """Test provider validation functionality."""
 
-    @patch('src.second_opinion.utils.client_factory.get_settings')
+    @patch("src.second_opinion.utils.client_factory.get_settings")
     def test_validate_provider_config_valid(self, mock_get_settings):
         """Test validating a properly configured provider."""
         mock_settings = MagicMock()
@@ -218,7 +219,7 @@ class TestProviderValidation:
 
         assert validate_provider_config("openrouter") is True
 
-    @patch('src.second_opinion.utils.client_factory.get_settings')
+    @patch("src.second_opinion.utils.client_factory.get_settings")
     def test_validate_provider_config_invalid(self, mock_get_settings):
         """Test validating an improperly configured provider."""
         mock_settings = MagicMock()
@@ -227,8 +228,8 @@ class TestProviderValidation:
 
         assert validate_provider_config("openrouter") is False
 
-    @patch('src.second_opinion.utils.client_factory.validate_provider_config')
-    @patch('src.second_opinion.utils.client_factory.get_supported_providers')
+    @patch("src.second_opinion.utils.client_factory.validate_provider_config")
+    @patch("src.second_opinion.utils.client_factory.get_supported_providers")
     def test_get_configured_providers(self, mock_get_supported, mock_validate):
         """Test getting list of configured providers."""
         mock_get_supported.return_value = ["openrouter", "lmstudio", "anthropic"]
@@ -239,8 +240,8 @@ class TestProviderValidation:
         assert configured == ["openrouter", "anthropic"]
         assert mock_validate.call_count == 3
 
-    @patch('src.second_opinion.utils.client_factory.validate_provider_config')
-    @patch('src.second_opinion.utils.client_factory.get_supported_providers')
+    @patch("src.second_opinion.utils.client_factory.validate_provider_config")
+    @patch("src.second_opinion.utils.client_factory.get_supported_providers")
     def test_get_configured_providers_none(self, mock_get_supported, mock_validate):
         """Test when no providers are configured."""
         mock_get_supported.return_value = ["openrouter", "lmstudio"]
@@ -254,16 +255,18 @@ class TestProviderValidation:
 class TestClientFactoryErrors:
     """Test error handling in client factory."""
 
-    @patch('src.second_opinion.utils.client_factory.get_settings')
+    @patch("src.second_opinion.utils.client_factory.get_settings")
     def test_create_client_generic_error(self, mock_get_settings):
         """Test handling of generic errors during client creation."""
         mock_get_settings.side_effect = Exception("Database connection failed")
 
-        with pytest.raises(ClientFactoryError, match="Failed to create openrouter client"):
+        with pytest.raises(
+            ClientFactoryError, match="Failed to create openrouter client"
+        ):
             create_client_from_config("openrouter")
 
-    @patch('src.second_opinion.utils.client_factory.get_settings')
-    @patch('src.second_opinion.utils.client_factory.create_client')
+    @patch("src.second_opinion.utils.client_factory.get_settings")
+    @patch("src.second_opinion.utils.client_factory.create_client")
     def test_create_client_creation_error(self, mock_create, mock_get_settings):
         """Test handling of client creation errors."""
         mock_settings = MagicMock()
@@ -275,7 +278,9 @@ class TestClientFactoryErrors:
 
         mock_create.side_effect = ValueError("Invalid API key format")
 
-        with pytest.raises(ClientFactoryError, match="Failed to create openrouter client"):
+        with pytest.raises(
+            ClientFactoryError, match="Failed to create openrouter client"
+        ):
             create_client_from_config("openrouter")
 
 
@@ -286,7 +291,9 @@ class TestClientFactoryIntegration:
     def test_factory_creates_working_client(self):
         """Test that factory creates a working client."""
         # This test uses actual client creation (but mocked settings)
-        with patch('src.second_opinion.utils.client_factory.get_settings') as mock_get_settings:
+        with patch(
+            "src.second_opinion.utils.client_factory.get_settings"
+        ) as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.get_api_key.return_value = "sk-or-test123"
             mock_settings.api.timeout = 30
@@ -306,7 +313,9 @@ class TestClientFactoryIntegration:
     @pytest.mark.integration
     def test_convenience_functions_work(self):
         """Test that convenience functions integrate properly."""
-        with patch('src.second_opinion.utils.client_factory.get_settings') as mock_get_settings:
+        with patch(
+            "src.second_opinion.utils.client_factory.get_settings"
+        ) as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.get_api_key.return_value = "sk-or-default"
             mock_settings.api.timeout = 30
@@ -325,7 +334,9 @@ class TestClientFactoryIntegration:
     @pytest.mark.integration
     def test_lmstudio_factory_creates_working_client(self):
         """Test that LM Studio factory creates a working client."""
-        with patch('src.second_opinion.utils.client_factory.get_settings') as mock_get_settings:
+        with patch(
+            "src.second_opinion.utils.client_factory.get_settings"
+        ) as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.lmstudio_base_url = "http://localhost:1234"
             mock_settings.api.timeout = 30
@@ -345,7 +356,9 @@ class TestClientFactoryIntegration:
     @pytest.mark.integration
     def test_lmstudio_convenience_functions_work(self):
         """Test that LM Studio convenience functions integrate properly."""
-        with patch('src.second_opinion.utils.client_factory.get_settings') as mock_get_settings:
+        with patch(
+            "src.second_opinion.utils.client_factory.get_settings"
+        ) as mock_get_settings:
             mock_settings = MagicMock()
             mock_settings.lmstudio_base_url = "http://localhost:1234"
             mock_settings.api.timeout = 30

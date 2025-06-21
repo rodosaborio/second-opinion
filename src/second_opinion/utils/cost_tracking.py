@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class BudgetPeriod(str, Enum):
     """Budget tracking periods."""
+
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
@@ -31,6 +32,7 @@ class BudgetPeriod(str, Enum):
 
 class BudgetStatus(str, Enum):
     """Budget status indicators."""
+
     OK = "ok"
     WARNING = "warning"
     EXCEEDED = "exceeded"
@@ -40,6 +42,7 @@ class BudgetStatus(str, Enum):
 @dataclass
 class BudgetReservation:
     """Represents a budget reservation for a pending operation."""
+
     reservation_id: str
     estimated_cost: Decimal
     operation_type: str
@@ -55,6 +58,7 @@ class BudgetReservation:
 @dataclass
 class BudgetUsage:
     """Current budget usage for a specific period."""
+
     period: BudgetPeriod
     current_usage: Decimal
     limit: Decimal
@@ -65,7 +69,7 @@ class BudgetUsage:
     @property
     def available(self) -> Decimal:
         """Available budget (limit - usage - reserved)."""
-        return max(Decimal('0'), self.limit - self.current_usage - self.reserved)
+        return max(Decimal("0"), self.limit - self.current_usage - self.reserved)
 
     @property
     def utilization(self) -> float:
@@ -90,7 +94,13 @@ class BudgetUsage:
 class CostLimitError(Exception):
     """Cost limit exceeded error."""
 
-    def __init__(self, message: str, estimated_cost: Decimal, limit: Decimal, period: str = "request"):
+    def __init__(
+        self,
+        message: str,
+        estimated_cost: Decimal,
+        limit: Decimal,
+        period: str = "request",
+    ):
         self.message = message
         self.estimated_cost = estimated_cost
         self.limit = limit
@@ -100,13 +110,14 @@ class CostLimitError(Exception):
 
 class BudgetExceededError(CostLimitError):
     """Budget exceeded error."""
+
     pass
 
 
 class CostGuard:
     """
     Multi-layer cost protection and budget management.
-    
+
     Provides:
     - Pre-request cost estimation and validation
     - Budget reservation system
@@ -117,20 +128,20 @@ class CostGuard:
 
     def __init__(
         self,
-        per_request_limit: Decimal = Decimal('0.10'),
-        daily_limit: Decimal = Decimal('5.00'),
-        weekly_limit: Decimal = Decimal('25.00'),
-        monthly_limit: Decimal = Decimal('100.00'),
+        per_request_limit: Decimal = Decimal("0.10"),
+        daily_limit: Decimal = Decimal("5.00"),
+        weekly_limit: Decimal = Decimal("25.00"),
+        monthly_limit: Decimal = Decimal("100.00"),
         warning_threshold: float = 0.8,
-        reservation_timeout: int = 300
+        reservation_timeout: int = 300,
     ):
         """
         Initialize cost guard with budget limits.
-        
+
         Args:
             per_request_limit: Maximum cost per individual request
             daily_limit: Daily spending limit
-            weekly_limit: Weekly spending limit 
+            weekly_limit: Weekly spending limit
             monthly_limit: Monthly spending limit
             warning_threshold: Warning threshold as fraction (0.0-1.0)
             reservation_timeout: Reservation timeout in seconds
@@ -147,7 +158,9 @@ class CostGuard:
         self._reservations: dict[str, BudgetReservation] = {}
         self._lock = asyncio.Lock()
 
-        logger.info(f"CostGuard initialized with per_request=${per_request_limit}, daily=${daily_limit}")
+        logger.info(
+            f"CostGuard initialized with per_request=${per_request_limit}, daily=${daily_limit}"
+        )
 
     async def check_and_reserve_budget(
         self,
@@ -155,21 +168,21 @@ class CostGuard:
         operation_type: str,
         model: str,
         user_id: str | None = None,
-        per_request_override: Decimal | None = None
+        per_request_override: Decimal | None = None,
     ) -> BudgetCheck:
         """
         Check budget limits and reserve budget for operation.
-        
+
         Args:
             estimated_cost: Estimated cost for the operation
             operation_type: Type of operation (e.g., 'second_opinion', 'compare')
             model: Model being used
             user_id: Optional user identifier
             per_request_override: Override per-request limit for this operation
-            
+
         Returns:
             BudgetCheck with reservation details
-            
+
         Raises:
             CostLimitError: If cost limits would be exceeded
         """
@@ -178,20 +191,28 @@ class CostGuard:
             await self._cleanup_expired_reservations()
 
             # Validate per-request limit (use override if provided)
-            effective_per_request_limit = per_request_override if per_request_override is not None else self.per_request_limit
+            effective_per_request_limit = (
+                per_request_override
+                if per_request_override is not None
+                else self.per_request_limit
+            )
             if estimated_cost > effective_per_request_limit:
                 raise CostLimitError(
                     f"Estimated cost ${estimated_cost} exceeds per-request limit ${effective_per_request_limit}",
                     estimated_cost,
                     effective_per_request_limit,
-                    "request"
+                    "request",
                 )
 
             # Check budget periods
             budget_checks = await self._check_all_budget_periods(estimated_cost)
 
             # Find any exceeded budgets
-            exceeded_periods = [usage for usage in budget_checks if usage.status == BudgetStatus.EXCEEDED]
+            exceeded_periods = [
+                usage
+                for usage in budget_checks
+                if usage.status == BudgetStatus.EXCEEDED
+            ]
             if exceeded_periods:
                 period = exceeded_periods[0].period.value
                 raise BudgetExceededError(
@@ -199,7 +220,7 @@ class CostGuard:
                     f"would exceed limit ${exceeded_periods[0].limit}",
                     estimated_cost,
                     exceeded_periods[0].limit,
-                    period
+                    period,
                 )
 
             # Create reservation
@@ -209,26 +230,40 @@ class CostGuard:
                 operation_type=operation_type,
                 timestamp=datetime.now(UTC),
                 model=model,
-                user_id=user_id
+                user_id=user_id,
             )
 
             self._reservations[reservation.reservation_id] = reservation
 
             # Calculate warnings
-            warning_periods = [usage for usage in budget_checks if usage.status == BudgetStatus.WARNING]
+            warning_periods = [
+                usage for usage in budget_checks if usage.status == BudgetStatus.WARNING
+            ]
 
             # Get current budget usage for the response
-            daily_usage = next((u for u in budget_checks if u.period == BudgetPeriod.DAILY), None)
-            monthly_usage = next((u for u in budget_checks if u.period == BudgetPeriod.MONTHLY), None)
+            daily_usage = next(
+                (u for u in budget_checks if u.period == BudgetPeriod.DAILY), None
+            )
+            monthly_usage = next(
+                (u for u in budget_checks if u.period == BudgetPeriod.MONTHLY), None
+            )
 
             return BudgetCheck(
                 approved=True,
                 reservation_id=reservation.reservation_id,
                 estimated_cost=estimated_cost,
                 budget_remaining=min(usage.available for usage in budget_checks),
-                daily_budget_remaining=daily_usage.available if daily_usage else Decimal('0'),
-                monthly_budget_remaining=monthly_usage.available if monthly_usage else Decimal('0'),
-                warning_message=self._generate_warning_message(warning_periods) if warning_periods else None
+                daily_budget_remaining=(
+                    daily_usage.available if daily_usage else Decimal("0")
+                ),
+                monthly_budget_remaining=(
+                    monthly_usage.available if monthly_usage else Decimal("0")
+                ),
+                warning_message=(
+                    self._generate_warning_message(warning_periods)
+                    if warning_periods
+                    else None
+                ),
             )
 
     async def record_actual_cost(
@@ -237,21 +272,21 @@ class CostGuard:
         actual_cost: Decimal,
         model: str,
         operation_type: str,
-        metadata: dict[str, Any] | None = None
+        metadata: dict[str, Any] | None = None,
     ) -> CostAnalysis:
         """
         Record actual cost and release reservation.
-        
+
         Args:
             reservation_id: Reservation ID from check_and_reserve_budget
             actual_cost: Actual cost incurred
             model: Model used
             operation_type: Type of operation
             metadata: Optional metadata
-            
+
         Returns:
             Cost analysis with budget impact
-            
+
         Raises:
             ValueError: If reservation not found
         """
@@ -268,7 +303,7 @@ class CostGuard:
                 "model": model,
                 "operation_type": operation_type,
                 "user_id": reservation.user_id,
-                "metadata": metadata or {}
+                "metadata": metadata or {},
             }
             self._usage_history.append(usage_record)
 
@@ -282,21 +317,19 @@ class CostGuard:
                 estimated_cost=reservation.estimated_cost,
                 actual_cost=actual_cost,
                 cost_per_token=self._calculate_cost_per_token(usage_record),
-                budget_remaining=budget_usage.available
+                budget_remaining=budget_usage.available,
             )
 
     async def get_usage_summary(
-        self,
-        period: BudgetPeriod = BudgetPeriod.DAILY,
-        user_id: str | None = None
+        self, period: BudgetPeriod = BudgetPeriod.DAILY, user_id: str | None = None
     ) -> BudgetUsage:
         """
         Get usage summary for a specific period.
-        
+
         Args:
             period: Budget period to analyze
             user_id: Optional user filter
-            
+
         Returns:
             Budget usage summary
         """
@@ -305,17 +338,15 @@ class CostGuard:
             return await self._get_budget_usage(period, user_id)
 
     async def get_detailed_analytics(
-        self,
-        days: int = 30,
-        user_id: str | None = None
+        self, days: int = 30, user_id: str | None = None
     ) -> dict[str, Any]:
         """
         Get detailed cost analytics and trends.
-        
+
         Args:
             days: Number of days to analyze
             user_id: Optional user filter
-            
+
         Returns:
             Detailed analytics dictionary
         """
@@ -324,19 +355,21 @@ class CostGuard:
 
             # Filter relevant usage records
             records = [
-                r for r in self._usage_history
-                if r["timestamp"] >= cutoff and (not user_id or r.get("user_id") == user_id)
+                r
+                for r in self._usage_history
+                if r["timestamp"] >= cutoff
+                and (not user_id or r.get("user_id") == user_id)
             ]
 
             if not records:
                 return {
-                    "total_cost": Decimal('0'),
+                    "total_cost": Decimal("0"),
                     "total_requests": 0,
-                    "average_cost_per_request": Decimal('0'),
+                    "average_cost_per_request": Decimal("0"),
                     "models_used": [],
                     "operations_breakdown": {},
                     "daily_spending": [],
-                    "cost_trends": {}
+                    "cost_trends": {},
                 }
 
             total_cost = sum(r["actual_cost"] for r in records)
@@ -346,44 +379,54 @@ class CostGuard:
             model_costs = {}
             for record in records:
                 model = record["model"]
-                model_costs[model] = model_costs.get(model, Decimal('0')) + record["actual_cost"]
+                model_costs[model] = (
+                    model_costs.get(model, Decimal("0")) + record["actual_cost"]
+                )
 
             # Operations breakdown
             operation_costs = {}
             for record in records:
                 op = record["operation_type"]
-                operation_costs[op] = operation_costs.get(op, Decimal('0')) + record["actual_cost"]
+                operation_costs[op] = (
+                    operation_costs.get(op, Decimal("0")) + record["actual_cost"]
+                )
 
             # Daily spending trend
             daily_spending = {}
             for record in records:
                 day = record["timestamp"].date()
-                daily_spending[day] = daily_spending.get(day, Decimal('0')) + record["actual_cost"]
+                daily_spending[day] = (
+                    daily_spending.get(day, Decimal("0")) + record["actual_cost"]
+                )
 
             return {
                 "total_cost": total_cost,
                 "total_requests": total_requests,
-                "average_cost_per_request": total_cost / total_requests if total_requests > 0 else Decimal('0'),
+                "average_cost_per_request": (
+                    total_cost / total_requests if total_requests > 0 else Decimal("0")
+                ),
                 "models_used": list(model_costs.keys()),
                 "model_costs": {k: float(v) for k, v in model_costs.items()},
-                "operations_breakdown": {k: float(v) for k, v in operation_costs.items()},
+                "operations_breakdown": {
+                    k: float(v) for k, v in operation_costs.items()
+                },
                 "daily_spending": {str(k): float(v) for k, v in daily_spending.items()},
                 "period_days": days,
-                "analysis_timestamp": datetime.now(UTC).isoformat()
+                "analysis_timestamp": datetime.now(UTC).isoformat(),
             }
 
     async def estimate_request_cost(
         self,
         request: ModelRequest,
-        model_pricing: dict[str, tuple[Decimal, Decimal]] | None = None
+        model_pricing: dict[str, tuple[Decimal, Decimal]] | None = None,
     ) -> Decimal:
         """
         Estimate cost for a model request using dynamic pricing.
-        
+
         Args:
             request: Model request to estimate
             model_pricing: Optional legacy pricing dict (deprecated, uses pricing manager by default)
-            
+
         Returns:
             Estimated cost
         """
@@ -402,16 +445,22 @@ class CostGuard:
         # Use pricing manager for dynamic cost calculation
         if model_pricing is None:
             pricing_manager = get_pricing_manager()
-            cost, source = pricing_manager.estimate_cost(request.model, input_tokens, estimated_output_tokens)
-            logger.debug(f"Estimated cost for {request.model}: ${cost} (source: {source})")
+            cost, source = pricing_manager.estimate_cost(
+                request.model, input_tokens, estimated_output_tokens
+            )
+            logger.debug(
+                f"Estimated cost for {request.model}: ${cost} (source: {source})"
+            )
             return cost
         else:
             # Legacy pricing mode (for backward compatibility)
-            logger.warning("Using legacy pricing mode, consider migrating to pricing manager")
+            logger.warning(
+                "Using legacy pricing mode, consider migrating to pricing manager"
+            )
 
             if request.model not in model_pricing:
                 # Conservative fallback estimate
-                return Decimal('0.10')
+                return Decimal("0.10")
 
             input_cost_per_1k, output_cost_per_1k = model_pricing[request.model]
 
@@ -421,7 +470,9 @@ class CostGuard:
 
             return input_cost + output_cost
 
-    async def _check_all_budget_periods(self, additional_cost: Decimal) -> list[BudgetUsage]:
+    async def _check_all_budget_periods(
+        self, additional_cost: Decimal
+    ) -> list[BudgetUsage]:
         """Check all budget periods with additional cost."""
         periods = [BudgetPeriod.DAILY, BudgetPeriod.WEEKLY, BudgetPeriod.MONTHLY]
         results = []
@@ -435,9 +486,7 @@ class CostGuard:
         return results
 
     async def _get_budget_usage(
-        self,
-        period: BudgetPeriod,
-        user_id: str | None = None
+        self, period: BudgetPeriod, user_id: str | None = None
     ) -> BudgetUsage:
         """Get current budget usage for a period."""
         now = datetime.now(UTC)
@@ -449,7 +498,9 @@ class CostGuard:
             limit = self.daily_limit
         elif period == BudgetPeriod.WEEKLY:
             days_since_monday = now.weekday()
-            start = (now - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
+            start = (now - timedelta(days=days_since_monday)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
             end = start + timedelta(weeks=1)
             limit = self.weekly_limit
         elif period == BudgetPeriod.MONTHLY:
@@ -467,14 +518,18 @@ class CostGuard:
 
         # Calculate current usage
         current_usage = sum(
-            r["actual_cost"] for r in self._usage_history
-            if start <= r["timestamp"] < end and (not user_id or r.get("user_id") == user_id)
+            r["actual_cost"]
+            for r in self._usage_history
+            if start <= r["timestamp"] < end
+            and (not user_id or r.get("user_id") == user_id)
         )
 
         # Calculate reserved amount
         reserved = sum(
-            r.estimated_cost for r in self._reservations.values()
-            if not r.is_expired(self.reservation_timeout) and (not user_id or r.user_id == user_id)
+            r.estimated_cost
+            for r in self._reservations.values()
+            if not r.is_expired(self.reservation_timeout)
+            and (not user_id or r.user_id == user_id)
         )
 
         return BudgetUsage(
@@ -483,13 +538,14 @@ class CostGuard:
             limit=limit,
             reserved=Decimal(str(reserved)),
             period_start=start,
-            period_end=end
+            period_end=end,
         )
 
     async def _cleanup_expired_reservations(self):
         """Remove expired reservations."""
         expired_ids = [
-            rid for rid, reservation in self._reservations.items()
+            rid
+            for rid, reservation in self._reservations.items()
             if reservation.is_expired(self.reservation_timeout)
         ]
 
@@ -502,7 +558,9 @@ class CostGuard:
         warnings = []
         for usage in warning_periods:
             percentage = int(usage.utilization * 100)
-            warnings.append(f"{usage.period.value} budget at {percentage}% (${usage.current_usage}/${usage.limit})")
+            warnings.append(
+                f"{usage.period.value} budget at {percentage}% (${usage.current_usage}/${usage.limit})"
+            )
 
         return "Budget warning: " + "; ".join(warnings)
 
@@ -516,7 +574,7 @@ class CostGuard:
         estimated_tokens = self._estimate_tokens(str(usage_record.get("metadata", {})))
         if estimated_tokens > 0:
             return usage_record["actual_cost"] / estimated_tokens
-        return Decimal('0')
+        return Decimal("0")
 
 
 # Global cost guard instance
@@ -529,15 +587,15 @@ def get_cost_guard() -> CostGuard:
     if _cost_guard is None:
         # Import here to avoid circular imports
         from ..config.settings import get_settings
-        
+
         settings = get_settings()
         cost_config = settings.cost_management
-        
+
         _cost_guard = CostGuard(
             per_request_limit=cost_config.default_per_request_limit,
             daily_limit=cost_config.daily_limit,
             monthly_limit=cost_config.monthly_limit,
-            warning_threshold=cost_config.warning_threshold
+            warning_threshold=cost_config.warning_threshold,
         )
     return _cost_guard
 
@@ -549,14 +607,13 @@ def set_cost_guard(cost_guard: CostGuard | None) -> None:
 
 
 async def check_budget(
-    estimated_cost: Decimal,
-    operation_type: str,
-    model: str,
-    user_id: str | None = None
+    estimated_cost: Decimal, operation_type: str, model: str, user_id: str | None = None
 ) -> BudgetCheck:
     """Global function to check and reserve budget."""
     guard = get_cost_guard()
-    return await guard.check_and_reserve_budget(estimated_cost, operation_type, model, user_id)
+    return await guard.check_and_reserve_budget(
+        estimated_cost, operation_type, model, user_id
+    )
 
 
 async def record_cost(
@@ -564,8 +621,10 @@ async def record_cost(
     actual_cost: Decimal,
     model: str,
     operation_type: str,
-    metadata: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None,
 ) -> CostAnalysis:
     """Global function to record actual cost."""
     guard = get_cost_guard()
-    return await guard.record_actual_cost(reservation_id, actual_cost, model, operation_type, metadata)
+    return await guard.record_actual_cost(
+        reservation_id, actual_cost, model, operation_type, metadata
+    )

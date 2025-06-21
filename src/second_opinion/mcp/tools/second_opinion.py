@@ -39,18 +39,18 @@ async def second_opinion_tool(
 ) -> str:
     """
     Get a second opinion on an AI response by comparing it against alternative models.
-    
+
     This tool is designed for natural conversation flow where an AI client has already
     provided a response and wants to evaluate it against alternatives. It helps optimize
     AI model usage by providing quality assessments, cost optimization recommendations,
     and suggestions for when to use local vs cloud models.
-    
+
     NATURAL USAGE PATTERN:
     1. User asks: "Write a Python function to calculate fibonacci"
     2. AI responds: <provides code>
     3. User asks: "Can you get a second opinion on that?"
     4. AI calls this tool with its response for comparison
-    
+
     Args:
         prompt: The original question or task that was asked
         primary_model: The model that provided the original response. Use OpenRouter format:
@@ -65,14 +65,14 @@ async def second_opinion_tool(
         comparison_models: Specific models to compare against. If not provided, will
                           auto-select alternatives including cost-effective local options.
         cost_limit: Maximum cost limit for this operation in USD (default: $0.25).
-    
+
     Returns:
         A second opinion report with:
         - Quality assessment of the original response
-        - Comparison with alternative model approaches  
+        - Comparison with alternative model approaches
         - Cost optimization recommendations (including local models)
         - Decision guidance: "stick with your model" vs "consider alternatives"
-        
+
     RECOMMENDED USAGE (Natural Conversation Flow):
         # After providing a response to user, get second opinion
         result = await second_opinion_tool(
@@ -81,7 +81,7 @@ async def second_opinion_tool(
             primary_response="def fibonacci(n):\n    if n <= 1:\n        return n...",
             context="coding task"
         )
-        
+
     OTHER USAGE PATTERNS:
         # Compare model capabilities for a new task
         result = await second_opinion_tool(
@@ -89,7 +89,7 @@ async def second_opinion_tool(
             primary_model="openai/gpt-4o-mini",  # Will generate response
             context="educational content"
         )
-        
+
         # Test local model vs cloud alternatives
         result = await second_opinion_tool(
             prompt="Debug this code snippet",
@@ -115,7 +115,9 @@ async def second_opinion_tool(
             except Exception as e:
                 # Provide helpful model name suggestions
                 suggestions = _get_model_name_suggestions(primary_model)
-                suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                suggestion_text = (
+                    f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                )
                 return f"❌ **Invalid Primary Model**: {str(e)}{suggestion_text}"
 
         if comparison_models:
@@ -126,7 +128,9 @@ async def second_opinion_tool(
             except Exception as e:
                 # Provide helpful model name suggestions
                 suggestions = _get_model_name_suggestions(str(e))
-                suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                suggestion_text = (
+                    f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                )
                 return f"❌ **Invalid Comparison Model**: {str(e)}{suggestion_text}"
 
         # Validate cost limit
@@ -142,8 +146,10 @@ async def second_opinion_tool(
                 settings = get_settings()
                 cost_limit_decimal = settings.cost_management.default_per_request_limit
 
-        logger.info(f"Starting second_opinion tool: prompt length={len(clean_prompt)}, "
-                   f"primary_model={primary_model}, has_primary_response={primary_response is not None}")
+        logger.info(
+            f"Starting second_opinion tool: prompt length={len(clean_prompt)}, "
+            f"primary_model={primary_model}, has_primary_response={primary_response is not None}"
+        )
         logger.info(f"Cost limit: ${cost_limit_decimal:.2f}")
 
         # Get core systems
@@ -169,13 +175,14 @@ async def second_opinion_tool(
         # Select comparison models if not provided
         if not comparison_models:
             from ...cli.main import ComparisonModelSelector
+
             selector = ComparisonModelSelector()
             comparison_models = selector.select_models(
                 primary_model=primary_model,
                 tool_name="second_opinion",  # Explicitly specify tool name
                 explicit_models=None,
                 task_complexity=task_complexity,
-                max_models=2
+                max_models=2,
             )
             logger.info(f"Auto-selected comparison models: {comparison_models}")
 
@@ -192,7 +199,7 @@ async def second_opinion_tool(
                     messages=[Message(role="user", content=clean_prompt)],
                     max_tokens=2000,
                     temperature=0.1,
-                    system_prompt=clean_context
+                    system_prompt=clean_context,
                 )
                 primary_cost = await primary_client.estimate_cost(primary_request)
                 estimated_cost += primary_cost
@@ -211,11 +218,13 @@ async def second_opinion_tool(
                     messages=[Message(role="user", content=clean_prompt)],
                     max_tokens=2000,
                     temperature=0.1,
-                    system_prompt=clean_context
+                    system_prompt=clean_context,
                 )
                 model_cost = await client.estimate_cost(request)
                 estimated_cost += model_cost
-                logger.info(f"Comparison model {model} cost estimate: ${model_cost:.4f}")
+                logger.info(
+                    f"Comparison model {model} cost estimate: ${model_cost:.4f}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to estimate cost for {model}: {e}")
                 estimated_cost += Decimal("0.05")  # Conservative estimate
@@ -232,11 +241,15 @@ async def second_opinion_tool(
                 messages=[Message(role="user", content="evaluation task")],
                 max_tokens=500,
                 temperature=0.1,
-                system_prompt=""
+                system_prompt="",
             )
             eval_cost = await eval_client.estimate_cost(eval_request)
-            estimated_cost += eval_cost * len(comparison_models)  # One evaluation per comparison
-            logger.info(f"Evaluation cost estimate: ${eval_cost * len(comparison_models):.4f}")
+            estimated_cost += eval_cost * len(
+                comparison_models
+            )  # One evaluation per comparison
+            logger.info(
+                f"Evaluation cost estimate: ${eval_cost * len(comparison_models):.4f}"
+            )
         except Exception as e:
             logger.warning(f"Failed to estimate evaluation cost: {e}")
             estimated_cost += Decimal("0.02")  # Conservative fallback
@@ -244,7 +257,10 @@ async def second_opinion_tool(
         # Check budget
         try:
             budget_check = await cost_guard.check_and_reserve_budget(
-                estimated_cost, "second_opinion", primary_model, per_request_override=cost_limit_decimal
+                estimated_cost,
+                "second_opinion",
+                primary_model,
+                per_request_override=cost_limit_decimal,
             )
             reservation_id = budget_check.reservation_id
         except Exception as e:
@@ -266,31 +282,43 @@ async def second_opinion_tool(
                 primary_request = ModelRequest(
                     model=primary_model,
                     messages=[Message(role="user", content=clean_prompt)],
-                    max_tokens=len(clean_primary_response_text.split()) * 2,  # Estimate tokens from response
+                    max_tokens=len(clean_primary_response_text.split())
+                    * 2,  # Estimate tokens from response
                     temperature=0.1,
-                    system_prompt=clean_context
+                    system_prompt=clean_context,
                 )
-                primary_cost_estimate = await primary_client.estimate_cost(primary_request)
-                logger.info(f"Estimated cost for provided primary response: ${primary_cost_estimate:.4f}")
+                primary_cost_estimate = await primary_client.estimate_cost(
+                    primary_request
+                )
+                logger.info(
+                    f"Estimated cost for provided primary response: ${primary_cost_estimate:.4f}"
+                )
             except Exception as e:
                 logger.warning(f"Failed to estimate cost for primary response: {e}")
                 primary_cost_estimate = Decimal("0.01")  # Small fallback estimate
 
             # Create a ModelResponse with realistic cost estimate
             from ...core.models import ModelResponse, TokenUsage
-            estimated_input_tokens = int(len(clean_prompt.split()) * 1.3)  # Rough token estimate
-            estimated_output_tokens = int(len(clean_primary_response_text.split()) * 1.3)
-            total_tokens = estimated_input_tokens + estimated_output_tokens  # Ensure exact sum
+
+            estimated_input_tokens = int(
+                len(clean_prompt.split()) * 1.3
+            )  # Rough token estimate
+            estimated_output_tokens = int(
+                len(clean_primary_response_text.split()) * 1.3
+            )
+            total_tokens = (
+                estimated_input_tokens + estimated_output_tokens
+            )  # Ensure exact sum
             primary_model_response = ModelResponse(
                 content=clean_primary_response_text,
                 model=primary_model,
                 usage=TokenUsage(
                     input_tokens=estimated_input_tokens,
                     output_tokens=estimated_output_tokens,
-                    total_tokens=total_tokens
+                    total_tokens=total_tokens,
                 ),
                 cost_estimate=primary_cost_estimate,
-                provider=detect_model_provider(primary_model)
+                provider=detect_model_provider(primary_model),
             )
             actual_cost += primary_cost_estimate
         else:
@@ -303,14 +331,20 @@ async def second_opinion_tool(
                     messages=[Message(role="user", content=clean_prompt)],
                     max_tokens=2000,
                     temperature=0.1,
-                    system_prompt=clean_context
+                    system_prompt=clean_context,
                 )
                 primary_model_response = await primary_client.complete(primary_request)
-                clean_primary_response_text = filter_think_tags(primary_model_response.content)
+                clean_primary_response_text = filter_think_tags(
+                    primary_model_response.content
+                )
                 actual_cost += primary_model_response.cost_estimate
             except Exception as e:
-                logger.error(f"Failed to get primary response from {primary_model}: {e}")
-                await cost_guard.record_actual_cost(reservation_id, actual_cost, primary_model, "second_opinion")
+                logger.error(
+                    f"Failed to get primary response from {primary_model}: {e}"
+                )
+                await cost_guard.record_actual_cost(
+                    reservation_id, actual_cost, primary_model, "second_opinion"
+                )
                 return f"❌ **Error**: Failed to get response from primary model {primary_model}: {str(e)}"
 
         # Get comparison responses
@@ -327,7 +361,7 @@ async def second_opinion_tool(
                     messages=[Message(role="user", content=clean_prompt)],
                     max_tokens=2000,
                     temperature=0.1,
-                    system_prompt=clean_context
+                    system_prompt=clean_context,
                 )
                 response = await client.complete(request)
                 # Store the full ModelResponse object for evaluation
@@ -338,12 +372,13 @@ async def second_opinion_tool(
                 logger.error(f"Failed to get response from {model}: {e}")
                 # Create error response as ModelResponse for consistency
                 from ...core.models import ModelResponse, TokenUsage
+
                 error_response = ModelResponse(
                     content=f"Error: Failed to get response from {model}: {str(e)}",
                     model=model,
                     usage=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0),
                     cost_estimate=Decimal("0.0"),
-                    provider=detect_model_provider(model)
+                    provider=detect_model_provider(model),
                 )
                 comparison_responses.append(error_response)
                 comparison_costs.append(Decimal("0.0"))
@@ -355,7 +390,7 @@ async def second_opinion_tool(
                 accuracy_weight=0.3,
                 completeness_weight=0.25,
                 clarity_weight=0.25,
-                usefulness_weight=0.2
+                usefulness_weight=0.2,
             )
 
             evaluation_results = []
@@ -369,9 +404,9 @@ async def second_opinion_tool(
                     # Skip error responses
                     if response.content.startswith("Error:"):
                         fallback_result = {
-                            'overall_winner': 'primary',
-                            'overall_score': 0.0,
-                            'reasoning': f"Comparison model {response.model} failed to respond."
+                            "overall_winner": "primary",
+                            "overall_score": 0.0,
+                            "reasoning": f"Comparison model {response.model} failed to respond.",
                         }
                         evaluation_results.append((response.model, fallback_result))
                         continue
@@ -381,13 +416,13 @@ async def second_opinion_tool(
                         response,
                         original_task=clean_prompt,
                         criteria=evaluation_criteria,
-                        evaluator_model=evaluator_model
+                        evaluator_model=evaluator_model,
                     )
                     # Convert ComparisonResult to dict format for consistency
                     result_dict = {
-                        'overall_winner': result.winner,
-                        'overall_score': result.overall_score,
-                        'reasoning': result.reasoning  # Fixed: use .reasoning not .detailed_analysis
+                        "overall_winner": result.winner,
+                        "overall_score": result.overall_score,
+                        "reasoning": result.reasoning,  # Fixed: use .reasoning not .detailed_analysis
                     }
                     evaluation_results.append((response.model, result_dict))
                     evaluation_cost += Decimal("0.01")  # Small evaluation cost
@@ -395,9 +430,9 @@ async def second_opinion_tool(
                     logger.warning(f"Evaluation failed for {response.model}: {e}")
                     # Create a fallback evaluation result
                     fallback_result = {
-                        'overall_winner': 'primary',
-                        'overall_score': 5.0,  # Neutral score
-                        'reasoning': f"Evaluation failed for {response.model}: {str(e)}. Using fallback assessment."
+                        "overall_winner": "primary",
+                        "overall_score": 5.0,  # Neutral score
+                        "reasoning": f"Evaluation failed for {response.model}: {str(e)}. Using fallback assessment.",
                     }
                     evaluation_results.append((response.model, fallback_result))
 
@@ -405,12 +440,25 @@ async def second_opinion_tool(
 
         except Exception as e:
             logger.error(f"Evaluation system failed: {e}")
-            evaluation_results = [(model, {'overall_winner': 'unknown', 'overall_score': 5.0, 'reasoning': 'Evaluation unavailable'})
-                                for model in comparison_models]
+            evaluation_results = [
+                (
+                    model,
+                    {
+                        "overall_winner": "unknown",
+                        "overall_score": 5.0,
+                        "reasoning": "Evaluation unavailable",
+                    },
+                )
+                for model in comparison_models
+            ]
 
         # Record actual cost
-        await cost_guard.record_actual_cost(reservation_id, actual_cost, primary_model, "second_opinion")
-        logger.info(f"Total operation cost: ${actual_cost:.4f}, Budget used: ${actual_cost:.4f}")
+        await cost_guard.record_actual_cost(
+            reservation_id, actual_cost, primary_model, "second_opinion"
+        )
+        logger.info(
+            f"Total operation cost: ${actual_cost:.4f}, Budget used: ${actual_cost:.4f}"
+        )
 
         # Generate report
         return await _format_comparison_report(
@@ -418,13 +466,15 @@ async def second_opinion_tool(
             primary_model=primary_model,
             primary_response=clean_primary_response_text,
             comparison_models=[r.model for r in comparison_responses],
-            comparison_responses=[filter_think_tags(r.content) for r in comparison_responses],
+            comparison_responses=[
+                filter_think_tags(r.content) for r in comparison_responses
+            ],
             comparison_costs=comparison_costs,
             evaluation_results=evaluation_results,
             task_complexity=task_complexity,
             actual_cost=actual_cost,
             cost_limit=cost_limit_decimal,
-            context=clean_context
+            context=clean_context,
         )
 
     except Exception as e:
@@ -443,7 +493,7 @@ async def _format_comparison_report(
     task_complexity: TaskComplexity,
     actual_cost: Decimal,
     cost_limit: Decimal,
-    context: str | None
+    context: str | None,
 ) -> str:
     """Format the comparison report for MCP client display."""
 
@@ -482,12 +532,16 @@ async def _format_comparison_report(
     report.append("## 🎯 Primary Response")
     report.append(f"**Model**: {primary_model}")
     report.append("")
-    report.append(primary_response[:1000] + ("..." if len(primary_response) > 1000 else ""))
+    report.append(
+        primary_response[:1000] + ("..." if len(primary_response) > 1000 else "")
+    )
     report.append("")
 
     # Comparison responses
     report.append("## 🔀 Alternative Responses")
-    for model, response, cost in zip(comparison_models, comparison_responses, comparison_costs, strict=False):
+    for model, response, cost in zip(
+        comparison_models, comparison_responses, comparison_costs, strict=False
+    ):
         report.append(f"### {model} (${cost:.4f})")
         report.append("")
         if response.startswith("Error:"):
@@ -503,13 +557,13 @@ async def _format_comparison_report(
     best_score = 0.0
 
     for model, result in evaluation_results:
-        score = result.get('overall_score', 0.0)
-        winner = result.get('overall_winner', 'unknown')
-        reasoning = result.get('reasoning', 'No reasoning available')
+        score = result.get("overall_score", 0.0)
+        winner = result.get("overall_winner", "unknown")
+        reasoning = result.get("reasoning", "No reasoning available")
 
         if score > best_score:
             best_score = score
-            if winner == 'comparison':
+            if winner == "comparison":
                 best_model = model
 
         report.append(f"### {model} vs {primary_model}")
@@ -528,16 +582,22 @@ async def _format_comparison_report(
         report.append("Your model provided the best response quality for this task.")
     else:
         report.append(f"**💡 CONSIDER switching to {best_model}**")
-        report.append("This alternative might provide better results for similar tasks.")
+        report.append(
+            "This alternative might provide better results for similar tasks."
+        )
 
     report.append("")
 
     # Cost optimization with local model focus
-    local_models = [m for m in comparison_models if detect_model_provider(m) == "lmstudio"]
+    local_models = [
+        m for m in comparison_models if detect_model_provider(m) == "lmstudio"
+    ]
     if local_models and primary_provider == "openrouter":
         local_model = local_models[0]
         report.append("## 💰 Cost Optimization Opportunity")
-        report.append(f"**Local Alternative**: Consider testing **{local_model}** for development or high-volume use")
+        report.append(
+            f"**Local Alternative**: Consider testing **{local_model}** for development or high-volume use"
+        )
         report.append("- **Cost**: $0.00 (local inference)")
         report.append(f"- **Your current cost**: ${actual_cost:.4f} per request")
         report.append("- **Potential savings**: 100% for similar quality tasks")
@@ -548,15 +608,23 @@ async def _format_comparison_report(
     if best_model == primary_model:
         if local_models:
             report.append(f"1. **Keep using** {primary_model} for quality")
-            report.append(f"2. **Test** {local_models[0]} for cost savings on similar tasks")
+            report.append(
+                f"2. **Test** {local_models[0]} for cost savings on similar tasks"
+            )
         else:
             report.append(f"1. **Continue using** {primary_model} - it's working well!")
-            report.append("2. **Consider** local models for development and cost optimization")
+            report.append(
+                "2. **Consider** local models for development and cost optimization"
+            )
     else:
         report.append(f"1. **Try** {best_model} for this type of task")
-        report.append("2. **Compare results** to see if the switch improves your workflow")
+        report.append(
+            "2. **Compare results** to see if the switch improves your workflow"
+        )
         if local_models:
-            report.append(f"3. **Experiment** with {local_models[0]} for cost-effective alternatives")
+            report.append(
+                f"3. **Experiment** with {local_models[0]} for cost-effective alternatives"
+            )
 
     report.append("")
     report.append("---")
@@ -568,10 +636,10 @@ async def _format_comparison_report(
 def _get_model_name_suggestions(invalid_model: str) -> str:
     """
     Generate helpful model name suggestions based on common patterns.
-    
+
     Args:
         invalid_model: The invalid model name that was provided
-        
+
     Returns:
         Formatted string with model name suggestions
     """
@@ -579,7 +647,9 @@ def _get_model_name_suggestions(invalid_model: str) -> str:
 
     # Common provider suggestions
     suggestions.append("**Cloud Models (OpenRouter format):**")
-    suggestions.append("- Claude: `anthropic/claude-3-5-sonnet`, `anthropic/claude-3-haiku`")
+    suggestions.append(
+        "- Claude: `anthropic/claude-3-5-sonnet`, `anthropic/claude-3-haiku`"
+    )
     suggestions.append("- ChatGPT: `openai/gpt-4o`, `openai/gpt-4o-mini`")
     suggestions.append("- Gemini: `google/gemini-pro-1.5`, `google/gemini-flash-1.5`")
     suggestions.append("")

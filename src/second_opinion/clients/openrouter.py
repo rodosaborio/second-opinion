@@ -51,12 +51,12 @@ class OpenRouterClient(BaseClient):
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                'HTTP-Referer': 'https://github.com/second-opinion-mcp',
+                "HTTP-Referer": "https://github.com/second-opinion-mcp",
                 "User-Agent": "Second Opinion AI Tool",
-                "X-Title": "Second Opinion AI Tool"
+                "X-Title": "Second Opinion AI Tool",
             },
             timeout=httpx.Timeout(self.timeout),
-            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
 
         # Get pricing manager for dynamic cost calculation
@@ -86,8 +86,7 @@ class OpenRouterClient(BaseClient):
         try:
             # Make API call with retry logic
             response = await self.retry_with_backoff(
-                self._make_completion_request,
-                openrouter_request
+                self._make_completion_request, openrouter_request
             )
 
             # Parse and return standardized response
@@ -102,7 +101,7 @@ class OpenRouterClient(BaseClient):
                     f"Unexpected error during completion: {e}",
                     provider=self.provider_name,
                     model=request.model,
-                    details={"error_type": type(e).__name__}
+                    details={"error_type": type(e).__name__},
                 ) from e
 
     async def estimate_cost(self, request: ModelRequest) -> Decimal:
@@ -125,11 +124,15 @@ class OpenRouterClient(BaseClient):
         )
 
         # Log cost estimation with more detail for debugging
-        logger.info(f"Cost estimate for {request.model}: ${total_cost:.4f} (tokens: {input_tokens}+{output_tokens}, source: {source})")
+        logger.info(
+            f"Cost estimate for {request.model}: ${total_cost:.4f} (tokens: {input_tokens}+{output_tokens}, source: {source})"
+        )
 
         # Print warning if pricing source is fallback
         if source == "conservative_fallback":
-            print(f"No pricing data for model {request.model}, using conservative estimate")
+            print(
+                f"No pricing data for model {request.model}, using conservative estimate"
+            )
 
         return total_cost
 
@@ -162,29 +165,25 @@ class OpenRouterClient(BaseClient):
             raise ClientError(
                 f"Failed to retrieve models: {e.response.status_code}",
                 provider=self.provider_name,
-                details={"status_code": e.response.status_code}
+                details={"status_code": e.response.status_code},
             ) from e
         except Exception as e:
             logger.error(f"Error retrieving models: {e}")
             raise ClientError(
                 f"Failed to retrieve models: {e}",
                 provider=self.provider_name,
-                details={"error_type": type(e).__name__}
+                details={"error_type": type(e).__name__},
             ) from e
 
     def _prepare_request(self, request: ModelRequest) -> dict[str, Any]:
         """Prepare OpenRouter API request from standardized request."""
         messages = [
-            {
-                "role": msg.role,
-                "content": msg.content
-            }
-            for msg in request.messages
+            {"role": msg.role, "content": msg.content} for msg in request.messages
         ]
 
         openrouter_request: dict[str, Any] = {
             "model": request.model,
-            "messages": messages
+            "messages": messages,
         }
 
         # Add optional parameters
@@ -196,14 +195,13 @@ class OpenRouterClient(BaseClient):
 
         if request.system_prompt:
             # Add system message at the beginning
-            messages.insert(0, {
-                "role": "system",
-                "content": request.system_prompt
-            })
+            messages.insert(0, {"role": "system", "content": request.system_prompt})
 
         return openrouter_request
 
-    async def _make_completion_request(self, request_data: dict[str, Any]) -> httpx.Response:
+    async def _make_completion_request(
+        self, request_data: dict[str, Any]
+    ) -> httpx.Response:
         """Make the actual HTTP request to OpenRouter."""
         response = await self._http_client.post("/chat/completions", json=request_data)
 
@@ -229,7 +227,7 @@ class OpenRouterClient(BaseClient):
             raise AuthenticationError(
                 f"Authentication failed: {error_message}",
                 provider=self.provider_name,
-                details=error_metadata
+                details=error_metadata,
             )
         elif response.status_code == 402:
             raise CostLimitExceededError(
@@ -237,7 +235,7 @@ class OpenRouterClient(BaseClient):
                 provider=self.provider_name,
                 estimated_cost=Decimal("0"),  # Unknown at this point
                 cost_limit=Decimal("0"),  # Unknown at this point
-                details=error_metadata
+                details=error_metadata,
             )
         elif response.status_code == 403:
             raise SecurityError(f"Request blocked by moderation: {error_message}")
@@ -253,22 +251,24 @@ class OpenRouterClient(BaseClient):
                 f"Rate limit exceeded: {error_message}",
                 provider=self.provider_name,
                 retry_after=retry_after,
-                details=error_metadata
+                details=error_metadata,
             )
         elif response.status_code in (408, 502, 503):
             raise RetryableError(
                 f"Service temporarily unavailable: {error_message}",
                 provider=self.provider_name,
-                details=error_metadata
+                details=error_metadata,
             )
         else:
             raise ClientError(
                 f"API error: {error_message}",
                 provider=self.provider_name,
-                details={**error_metadata, "status_code": response.status_code}
+                details={**error_metadata, "status_code": response.status_code},
             )
 
-    async def _parse_response(self, response: httpx.Response, request: ModelRequest) -> ModelResponse:
+    async def _parse_response(
+        self, response: httpx.Response, request: ModelRequest
+    ) -> ModelResponse:
         """Parse OpenRouter response into standardized format."""
         try:
             data = response.json()
@@ -279,7 +279,7 @@ class OpenRouterClient(BaseClient):
                 raise ClientError(
                     "No choices in response",
                     provider=self.provider_name,
-                    model=request.model
+                    model=request.model,
                 )
 
             content = choices[0].get("message", {}).get("content", "")
@@ -289,26 +289,30 @@ class OpenRouterClient(BaseClient):
             usage = TokenUsage(
                 input_tokens=usage_data.get("prompt_tokens", 0),
                 output_tokens=usage_data.get("completion_tokens", 0),
-                total_tokens=usage_data.get("total_tokens", 0)
+                total_tokens=usage_data.get("total_tokens", 0),
             )
 
             # Calculate actual cost
             try:
                 model_info = await self._get_model_cost_info(request.model)
                 actual_cost = self._calculate_token_cost(
-                    usage.input_tokens,
-                    usage.output_tokens,
-                    model_info
+                    usage.input_tokens, usage.output_tokens, model_info
                 )
-                logger.debug(f"Actual cost for {request.model}: ${actual_cost:.4f} ({usage.input_tokens}+{usage.output_tokens} tokens)")
+                logger.debug(
+                    f"Actual cost for {request.model}: ${actual_cost:.4f} ({usage.input_tokens}+{usage.output_tokens} tokens)"
+                )
             except Exception as e:
                 # Fallback cost calculation using pricing manager
-                logger.warning(f"Failed to get model cost info for {request.model}: {e}")
+                logger.warning(
+                    f"Failed to get model cost info for {request.model}: {e}"
+                )
                 fallback_cost, source = self._pricing_manager.estimate_cost(
                     request.model, usage.input_tokens, usage.output_tokens
                 )
                 actual_cost = fallback_cost
-                logger.debug(f"Using fallback cost for {request.model}: ${actual_cost:.4f} (source: {source})")
+                logger.debug(
+                    f"Using fallback cost for {request.model}: ${actual_cost:.4f} (source: {source})"
+                )
 
             return ModelResponse(
                 content=content,
@@ -319,8 +323,8 @@ class OpenRouterClient(BaseClient):
                 metadata={
                     "openrouter_id": data.get("id"),
                     "finish_reason": choices[0].get("finish_reason"),
-                    "response_time": datetime.now(UTC)
-                }
+                    "response_time": datetime.now(UTC),
+                },
             )
 
         except Exception as e:
@@ -329,7 +333,7 @@ class OpenRouterClient(BaseClient):
                 f"Failed to parse response: {e}",
                 provider=self.provider_name,
                 model=request.model,
-                details={"error_type": type(e).__name__}
+                details={"error_type": type(e).__name__},
             ) from e
 
     def _parse_models_response(self, models_data: dict[str, Any]) -> list[ModelInfo]:
@@ -350,7 +354,9 @@ class OpenRouterClient(BaseClient):
 
                 # Extract capabilities
                 context_length = model_data.get("context_length")
-                max_tokens = model_data.get("top_provider", {}).get("max_completion_tokens")
+                max_tokens = model_data.get("top_provider", {}).get(
+                    "max_completion_tokens"
+                )
 
                 model_info = ModelInfo(
                     name=model_id,
@@ -359,13 +365,15 @@ class OpenRouterClient(BaseClient):
                     output_cost_per_1k=output_cost,
                     max_tokens=max_tokens,
                     context_window=context_length,
-                    description=model_data.get("description", "")
+                    description=model_data.get("description", ""),
                 )
 
                 models.append(model_info)
 
             except Exception as e:
-                logger.warning(f"Failed to parse model {model_data.get('id', 'unknown')}: {e}")
+                logger.warning(
+                    f"Failed to parse model {model_data.get('id', 'unknown')}: {e}"
+                )
                 continue
 
         return models
@@ -391,7 +399,7 @@ class OpenRouterClient(BaseClient):
                 output_cost_per_1k=pricing_info.output_cost_per_1k_tokens,
                 max_tokens=pricing_info.max_tokens,
                 context_window=pricing_info.max_tokens,
-                supports_function_calling=pricing_info.supports_function_calling
+                supports_function_calling=pricing_info.supports_function_calling,
             )
 
         # Ultimate fallback with conservative estimates
@@ -399,9 +407,8 @@ class OpenRouterClient(BaseClient):
             name=model_name,
             provider=self.provider_name,
             input_cost_per_1k=Decimal("0.01"),  # More conservative fallback
-            output_cost_per_1k=Decimal("0.02")
+            output_cost_per_1k=Decimal("0.02"),
         )
-
 
     def _estimate_input_tokens(self, request: ModelRequest) -> int:
         """Estimate input tokens for a request."""
@@ -419,6 +426,6 @@ class OpenRouterClient(BaseClient):
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Clean up HTTP client on exit."""
-        if hasattr(self, '_http_client'):
+        if hasattr(self, "_http_client"):
             await self._http_client.aclose()
         await super().__aexit__(exc_type, exc_val, exc_tb)

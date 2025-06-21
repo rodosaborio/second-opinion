@@ -86,7 +86,9 @@ class TestInputSanitizer:
 
     def test_prompt_length_limit(self):
         """Test prompt length limits."""
-        long_prompt = "What is the capital of France? " * 2000  # Create a long but safe prompt
+        long_prompt = (
+            "What is the capital of France? " * 2000
+        )  # Create a long but safe prompt
         with pytest.raises(ValidationError, match="exceeds maximum length"):
             self.sanitizer.sanitize_prompt(long_prompt)
 
@@ -120,11 +122,17 @@ class TestModelNameValidation:
         # Test cases with expected normalized results
         test_cases = [
             ("gpt-4", "gpt-4"),  # gpt-4 stays as-is
-            ("claude-3-sonnet", "anthropic/claude-3-5-sonnet"),  # claude-3-sonnet normalizes
-            ("anthropic/claude-3-5-sonnet", "anthropic/claude-3-5-sonnet"),  # already normalized
+            (
+                "claude-3-sonnet",
+                "anthropic/claude-3-5-sonnet",
+            ),  # claude-3-sonnet normalizes
+            (
+                "anthropic/claude-3-5-sonnet",
+                "anthropic/claude-3-5-sonnet",
+            ),  # already normalized
             ("openai/gpt-4o", "openai/gpt-4o"),  # already normalized
             ("meta-llama/llama-2-7b", "meta-llama/llama-2-7b"),  # already normalized
-            ("model_name_123", "model_name_123")  # no normalization needed
+            ("model_name_123", "model_name_123"),  # no normalization needed
         ]
 
         for name, expected in test_cases:
@@ -159,7 +167,7 @@ class TestModelNameValidation:
             "model$injection",
             "model name with spaces",
             "model@domain.com",
-            "model#fragment"
+            "model#fragment",
         ]
 
         for name in invalid_names:
@@ -185,7 +193,7 @@ class TestMetadataSanitization:
             "session": "session456",
             "cost": Decimal("0.05"),
             "tokens": 100,
-            "success": True
+            "success": True,
         }
 
         result = self.sanitizer.sanitize_metadata(metadata)
@@ -196,7 +204,7 @@ class TestMetadataSanitization:
         metadata = {
             "prompt": "  What is AI?  \n\n",
             "model": "gpt-4",
-            "context": "user query"
+            "context": "user query",
         }
 
         result = self.sanitizer.sanitize_metadata(metadata)
@@ -209,7 +217,7 @@ class TestMetadataSanitization:
         metadata = {
             "good_field": "safe value",
             "api_key": "sk-1234567890abcdef1234567890abcdef",
-            "another_field": "also safe"
+            "another_field": "also safe",
         }
 
         result = self.sanitizer.sanitize_metadata(metadata)
@@ -222,7 +230,7 @@ class TestMetadataSanitization:
         metadata = {
             "safe_field": "safe value",
             "malicious": "<script>alert('xss')</script>",
-            "sql_injection": "'; DROP TABLE users; --"
+            "sql_injection": "'; DROP TABLE users; --",
         }
 
         result = self.sanitizer.sanitize_metadata(metadata)
@@ -236,7 +244,7 @@ class TestMetadataSanitization:
             "  good_key  ": "value1",
             "bad<script>key": "value2",
             "": "value3",
-            "very_long_key_" + "x" * 100: "value4"
+            "very_long_key_" + "x" * 100: "value4",
         }
 
         result = self.sanitizer.sanitize_metadata(metadata)
@@ -259,13 +267,7 @@ class TestCostLimitValidation:
 
     def test_valid_cost_limits(self):
         """Test validation of valid cost limits."""
-        valid_limits = [
-            "0.05",
-            0.10,
-            Decimal("1.50"),
-            "10.00",
-            100.0000
-        ]
+        valid_limits = ["0.05", 0.10, Decimal("1.50"), "10.00", 100.0000]
 
         for limit in valid_limits:
             result = self.sanitizer.validate_cost_limit(limit)
@@ -292,13 +294,7 @@ class TestCostLimitValidation:
 
     def test_invalid_cost_format(self):
         """Test handling of invalid cost formats."""
-        invalid_costs = [
-            "not a number",
-            "1.2.3",
-            None,
-            [],
-            {}
-        ]
+        invalid_costs = ["not a number", "1.2.3", None, [], {}]
 
         for cost in invalid_costs:
             with pytest.raises(ValidationError, match="Invalid cost limit format"):
@@ -344,8 +340,12 @@ class TestSanitizerInternals:
 
     def test_contains_api_key_pattern(self):
         """Test API key pattern detection."""
-        assert self.sanitizer._contains_api_key_pattern("sk-1234567890abcdef1234567890abcdef")
-        assert self.sanitizer._contains_api_key_pattern("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")
+        assert self.sanitizer._contains_api_key_pattern(
+            "sk-1234567890abcdef1234567890abcdef"
+        )
+        assert self.sanitizer._contains_api_key_pattern(
+            "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        )
         assert not self.sanitizer._contains_api_key_pattern("regular text")
         assert not self.sanitizer._contains_api_key_pattern("short-key")
 
@@ -355,15 +355,27 @@ class TestSanitizerInternals:
 
         # Script tags should be detected in all contexts
         script_text = "<script>alert('test')</script>"
-        assert self.sanitizer._contains_injection_pattern(script_text, SecurityContext.USER_PROMPT)
-        assert self.sanitizer._contains_injection_pattern(script_text, SecurityContext.SYSTEM_PROMPT)
-        assert self.sanitizer._contains_injection_pattern(script_text, SecurityContext.CONFIGURATION)
+        assert self.sanitizer._contains_injection_pattern(
+            script_text, SecurityContext.USER_PROMPT
+        )
+        assert self.sanitizer._contains_injection_pattern(
+            script_text, SecurityContext.SYSTEM_PROMPT
+        )
+        assert self.sanitizer._contains_injection_pattern(
+            script_text, SecurityContext.CONFIGURATION
+        )
 
         # Backticks allowed in user prompts and system prompts for code snippets
         backtick_text = "`rm -rf /`"
-        assert not self.sanitizer._contains_injection_pattern(backtick_text, SecurityContext.USER_PROMPT)
-        assert not self.sanitizer._contains_injection_pattern(backtick_text, SecurityContext.SYSTEM_PROMPT)
-        assert self.sanitizer._contains_injection_pattern(backtick_text, SecurityContext.CONFIGURATION)
+        assert not self.sanitizer._contains_injection_pattern(
+            backtick_text, SecurityContext.USER_PROMPT
+        )
+        assert not self.sanitizer._contains_injection_pattern(
+            backtick_text, SecurityContext.SYSTEM_PROMPT
+        )
+        assert self.sanitizer._contains_injection_pattern(
+            backtick_text, SecurityContext.CONFIGURATION
+        )
 
     def test_normalize_whitespace_edge_cases(self):
         """Test whitespace normalization edge cases."""
@@ -384,10 +396,22 @@ class TestSanitizerInternals:
         """Test context-specific length limits."""
         from src.second_opinion.core.models import SecurityContext
 
-        assert self.sanitizer._get_max_length_for_context(SecurityContext.USER_PROMPT) == 50000
-        assert self.sanitizer._get_max_length_for_context(SecurityContext.SYSTEM_PROMPT) == 10000
-        assert self.sanitizer._get_max_length_for_context(SecurityContext.CONFIGURATION) == 1000
-        assert self.sanitizer._get_max_length_for_context(SecurityContext.API_REQUEST) == 50000
+        assert (
+            self.sanitizer._get_max_length_for_context(SecurityContext.USER_PROMPT)
+            == 50000
+        )
+        assert (
+            self.sanitizer._get_max_length_for_context(SecurityContext.SYSTEM_PROMPT)
+            == 10000
+        )
+        assert (
+            self.sanitizer._get_max_length_for_context(SecurityContext.CONFIGURATION)
+            == 1000
+        )
+        assert (
+            self.sanitizer._get_max_length_for_context(SecurityContext.API_REQUEST)
+            == 50000
+        )
 
     def test_sanitize_system_prompt_patterns(self):
         """Test system prompt specific sanitization."""
@@ -401,7 +425,9 @@ class TestSanitizerInternals:
 
     def test_sanitize_api_request_patterns(self):
         """Test API request specific sanitization."""
-        malicious_request = "Content-Type: application/json\nX-API-Key: secret\nWhat is AI?"
+        malicious_request = (
+            "Content-Type: application/json\nX-API-Key: secret\nWhat is AI?"
+        )
         result = self.sanitizer._sanitize_api_request(malicious_request)
 
         assert "Content-Type:" not in result
@@ -455,7 +481,7 @@ class TestSecurityScenarios:
         for attempt in serious_injection_attempts:
             with pytest.raises(SecurityError):
                 sanitize_prompt(attempt)
-        
+
         # Shell commands are now acceptable for code analysis
         acceptable_code_snippets = [
             "`curl http://example.com/api`",
@@ -463,7 +489,7 @@ class TestSecurityScenarios:
             "def square_root(num): return math.sqrt(num)",
             "#!/bin/bash\necho 'Hello World'",
         ]
-        
+
         for snippet in acceptable_code_snippets:
             # These should not raise exceptions
             try:
@@ -491,8 +517,8 @@ class TestSecurityScenarios:
         # These are legitimate Unicode characters that could be misused
         unicode_prompts = [
             "What is AI?\u202e\u0041\u0042\u0043",  # Right-to-left override
-            "Normal text\u0000hidden\u0000text",     # Null byte injection
-            "Text with\ufeffzero width space",       # Zero width no-break space
+            "Normal text\u0000hidden\u0000text",  # Null byte injection
+            "Text with\ufeffzero width space",  # Zero width no-break space
         ]
 
         for prompt in unicode_prompts:

@@ -31,7 +31,7 @@ def sample_response_primary():
         model="gpt-4o",
         usage=TokenUsage(input_tokens=100, output_tokens=150, total_tokens=250),
         cost_estimate=Decimal("0.01"),
-        provider="openai"
+        provider="openai",
     )
 
 
@@ -43,7 +43,7 @@ def sample_response_comparison():
         model="gpt-3.5-turbo",
         usage=TokenUsage(input_tokens=80, output_tokens=80, total_tokens=160),
         cost_estimate=Decimal("0.002"),
-        provider="openai"
+        provider="openai",
     )
 
 
@@ -54,7 +54,7 @@ def sample_evaluation_criteria():
         accuracy_weight=0.4,
         completeness_weight=0.3,
         clarity_weight=0.2,
-        usefulness_weight=0.1
+        usefulness_weight=0.1,
     )
 
 
@@ -87,7 +87,7 @@ class TestResponseEvaluator:
             "What is Python?",
             "Define machine learning",
             "List the benefits of exercise",
-            "When was Python created?"
+            "When was Python created?",
         ]
 
         for task in simple_tasks:
@@ -101,7 +101,7 @@ class TestResponseEvaluator:
             "Analyze the benefits and drawbacks of remote work",
             "Compare Python and JavaScript for web development",
             "Explain how neural networks work",
-            "Summarize the main points of this article"
+            "Summarize the main points of this article",
         ]
 
         for task in moderate_tasks:
@@ -115,7 +115,7 @@ class TestResponseEvaluator:
             "Design a distributed system for processing millions of transactions",
             "Evaluate the economic impact of artificial intelligence on employment",
             "Create a comprehensive marketing strategy for a new product",
-            "Solve this optimization problem with multiple constraints"
+            "Solve this optimization problem with multiple constraints",
         ]
 
         for task in complex_tasks:
@@ -129,7 +129,7 @@ class TestResponseEvaluator:
             "Derive a mathematical proof for this theorem",
             "Conduct advanced research on quantum computing applications",
             "Formulate a comprehensive theory of economic behavior",
-            "Develop sophisticated machine learning algorithms"
+            "Develop sophisticated machine learning algorithms",
         ]
 
         for task in expert_tasks:
@@ -150,7 +150,11 @@ class TestResponseEvaluator:
         # Short tasks should trend toward simple
         assert short_complexity in [TaskComplexity.SIMPLE, TaskComplexity.MODERATE]
         # Long tasks should trend toward complex
-        assert long_complexity in [TaskComplexity.MODERATE, TaskComplexity.COMPLEX, TaskComplexity.EXPERT]
+        assert long_complexity in [
+            TaskComplexity.MODERATE,
+            TaskComplexity.COMPLEX,
+            TaskComplexity.EXPERT,
+        ]
 
     @pytest.mark.asyncio
     @patch("second_opinion.core.evaluator.get_client_for_model")
@@ -162,7 +166,7 @@ class TestResponseEvaluator:
         evaluator,
         sample_response_primary,
         sample_response_comparison,
-        sample_evaluation_criteria
+        sample_evaluation_criteria,
     ):
         """Test basic response comparison."""
         # Mock the evaluator client
@@ -170,22 +174,22 @@ class TestResponseEvaluator:
         mock_client.estimate_cost.return_value = Decimal("0.01")
         mock_client.complete.return_value = MagicMock(
             content="Analysis: Response A wins in accuracy. Response B wins in clarity. Overall: Response A is better.",
-            cost_estimate=Decimal("0.01")
+            cost_estimate=Decimal("0.01"),
         )
         mock_get_client_for_model.return_value = mock_client
         mock_create_client_from_config.return_value = mock_client
-        
+
         # Mock the cost guard to avoid reservation issues
         evaluator.cost_guard.check_and_reserve_budget = AsyncMock()
         evaluator.cost_guard.record_actual_cost = AsyncMock()
-        
+
         original_task = "Explain the benefits of exercise"
 
         result = await evaluator.compare_responses(
             sample_response_primary,
             sample_response_comparison,
             original_task,
-            sample_evaluation_criteria
+            sample_evaluation_criteria,
         )
 
         assert isinstance(result, ComparisonResult)
@@ -209,7 +213,7 @@ class TestResponseEvaluator:
         mock_get_client_for_model,
         evaluator,
         sample_response_primary,
-        sample_response_comparison
+        sample_response_comparison,
     ):
         """Test response comparison with default criteria."""
         # Mock the evaluator client
@@ -217,21 +221,19 @@ class TestResponseEvaluator:
         mock_client.estimate_cost.return_value = Decimal("0.01")
         mock_client.complete.return_value = MagicMock(
             content="Analysis: Response A wins in accuracy. Response B wins in clarity. Overall: Response A is better.",
-            cost_estimate=Decimal("0.01")
+            cost_estimate=Decimal("0.01"),
         )
         mock_get_client_for_model.return_value = mock_client
         mock_create_client_from_config.return_value = mock_client
-        
+
         # Mock the cost guard to avoid reservation issues
         evaluator.cost_guard.check_and_reserve_budget = AsyncMock()
         evaluator.cost_guard.record_actual_cost = AsyncMock()
-        
+
         original_task = "What is machine learning?"
 
         result = await evaluator.compare_responses(
-            sample_response_primary,
-            sample_response_comparison,
-            original_task
+            sample_response_primary, sample_response_comparison, original_task
         )
 
         assert isinstance(result, ComparisonResult)
@@ -276,9 +278,7 @@ class TestResponseEvaluator:
         current_response = "Photosynthesis is the process by which plants convert sunlight into energy."
 
         result = await evaluator.recommend_model_tier(
-            task,
-            current_model,
-            current_response
+            task, current_model, current_response
         )
 
         assert isinstance(result, RecommendationResult)
@@ -292,33 +292,33 @@ class TestResponseEvaluator:
         max_cost_increase = Decimal("0.001")  # Very small increase
 
         result = await evaluator.recommend_model_tier(
-            task,
-            current_model,
-            max_cost_increase=max_cost_increase
+            task, current_model, max_cost_increase=max_cost_increase
         )
 
         assert isinstance(result, RecommendationResult)
         # Should consider cost constraints in recommendation
-        assert result.cost_impact <= max_cost_increase or result.recommended_action == RecommendationType.MAINTAIN
+        assert (
+            result.cost_impact <= max_cost_increase
+            or result.recommended_action == RecommendationType.MAINTAIN
+        )
 
     @pytest.mark.asyncio
     async def test_evaluate_cost_effectiveness_empty_list(self, evaluator):
         """Test cost-effectiveness evaluation with empty response list."""
-        result = await evaluator.evaluate_cost_effectiveness([], TaskComplexity.MODERATE)
+        result = await evaluator.evaluate_cost_effectiveness(
+            [], TaskComplexity.MODERATE
+        )
 
         assert "error" in result
         assert result["error"] == "No responses to evaluate"
 
     @pytest.mark.asyncio
     async def test_evaluate_cost_effectiveness_single_response(
-        self,
-        evaluator,
-        sample_response_primary
+        self, evaluator, sample_response_primary
     ):
         """Test cost-effectiveness evaluation with single response."""
         result = await evaluator.evaluate_cost_effectiveness(
-            [sample_response_primary],
-            TaskComplexity.MODERATE
+            [sample_response_primary], TaskComplexity.MODERATE
         )
 
         assert result["task_complexity"] == "moderate"
@@ -334,17 +334,13 @@ class TestResponseEvaluator:
 
     @pytest.mark.asyncio
     async def test_evaluate_cost_effectiveness_multiple_responses(
-        self,
-        evaluator,
-        sample_response_primary,
-        sample_response_comparison
+        self, evaluator, sample_response_primary, sample_response_comparison
     ):
         """Test cost-effectiveness evaluation with multiple responses."""
         responses = [sample_response_primary, sample_response_comparison]
 
         result = await evaluator.evaluate_cost_effectiveness(
-            responses,
-            TaskComplexity.COMPLEX
+            responses, TaskComplexity.COMPLEX
         )
 
         assert result["task_complexity"] == "complex"
@@ -362,7 +358,9 @@ class TestResponseEvaluator:
         task = "Explain machine learning"
         response = "Machine learning is a subset of artificial intelligence that enables computers to learn and improve from experience without being explicitly programmed."
 
-        quality = await evaluator._evaluate_response_quality(task, response, "gpt-4o-mini")
+        quality = await evaluator._evaluate_response_quality(
+            task, response, "gpt-4o-mini"
+        )
 
         assert 1.0 <= quality <= 10.0
 
@@ -372,7 +370,9 @@ class TestResponseEvaluator:
         task = "What is AI?"
         response = "AI is artificial intelligence."
 
-        quality = await evaluator._evaluate_response_quality(task, response, "gpt-4o-mini")
+        quality = await evaluator._evaluate_response_quality(
+            task, response, "gpt-4o-mini"
+        )
 
         # Short responses should get lower scores
         assert quality < 7.0
@@ -383,7 +383,9 @@ class TestResponseEvaluator:
         task = "Explain machine learning algorithms"
         response = "Machine learning algorithms are computational methods that allow systems to learn patterns from data. Common algorithms include neural networks, decision trees, and support vector machines."
 
-        quality = await evaluator._evaluate_response_quality(task, response, "gpt-4o-mini")
+        quality = await evaluator._evaluate_response_quality(
+            task, response, "gpt-4o-mini"
+        )
 
         # Relevant responses should get higher scores
         assert quality > 5.0
@@ -407,7 +409,6 @@ class TestResponseEvaluator:
         assert impact < 0  # Downgrade should cost less
 
 
-
 class TestGlobalEvaluator:
     def test_global_evaluator_singleton(self):
         """Test that global evaluator maintains singleton behavior."""
@@ -426,25 +427,35 @@ class TestGlobalEvaluator:
 
 
 class TestEvaluationCriteria:
-    def test_custom_criteria_weights(self, evaluator, sample_response_primary, sample_response_comparison):
+    def test_custom_criteria_weights(
+        self, evaluator, sample_response_primary, sample_response_comparison
+    ):
         """Test using custom evaluation criteria weights."""
         # Create criteria heavily weighted toward accuracy
         custom_criteria = EvaluationCriteria(
             accuracy_weight=0.7,
             completeness_weight=0.1,
             clarity_weight=0.1,
-            usefulness_weight=0.1
+            usefulness_weight=0.1,
         )
 
         # The comparison should work with custom criteria
         # (actual behavior depends on the simulation logic)
         assert custom_criteria.accuracy_weight == 0.7
-        assert abs(sum([
-            custom_criteria.accuracy_weight,
-            custom_criteria.completeness_weight,
-            custom_criteria.clarity_weight,
-            custom_criteria.usefulness_weight
-        ]) - 1.0) < 0.01
+        assert (
+            abs(
+                sum(
+                    [
+                        custom_criteria.accuracy_weight,
+                        custom_criteria.completeness_weight,
+                        custom_criteria.clarity_weight,
+                        custom_criteria.usefulness_weight,
+                    ]
+                )
+                - 1.0
+            )
+            < 0.01
+        )
 
 
 class TestEdgeCases:
@@ -459,7 +470,11 @@ class TestEdgeCases:
         """Test task complexity classification with very long task."""
         long_task = "This is a very long task description. " * 50
         complexity = await evaluator.classify_task_complexity(long_task)
-        assert complexity in [TaskComplexity.COMPLEX, TaskComplexity.EXPERT, TaskComplexity.MODERATE]
+        assert complexity in [
+            TaskComplexity.COMPLEX,
+            TaskComplexity.EXPERT,
+            TaskComplexity.MODERATE,
+        ]
 
     @pytest.mark.asyncio
     async def test_multiple_questions_complexity(self, evaluator):
@@ -468,7 +483,11 @@ class TestEdgeCases:
         complexity = await evaluator.classify_task_complexity(multi_question_task)
 
         # Multiple questions should trend toward higher complexity
-        assert complexity in [TaskComplexity.MODERATE, TaskComplexity.COMPLEX, TaskComplexity.EXPERT]
+        assert complexity in [
+            TaskComplexity.MODERATE,
+            TaskComplexity.COMPLEX,
+            TaskComplexity.EXPERT,
+        ]
 
     @pytest.mark.asyncio
     async def test_recommend_with_poor_quality_response(self, evaluator):
@@ -478,13 +497,14 @@ class TestEdgeCases:
         poor_response = "Umm, I don't know."
 
         result = await evaluator.recommend_model_tier(
-            task,
-            current_model,
-            poor_response
+            task, current_model, poor_response
         )
 
         # Should recommend upgrade due to poor quality
-        assert result.recommended_action in [RecommendationType.UPGRADE, RecommendationType.MAINTAIN]
+        assert result.recommended_action in [
+            RecommendationType.UPGRADE,
+            RecommendationType.MAINTAIN,
+        ]
 
 
 # Test cleanup

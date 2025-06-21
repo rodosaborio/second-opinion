@@ -39,7 +39,7 @@ class TestToolConfig:
             comparison_models=["model1", "model2"],
             max_tokens=1000,
             temperature=0.5,
-            cost_limit_per_request=Decimal("0.10")
+            cost_limit_per_request=Decimal("0.10"),
         )
 
         assert config.description == "Test tool"
@@ -53,7 +53,7 @@ class TestToolConfig:
         with pytest.raises(ValueError):
             ToolConfig(
                 description="Test tool",
-                comparison_models=[]  # Empty list should be rejected
+                comparison_models=[],  # Empty list should be rejected
             )
 
 
@@ -64,7 +64,7 @@ class TestModelTierConfig:
             budget=["model1", "model2"],
             mid_range=["model3", "model4"],
             premium=["model5"],
-            reasoning=["model6"]
+            reasoning=["model6"],
         )
 
         # Test getting models for tier
@@ -81,14 +81,8 @@ class TestCostEstimates:
     def test_cost_estimation(self):
         """Test cost estimation functionality."""
         estimates = CostEstimates(
-            input_token_costs={
-                "gpt-4": Decimal("0.03"),
-                "claude-3": Decimal("0.015")
-            },
-            output_token_costs={
-                "gpt-4": Decimal("0.06"),
-                "claude-3": Decimal("0.075")
-            }
+            input_token_costs={"gpt-4": Decimal("0.03"), "claude-3": Decimal("0.015")},
+            output_token_costs={"gpt-4": Decimal("0.06"), "claude-3": Decimal("0.075")},
         )
 
         # Test getting individual costs
@@ -101,7 +95,9 @@ class TestCostEstimates:
 
         # Test cost calculation
         cost = estimates.estimate_cost("gpt-4", 1000, 500)
-        expected = (Decimal("1000") / 1000 * Decimal("0.03")) + (Decimal("500") / 1000 * Decimal("0.06"))
+        expected = (Decimal("1000") / 1000 * Decimal("0.03")) + (
+            Decimal("500") / 1000 * Decimal("0.06")
+        )
         assert cost == expected
 
 
@@ -115,19 +111,19 @@ class TestModelProfilesConfig:
                     description="Get second opinion",
                     comparison_models=["gpt-4", "claude-3"],
                     max_tokens=1000,
-                    temperature=0.1
+                    temperature=0.1,
                 ),
                 "should_upgrade": ToolConfig(
                     description="Check if should upgrade",
                     upgrade_targets={"budget_to_mid": "gpt-4"},
-                    max_tokens=500
-                )
+                    max_tokens=500,
+                ),
             },
             model_tiers=ModelTierConfig(
                 budget=["gpt-3.5"],
                 mid_range=["gpt-4", "claude-3"],
-                premium=["gpt-4-turbo"]
-            )
+                premium=["gpt-4-turbo"],
+            ),
         )
 
     def test_get_tool_config(self, sample_config):
@@ -165,8 +161,7 @@ class TestModelProfilesConfig:
 
         # Add downgrade targets to config
         sample_config.tools["test_tool"] = ToolConfig(
-            description="Test",
-            downgrade_targets=["gpt-3.5", "claude-haiku"]
+            description="Test", downgrade_targets=["gpt-3.5", "claude-haiku"]
         )
         candidates = sample_config.get_downgrade_candidates("test_tool")
         assert candidates == ["gpt-3.5", "claude-haiku"]
@@ -183,36 +178,27 @@ class TestModelConfigManager:
     def sample_yaml_config(self):
         """Sample YAML configuration."""
         return {
-            'version': '1.0',
-            'tools': {
-                'second_opinion': {
-                    'description': 'Get alternative perspective',
-                    'comparison_models': ['gpt-4', 'claude-3'],
-                    'max_tokens': 1000,
-                    'temperature': 0.1,
-                    'cost_limit_per_request': '0.10'
+            "version": "1.0",
+            "tools": {
+                "second_opinion": {
+                    "description": "Get alternative perspective",
+                    "comparison_models": ["gpt-4", "claude-3"],
+                    "max_tokens": 1000,
+                    "temperature": 0.1,
+                    "cost_limit_per_request": "0.10",
                 }
             },
-            'model_tiers': {
-                'budget': ['gpt-3.5'],
-                'mid_range': ['gpt-4', 'claude-3']
+            "model_tiers": {"budget": ["gpt-3.5"], "mid_range": ["gpt-4", "claude-3"]},
+            "cost_estimates": {
+                "input_token_costs": {"gpt-4": "0.03", "claude-3": "0.015"},
+                "output_token_costs": {"gpt-4": "0.06", "claude-3": "0.075"},
             },
-            'cost_estimates': {
-                'input_token_costs': {
-                    'gpt-4': '0.03',
-                    'claude-3': '0.015'
-                },
-                'output_token_costs': {
-                    'gpt-4': '0.06',
-                    'claude-3': '0.075'
-                }
-            }
         }
 
     def test_load_config_from_file(self, temp_config_dir, sample_yaml_config):
         """Test loading configuration from YAML file."""
         config_file = temp_config_dir / "model_config.yaml"
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(sample_yaml_config, f)
 
         manager = ModelConfigManager()
@@ -234,7 +220,7 @@ class TestModelConfigManager:
     def test_get_model_config(self, temp_config_dir, sample_yaml_config):
         """Test getting model configuration for a tool."""
         config_file = temp_config_dir / "model_config.yaml"
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(sample_yaml_config, f)
 
         manager = ModelConfigManager()
@@ -242,20 +228,20 @@ class TestModelConfigManager:
 
         # Get config for existing tool
         config = manager.get_model_config("second_opinion", "claude-3")
-        assert config['description'] == "Get alternative perspective"
-        assert config['max_tokens'] == 1000
-        assert "gpt-4" in config['comparison_models']  # claude-3 should be excluded
-        assert "claude-3" not in config['comparison_models']
+        assert config["description"] == "Get alternative perspective"
+        assert config["max_tokens"] == 1000
+        assert "gpt-4" in config["comparison_models"]  # claude-3 should be excluded
+        assert "claude-3" not in config["comparison_models"]
 
         # Get config for non-existent tool (should return defaults)
         config = manager.get_model_config("nonexistent")
-        assert config['max_tokens'] == 500  # Default value
-        assert config['comparison_models'] == []
+        assert config["max_tokens"] == 500  # Default value
+        assert config["comparison_models"] == []
 
     def test_model_tier_operations(self, temp_config_dir, sample_yaml_config):
         """Test model tier operations."""
         config_file = temp_config_dir / "model_config.yaml"
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(sample_yaml_config, f)
 
         manager = ModelConfigManager()
@@ -273,7 +259,7 @@ class TestModelConfigManager:
     def test_cost_estimation(self, temp_config_dir, sample_yaml_config):
         """Test cost estimation functionality."""
         config_file = temp_config_dir / "model_config.yaml"
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             yaml.dump(sample_yaml_config, f)
 
         manager = ModelConfigManager()
@@ -281,7 +267,9 @@ class TestModelConfigManager:
 
         # Test cost estimation
         cost = manager.estimate_cost("gpt-4", 1000, 500)
-        expected = (Decimal("1000") / 1000 * Decimal("0.03")) + (Decimal("500") / 1000 * Decimal("0.06"))
+        expected = (Decimal("1000") / 1000 * Decimal("0.03")) + (
+            Decimal("500") / 1000 * Decimal("0.06")
+        )
         assert cost == expected
 
         # Test unknown model (should return conservative default)
@@ -298,7 +286,7 @@ class TestModelConfigManager:
             tier=ModelTier.MID_RANGE,
             max_context=8000,
             supports_system_messages=True,
-            supports_temperature=False
+            supports_temperature=False,
         )
 
         manager.register_model_capability(capability)
@@ -312,7 +300,9 @@ class TestModelConfigManager:
         # Test feature support checking
         assert manager.is_model_supported("test-model", "system_messages") is True
         assert manager.is_model_supported("test-model", "temperature") is False
-        assert manager.is_model_supported("unknown-model", "anything") is True  # Assume supported
+        assert (
+            manager.is_model_supported("unknown-model", "anything") is True
+        )  # Assume supported
 
     def test_model_request_validation(self):
         """Test model request validation against capabilities."""
@@ -323,7 +313,7 @@ class TestModelConfigManager:
             provider="test",
             tier=ModelTier.BUDGET,
             max_output=1000,
-            supports_system_messages=False
+            supports_system_messages=False,
         )
 
         manager.register_model_capability(capability)
@@ -336,7 +326,9 @@ class TestModelConfigManager:
         warnings = manager.validate_model_request("limited-model", 2000, True)
         assert len(warnings) == 2
         assert any("exceeds model limit" in warning for warning in warnings)
-        assert any("does not support system messages" in warning for warning in warnings)
+        assert any(
+            "does not support system messages" in warning for warning in warnings
+        )
 
 
 @pytest.mark.security
@@ -358,7 +350,7 @@ class TestModelConfigSecurity:
         """
 
         config_file = temp_config_dir / "malicious.yaml"
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             f.write(malicious_config)
 
         manager = ModelConfigManager()
@@ -370,7 +362,7 @@ class TestModelConfigSecurity:
         """Test that cost limits are properly enforced."""
         config = ToolConfig(
             description="Test",
-            cost_limit_per_request=Decimal("1000.00")  # Suspiciously high
+            cost_limit_per_request=Decimal("1000.00"),  # Suspiciously high
         )
 
         # Configuration should accept but application should validate
@@ -381,7 +373,7 @@ class TestModelConfigSecurity:
         capability = ModelCapabilities(
             model="../../etc/passwd",  # Path traversal attempt
             provider="test",
-            tier=ModelTier.BUDGET
+            tier=ModelTier.BUDGET,
         )
 
         # Should not raise error - validation happens at application level
@@ -395,7 +387,7 @@ class TestGlobalModelConfig:
         """Test the get_model_config convenience function."""
         config = get_model_config("second_opinion")
         assert isinstance(config, dict)
-        assert 'max_tokens' in config
+        assert "max_tokens" in config
 
     def test_estimate_request_cost_function(self):
         """Test the estimate_request_cost convenience function."""

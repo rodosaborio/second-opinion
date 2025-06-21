@@ -27,32 +27,38 @@ logging.getLogger("second_opinion").setLevel(logging.WARNING)
 def isolated_environment(tmp_path):
     """
     Isolate environment variables for each test to prevent test pollution.
-    
+
     This ensures that configuration tests don't inherit environment variables
     from the host system, .env files, or other tests.
     """
     import os
-    
+
     # Store original environment variables that could affect settings
     sensitive_env_vars = [
-        "LOG_LEVEL", "ENVIRONMENT", "APP_NAME", 
-        "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "LMSTUDIO_BASE_URL",
-        "DATABASE_ENCRYPTION_KEY", "COST_LIMIT_DAILY", "COST_LIMIT_MONTHLY"
+        "LOG_LEVEL",
+        "ENVIRONMENT",
+        "APP_NAME",
+        "OPENROUTER_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "LMSTUDIO_BASE_URL",
+        "DATABASE_ENCRYPTION_KEY",
+        "COST_LIMIT_DAILY",
+        "COST_LIMIT_MONTHLY",
     ]
-    
+
     original_env = {}
     for var in sensitive_env_vars:
         original_env[var] = os.environ.get(var)
         # Remove from environment to test defaults
         if var in os.environ:
             del os.environ[var]
-    
+
     # Change working directory to temp path to avoid loading .env files
     original_cwd = os.getcwd()
     os.chdir(tmp_path)
-    
+
     yield
-    
+
     # Restore original environment and working directory
     os.chdir(original_cwd)
     for var, original_value in original_env.items():
@@ -66,7 +72,7 @@ def isolated_environment(tmp_path):
 def reset_global_state():
     """
     Reset all global state between tests to ensure isolation.
-    
+
     This fixture automatically runs before and after each test to:
     - Reset configuration manager
     - Reset pricing manager
@@ -87,7 +93,7 @@ def reset_global_state():
 def ensure_async_cleanup():
     """
     Ensure proper cleanup of async resources.
-    
+
     This helps prevent hanging tests by ensuring all async resources
     are properly closed and event loops are cleaned up.
     """
@@ -114,7 +120,7 @@ def ensure_async_cleanup():
 def isolated_temp_dir(tmp_path):
     """
     Provide isolated temporary directory for each test.
-    
+
     Sets up a clean temporary directory and updates environment
     variables to use it for data storage.
     """
@@ -149,7 +155,7 @@ def isolated_temp_dir(tmp_path):
 def mock_http_client():
     """
     Provide a mock HTTP client for testing.
-    
+
     This prevents tests from making real network calls and
     ensures consistent, fast test execution.
     """
@@ -160,17 +166,8 @@ def mock_http_client():
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "id": "test-response",
-        "choices": [
-            {
-                "message": {"content": "Test response"},
-                "finish_reason": "stop"
-            }
-        ],
-        "usage": {
-            "prompt_tokens": 10,
-            "completion_tokens": 5,
-            "total_tokens": 15
-        }
+        "choices": [{"message": {"content": "Test response"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
     }
     mock_response.raise_for_status.return_value = None
 
@@ -186,14 +183,15 @@ def mock_http_client():
 def mock_asyncio_sleep():
     """
     Mock asyncio.sleep to prevent actual delays during testing.
-    
+
     This prevents retry logic from causing real delays that slow down tests
     and can cause timeouts in CI environments.
     """
     from unittest.mock import patch
 
     # Mock asyncio.sleep to return immediately
-    with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+
         async def instant_sleep(delay):
             # Log the intended delay for debugging but return immediately
             pass
@@ -206,7 +204,7 @@ def mock_asyncio_sleep():
 def limit_retries_in_tests(request):
     """
     Limit the number of retries during testing to prevent infinite loops.
-    
+
     This patches the retry_with_backoff method to use minimal retries during testing,
     but skips the patch for tests that are specifically testing retry logic.
     """
@@ -219,7 +217,10 @@ def limit_retries_in_tests(request):
         return
 
     # Patch retry_with_backoff to have test-friendly behavior for integration tests
-    with patch('src.second_opinion.clients.base.BaseClient.retry_with_backoff') as mock_retry:
+    with patch(
+        "src.second_opinion.clients.base.BaseClient.retry_with_backoff"
+    ) as mock_retry:
+
         async def test_retry_with_backoff(operation, *args, **kwargs):
             """Test-friendly retry with minimal attempts."""
             last_exception = None
@@ -258,7 +259,7 @@ def limit_retries_in_tests(request):
 def test_settings():
     """
     Provide test-specific settings configuration.
-    
+
     Creates a settings instance with safe test defaults that
     won't interfere with production configurations.
     """
@@ -300,7 +301,7 @@ def test_settings():
 def mock_pricing_manager():
     """
     Provide a mock pricing manager for testing.
-    
+
     This prevents tests from making network calls to fetch pricing
     data and provides predictable cost estimates.
     """
@@ -322,22 +323,22 @@ def mock_pricing_manager():
             input_cost_per_1k_tokens=Decimal("0.0015"),
             output_cost_per_1k_tokens=Decimal("0.002"),
             max_tokens=4096,
-            provider="openai"
+            provider="openai",
         ),
         "gpt-4": ModelPricingInfo(
             model_name="gpt-4",
             input_cost_per_1k_tokens=Decimal("0.03"),
             output_cost_per_1k_tokens=Decimal("0.06"),
             max_tokens=8192,
-            provider="openai"
+            provider="openai",
         ),
         "claude-3-haiku": ModelPricingInfo(
             model_name="claude-3-haiku",
             input_cost_per_1k_tokens=Decimal("0.00025"),
             output_cost_per_1k_tokens=Decimal("0.00125"),
             max_tokens=200000,
-            provider="anthropic"
-        )
+            provider="anthropic",
+        ),
     }
 
     def mock_get_model_pricing(model_name: str):
@@ -346,8 +347,12 @@ def mock_pricing_manager():
     def mock_estimate_cost(model_name: str, input_tokens: int, output_tokens: int = 0):
         pricing = test_pricing.get(model_name)
         if pricing:
-            input_cost = (Decimal(input_tokens) * pricing.input_cost_per_1k_tokens) / 1000
-            output_cost = (Decimal(output_tokens) * pricing.output_cost_per_1k_tokens) / 1000
+            input_cost = (
+                Decimal(input_tokens) * pricing.input_cost_per_1k_tokens
+            ) / 1000
+            output_cost = (
+                Decimal(output_tokens) * pricing.output_cost_per_1k_tokens
+            ) / 1000
             return input_cost + output_cost, "mock_pricing"
         return Decimal("0.05"), "mock_fallback"
 
@@ -357,7 +362,7 @@ def mock_pricing_manager():
         "status": "loaded",
         "models": len(test_pricing),
         "source": "mock",
-        "is_expired": False
+        "is_expired": False,
     }
 
     # Set as global manager
@@ -373,7 +378,7 @@ def mock_pricing_manager():
 def clean_cost_guard():
     """
     Provide a clean cost guard instance for testing.
-    
+
     Creates a new cost guard with test-friendly limits and
     ensures it's reset between tests.
     """
@@ -388,7 +393,7 @@ def clean_cost_guard():
         weekly_limit=Decimal("500.00"),
         monthly_limit=Decimal("1000.00"),
         warning_threshold=0.8,
-        reservation_timeout=300
+        reservation_timeout=300,
     )
 
     set_cost_guard(test_guard)
@@ -405,6 +410,7 @@ def _reset_all_global_state():
     # Reset configuration manager
     try:
         from src.second_opinion.config.settings import config_manager
+
         config_manager.reset()
     except ImportError:
         pass
@@ -412,6 +418,7 @@ def _reset_all_global_state():
     # Reset pricing manager
     try:
         from src.second_opinion.utils.pricing import set_pricing_manager
+
         set_pricing_manager(None)
     except ImportError:
         pass
@@ -419,6 +426,7 @@ def _reset_all_global_state():
     # Reset cost guard
     try:
         from src.second_opinion.utils.cost_tracking import set_cost_guard
+
         set_cost_guard(None)
     except ImportError:
         pass
@@ -433,6 +441,7 @@ def _clear_module_caches():
     # Clear any function caches
     try:
         import functools
+
         # Clear lru_cache instances if any exist
         # This is a generic approach - specific caches can be added as needed
     except ImportError:
@@ -440,14 +449,15 @@ def _clear_module_caches():
 
     # Clear any global variables that might cache instances
     import sys
+
     for module_name, module in sys.modules.items():
-        if module_name.startswith('src.second_opinion'):
+        if module_name.startswith("src.second_opinion"):
             # Look for common global cache patterns
-            if hasattr(module, '_cache'):
-                if hasattr(module._cache, 'clear'):
+            if hasattr(module, "_cache"):
+                if hasattr(module._cache, "clear"):
                     module._cache.clear()
-            if hasattr(module, '_instances'):
-                if hasattr(module._instances, 'clear'):
+            if hasattr(module, "_instances"):
+                if hasattr(module._instances, "clear"):
                     module._instances.clear()
 
 
@@ -466,9 +476,7 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
     config.addinivalue_line(
         "markers", "security: marks tests as security-focused tests"
     )
@@ -505,6 +513,7 @@ def pytest_runtest_teardown(item, nextitem):
     # State reset is handled by the reset_global_state fixture
     # Force garbage collection to help with resource cleanup
     import gc
+
     gc.collect()
 
 

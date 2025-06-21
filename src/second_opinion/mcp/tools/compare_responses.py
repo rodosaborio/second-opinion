@@ -114,7 +114,9 @@ async def compare_responses_tool(
                 model_a = validate_model_name(model_a)
             except Exception as e:
                 suggestions = get_model_name_suggestions(model_a, "general")
-                suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                suggestion_text = (
+                    f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                )
                 return f"❌ **Invalid Model A**: {str(e)}{suggestion_text}"
 
         if model_b:
@@ -122,7 +124,9 @@ async def compare_responses_tool(
                 model_b = validate_model_name(model_b)
             except Exception as e:
                 suggestions = get_model_name_suggestions(model_b, "general")
-                suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                suggestion_text = (
+                    f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                )
                 return f"❌ **Invalid Model B**: {str(e)}{suggestion_text}"
 
         # Validate cost limit
@@ -136,8 +140,10 @@ async def compare_responses_tool(
             except Exception:
                 cost_limit_decimal = Decimal("0.25")
 
-        logger.info(f"Starting compare_responses tool: response_a length={len(clean_response_a)}, "
-                   f"response_b length={len(clean_response_b)}, task length={len(clean_task)}")
+        logger.info(
+            f"Starting compare_responses tool: response_a length={len(clean_response_a)}, "
+            f"response_b length={len(clean_response_b)}, task length={len(clean_task)}"
+        )
         logger.info(f"Model A: {model_a}, Model B: {model_b}")
         logger.info(f"Cost limit: ${cost_limit_decimal:.2f}")
 
@@ -175,7 +181,7 @@ async def compare_responses_tool(
                 messages=[Message(role="user", content="comparison evaluation task")],
                 max_tokens=500,  # Small evaluation request
                 temperature=0.1,
-                system_prompt=""
+                system_prompt="",
             )
             eval_cost = await eval_client.estimate_cost(eval_request)
             estimated_cost += eval_cost  # Only one evaluation needed
@@ -186,17 +192,26 @@ async def compare_responses_tool(
 
         # Check budget
         try:
-            primary_model_for_budget = model_a if model_a != "unknown/model-a" else "comparison-analysis"
+            primary_model_for_budget = (
+                model_a if model_a != "unknown/model-a" else "comparison-analysis"
+            )
             budget_check = await cost_guard.check_and_reserve_budget(
-                estimated_cost, "compare_responses", primary_model_for_budget, per_request_override=cost_limit_decimal
+                estimated_cost,
+                "compare_responses",
+                primary_model_for_budget,
+                per_request_override=cost_limit_decimal,
             )
             reservation_id = budget_check.reservation_id
         except Exception as e:
             return f"❌ **Budget Error**: {str(e)}\n\nEstimated cost: ${estimated_cost:.4f}\nCost limit: ${cost_limit_decimal:.2f}"
 
         # Get cost estimates for both models (for cost analysis reporting)
-        model_a_cost_estimate = await _estimate_model_cost(model_a, clean_task, len(clean_response_a.split()))
-        model_b_cost_estimate = await _estimate_model_cost(model_b, clean_task, len(clean_response_b.split()))
+        model_a_cost_estimate = await _estimate_model_cost(
+            model_a, clean_task, len(clean_response_a.split())
+        )
+        model_b_cost_estimate = await _estimate_model_cost(
+            model_b, clean_task, len(clean_response_b.split())
+        )
 
         # Create ModelResponse objects for both responses
 
@@ -204,14 +219,14 @@ async def compare_responses_tool(
             content=clean_response_a,
             model=model_a,
             task=clean_task,
-            cost_estimate=model_a_cost_estimate
+            cost_estimate=model_a_cost_estimate,
         )
 
         model_b_response = _create_model_response(
             content=clean_response_b,
             model=model_b,
             task=clean_task,
-            cost_estimate=model_b_cost_estimate
+            cost_estimate=model_b_cost_estimate,
         )
 
         # Perform detailed comparison evaluation
@@ -220,13 +235,15 @@ async def compare_responses_tool(
         try:
             logger.info("Performing detailed comparison evaluation")
             evaluation_criteria = EvaluationCriteria(
-                accuracy_weight=0.3,      # Balanced weights for comprehensive comparison
+                accuracy_weight=0.3,  # Balanced weights for comprehensive comparison
                 completeness_weight=0.25,
                 clarity_weight=0.25,
-                usefulness_weight=0.2
+                usefulness_weight=0.2,
             )
 
-            evaluator_model = "openai/gpt-4o-mini"  # Use cost-effective model for evaluation
+            evaluator_model = (
+                "openai/gpt-4o-mini"  # Use cost-effective model for evaluation
+            )
 
             # Compare Response A vs Response B
             comparison_result = await evaluator.compare_responses(
@@ -234,20 +251,22 @@ async def compare_responses_tool(
                 model_b_response,  # Response B as comparison
                 original_task=clean_task,
                 criteria=evaluation_criteria,
-                evaluator_model=evaluator_model
+                evaluator_model=evaluator_model,
             )
 
             # Convert ComparisonResult to analysis format
             analysis_result = {
-                'winner': comparison_result.winner,
-                'overall_score': comparison_result.overall_score,
-                'reasoning': comparison_result.reasoning,
-                'criteria_scores': {
-                    'accuracy': getattr(comparison_result, 'accuracy_score', None),
-                    'completeness': getattr(comparison_result, 'completeness_score', None),
-                    'clarity': getattr(comparison_result, 'clarity_score', None),
-                    'usefulness': getattr(comparison_result, 'usefulness_score', None)
-                }
+                "winner": comparison_result.winner,
+                "overall_score": comparison_result.overall_score,
+                "reasoning": comparison_result.reasoning,
+                "criteria_scores": {
+                    "accuracy": getattr(comparison_result, "accuracy_score", None),
+                    "completeness": getattr(
+                        comparison_result, "completeness_score", None
+                    ),
+                    "clarity": getattr(comparison_result, "clarity_score", None),
+                    "usefulness": getattr(comparison_result, "usefulness_score", None),
+                },
             }
 
             actual_cost += Decimal("0.01")  # Small evaluation cost
@@ -257,19 +276,21 @@ async def compare_responses_tool(
             logger.error(f"Evaluation system failed: {e}")
             # Create fallback analysis
             analysis_result = {
-                'winner': 'tie',
-                'overall_score': 5.0,
-                'reasoning': f'Evaluation unavailable due to system error: {str(e)}. Manual comparison recommended.',
-                'criteria_scores': {
-                    'accuracy': None,
-                    'completeness': None,
-                    'clarity': None,
-                    'usefulness': None
-                }
+                "winner": "tie",
+                "overall_score": 5.0,
+                "reasoning": f"Evaluation unavailable due to system error: {str(e)}. Manual comparison recommended.",
+                "criteria_scores": {
+                    "accuracy": None,
+                    "completeness": None,
+                    "clarity": None,
+                    "usefulness": None,
+                },
             }
 
         # Record actual cost
-        await cost_guard.record_actual_cost(reservation_id, actual_cost, primary_model_for_budget, "compare_responses")
+        await cost_guard.record_actual_cost(
+            reservation_id, actual_cost, primary_model_for_budget, "compare_responses"
+        )
         logger.info(f"Total operation cost: ${actual_cost:.4f}")
 
         # Generate detailed comparison report
@@ -284,7 +305,7 @@ async def compare_responses_tool(
             analysis_result=analysis_result,
             task_complexity=task_complexity,
             actual_cost=actual_cost,
-            cost_limit=cost_limit_decimal
+            cost_limit=cost_limit_decimal,
         )
 
     except Exception as e:
@@ -292,7 +313,9 @@ async def compare_responses_tool(
         return f"❌ **Unexpected Error**: {str(e)}\n\nPlease check the logs for more details and try again with simpler parameters."
 
 
-async def _estimate_model_cost(model: str, task: str, response_length_words: int) -> Decimal:
+async def _estimate_model_cost(
+    model: str, task: str, response_length_words: int
+) -> Decimal:
     """Estimate the cost for a model to generate a response of given length."""
     if model.startswith("unknown/"):
         return Decimal("0.0")  # Can't estimate cost for unknown models
@@ -305,7 +328,7 @@ async def _estimate_model_cost(model: str, task: str, response_length_words: int
             messages=[Message(role="user", content=task)],
             max_tokens=response_length_words * 2,  # Rough estimate
             temperature=0.1,
-            system_prompt=""
+            system_prompt="",
         )
         return await client.estimate_cost(request)
     except Exception as e:
@@ -333,7 +356,9 @@ def _create_model_response(content: str, model: str, task: str, cost_estimate: D
     estimated_output_tokens = int(len(content.split()) * 1.3)
     total_tokens = estimated_input_tokens + estimated_output_tokens
 
-    provider = detect_model_provider(model) if not model.startswith("unknown/") else "unknown"
+    provider = (
+        detect_model_provider(model) if not model.startswith("unknown/") else "unknown"
+    )
 
     return ModelResponse(
         content=content,
@@ -341,10 +366,10 @@ def _create_model_response(content: str, model: str, task: str, cost_estimate: D
         usage=TokenUsage(
             input_tokens=estimated_input_tokens,
             output_tokens=estimated_output_tokens,
-            total_tokens=total_tokens
+            total_tokens=total_tokens,
         ),
         cost_estimate=cost_estimate,
-        provider=provider
+        provider=provider,
     )
 
 
@@ -359,7 +384,7 @@ async def _format_comparison_report(
     analysis_result: dict[str, Any],
     task_complexity: TaskComplexity,
     actual_cost: Decimal,
-    cost_limit: Decimal
+    cost_limit: Decimal,
 ) -> str:
     """Format the detailed comparison report for MCP client display."""
 
@@ -378,16 +403,16 @@ async def _format_comparison_report(
     report.append("")
 
     # Overall winner and score
-    winner = analysis_result.get('winner', 'tie')
-    overall_score = analysis_result.get('overall_score', 5.0)
-    reasoning = analysis_result.get('reasoning', 'No detailed analysis available')
+    winner = analysis_result.get("winner", "tie")
+    overall_score = analysis_result.get("overall_score", 5.0)
+    reasoning = analysis_result.get("reasoning", "No detailed analysis available")
 
     report.append("## 🏆 Overall Winner")
 
-    if winner == 'primary':
+    if winner == "primary":
         report.append(f"**🥇 Model A ({model_a}) WINS**")
         report.append(f"**Quality Score**: {overall_score:.1f}/10")
-    elif winner == 'comparison':
+    elif winner == "comparison":
         report.append(f"**🥇 Model B ({model_b}) WINS**")
         report.append(f"**Quality Score**: {overall_score:.1f}/10")
     else:
@@ -399,15 +424,15 @@ async def _format_comparison_report(
     report.append("")
 
     # Detailed criteria breakdown
-    criteria_scores = analysis_result.get('criteria_scores', {})
+    criteria_scores = analysis_result.get("criteria_scores", {})
     if any(score is not None for score in criteria_scores.values()):
         report.append("## 📊 Quality Criteria Breakdown")
 
         criteria_names = {
-            'accuracy': 'Accuracy & Correctness',
-            'completeness': 'Completeness & Coverage',
-            'clarity': 'Clarity & Readability',
-            'usefulness': 'Usefulness & Practicality'
+            "accuracy": "Accuracy & Correctness",
+            "completeness": "Completeness & Coverage",
+            "clarity": "Clarity & Readability",
+            "usefulness": "Usefulness & Practicality",
         }
 
         for criterion, score in criteria_scores.items():
@@ -424,35 +449,55 @@ async def _format_comparison_report(
     report.append(f"### Response A: {model_a}")
     report.append("")
     clean_response_a = filter_think_tags(response_a)
-    report.append(clean_response_a[:1000] + ("..." if len(clean_response_a) > 1000 else ""))
+    report.append(
+        clean_response_a[:1000] + ("..." if len(clean_response_a) > 1000 else "")
+    )
     report.append("")
 
     # Response B
     report.append(f"### Response B: {model_b}")
     report.append("")
     clean_response_b = filter_think_tags(response_b)
-    report.append(clean_response_b[:1000] + ("..." if len(clean_response_b) > 1000 else ""))
+    report.append(
+        clean_response_b[:1000] + ("..." if len(clean_response_b) > 1000 else "")
+    )
     report.append("")
 
     # Cost and model tier analysis
     report.append("## 💰 Cost & Model Analysis")
 
-    tier_a = get_model_tier(model_a) if not model_a.startswith("unknown/") else "unknown"
-    tier_b = get_model_tier(model_b) if not model_b.startswith("unknown/") else "unknown"
+    tier_a = (
+        get_model_tier(model_a) if not model_a.startswith("unknown/") else "unknown"
+    )
+    tier_b = (
+        get_model_tier(model_b) if not model_b.startswith("unknown/") else "unknown"
+    )
 
-    report.append(f"**Model A**: {model_a} ({tier_a.title()} Tier) - ${model_a_cost:.4f}")
-    report.append(f"**Model B**: {model_b} ({tier_b.title()} Tier) - ${model_b_cost:.4f}")
+    report.append(
+        f"**Model A**: {model_a} ({tier_a.title()} Tier) - ${model_a_cost:.4f}"
+    )
+    report.append(
+        f"**Model B**: {model_b} ({tier_b.title()} Tier) - ${model_b_cost:.4f}"
+    )
 
     # Cost difference analysis
     if model_a_cost > 0 or model_b_cost > 0:
         cost_diff = abs(model_b_cost - model_a_cost)
         if cost_diff > Decimal("0.001"):  # Meaningful difference
             if model_a_cost > model_b_cost:
-                savings_pct = (cost_diff / model_a_cost * 100) if model_a_cost > 0 else 0
-                report.append(f"**Cost Difference**: Model B saves ${cost_diff:.4f} ({savings_pct:.0f}% cheaper)")
+                savings_pct = (
+                    (cost_diff / model_a_cost * 100) if model_a_cost > 0 else 0
+                )
+                report.append(
+                    f"**Cost Difference**: Model B saves ${cost_diff:.4f} ({savings_pct:.0f}% cheaper)"
+                )
             else:
-                increase_pct = (cost_diff / model_b_cost * 100) if model_b_cost > 0 else 0
-                report.append(f"**Cost Difference**: Model A saves ${cost_diff:.4f} ({increase_pct:.0f}% cheaper)")
+                increase_pct = (
+                    (cost_diff / model_b_cost * 100) if model_b_cost > 0 else 0
+                )
+                report.append(
+                    f"**Cost Difference**: Model A saves ${cost_diff:.4f} ({increase_pct:.0f}% cheaper)"
+                )
         else:
             report.append("**Cost Difference**: Similar cost (< $0.001 difference)")
 
@@ -463,9 +508,9 @@ async def _format_comparison_report(
     report.append("## 🎯 Actionable Recommendations")
 
     # Determine best recommendation based on winner, cost, and tiers
-    if winner == 'primary':
+    if winner == "primary":
         winning_model = model_a
-    elif winner == 'comparison':
+    elif winner == "comparison":
         winning_model = model_b
     else:
         # For ties, recommend based on cost efficiency
@@ -503,14 +548,22 @@ async def _format_comparison_report(
         report.append("**Strategic Considerations:**")
         if any(tier in ["local"] for tier in [tier_a, tier_b]):
             local_model = model_a if tier_a == "local" else model_b
-            report.append(f"- **{local_model}** offers zero marginal cost for high-volume use")
+            report.append(
+                f"- **{local_model}** offers zero marginal cost for high-volume use"
+            )
         if any(tier in ["premium"] for tier in [tier_a, tier_b]):
             premium_model = model_a if tier_a == "premium" else model_b
-            report.append(f"- **{premium_model}** provides premium quality for critical tasks")
-        report.append("- **Consider task-based model selection** (budget for drafts, premium for finals)")
+            report.append(
+                f"- **{premium_model}** provides premium quality for critical tasks"
+            )
+        report.append(
+            "- **Consider task-based model selection** (budget for drafts, premium for finals)"
+        )
 
     report.append("")
     report.append("---")
-    report.append("*Response comparison complete - Choose wisely based on your priorities! ⚖️*")
+    report.append(
+        "*Response comparison complete - Choose wisely based on your priorities! ⚖️*"
+    )
 
     return "\n".join(report)
