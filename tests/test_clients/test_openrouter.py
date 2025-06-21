@@ -425,7 +425,7 @@ class TestOpenRouterClientSecurity:
             messages=[Message(role="user", content="Hello")]
         )
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(SecurityError):
             await client.complete(malicious_request)
 
     @pytest.mark.security

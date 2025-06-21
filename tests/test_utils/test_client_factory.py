@@ -116,7 +116,7 @@ class TestClientFactory:
 
         assert isinstance(client, LMStudioClient)
         assert client.provider_name == "lmstudio"
-        assert client.base_url == "http://localhost:1234"
+        assert client.base_url == "http://localhost:1234/v1"
 
     @patch('src.second_opinion.utils.client_factory.create_client_from_config')
     def test_create_lmstudio_client_convenience(self, mock_create):
@@ -338,7 +338,7 @@ class TestClientFactoryIntegration:
             assert isinstance(client, BaseClient)
             assert isinstance(client, LMStudioClient)
             assert client.provider_name == "lmstudio"
-            assert client.base_url == "http://localhost:1234"
+            assert client.base_url == "http://localhost:1234/v1"
             assert client.timeout == 30
             assert client.max_retries == 2
 
@@ -355,8 +355,8 @@ class TestClientFactoryIntegration:
 
             # Test with override
             client = create_lmstudio_client(base_url="http://192.168.1.100:8080")
-            assert client.base_url == "http://192.168.1.100:8080"
+            assert client.base_url == "http://192.168.1.100:8080/v1"
 
             # Test without override
             client2 = create_lmstudio_client()
-            assert client2.base_url == "http://localhost:1234"
+            assert client2.base_url == "http://localhost:1234/v1"

@@ -128,6 +128,11 @@ class InputSanitizer:
         if len(original_model_name) > self.MAX_MODEL_NAME_LENGTH:
             raise ValidationError(f"Model name exceeds maximum length of {self.MAX_MODEL_NAME_LENGTH}")
 
+        # Check for injection patterns BEFORE normalization to prevent bypassing security
+        # Use CONFIGURATION context for stricter validation of model names
+        if self._contains_injection_pattern(original_model_name, SecurityContext.CONFIGURATION):
+            raise SecurityError("Potential injection attempt in model name")
+
         # Try to normalize common model name patterns
         normalized_name = self._normalize_model_name(original_model_name)
 
@@ -136,8 +141,8 @@ class InputSanitizer:
         if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-_./:]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$', normalized_name):
             raise ValidationError(f"Model name '{original_model_name}' contains invalid characters. Normalized to '{normalized_name}' but still invalid.")
 
-        # Prevent injection through model names
-        if self._contains_injection_pattern(normalized_name):
+        # Double-check for injection patterns after normalization as well
+        if self._contains_injection_pattern(normalized_name, SecurityContext.CONFIGURATION):
             raise SecurityError("Potential injection attempt in model name")
 
         return normalized_name

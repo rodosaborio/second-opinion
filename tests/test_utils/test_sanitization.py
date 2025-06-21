@@ -117,18 +117,19 @@ class TestModelNameValidation:
 
     def test_valid_model_names(self):
         """Test validation of valid model names."""
-        valid_names = [
-            "gpt-4",
-            "claude-3-sonnet",
-            "anthropic/claude-3-5-sonnet",
-            "openai/gpt-4o",
-            "meta-llama/llama-2-7b",
-            "model_name_123"
+        # Test cases with expected normalized results
+        test_cases = [
+            ("gpt-4", "gpt-4"),  # gpt-4 stays as-is
+            ("claude-3-sonnet", "anthropic/claude-3-5-sonnet"),  # claude-3-sonnet normalizes
+            ("anthropic/claude-3-5-sonnet", "anthropic/claude-3-5-sonnet"),  # already normalized
+            ("openai/gpt-4o", "openai/gpt-4o"),  # already normalized
+            ("meta-llama/llama-2-7b", "meta-llama/llama-2-7b"),  # already normalized
+            ("model_name_123", "model_name_123")  # no normalization needed
         ]
 
-        for name in valid_names:
+        for name, expected in test_cases:
             result = self.sanitizer.validate_model_name(name)
-            assert result == name.strip()
+            assert result == expected
 
     def test_empty_model_name(self):
         """Test handling of empty model names."""
@@ -167,7 +168,7 @@ class TestModelNameValidation:
 
     def test_model_name_injection_attempt(self):
         """Test detection of injection attempts in model names."""
-        with pytest.raises(ValidationError, match="invalid characters"):
+        with pytest.raises(SecurityError, match="injection attempt"):
             self.sanitizer.validate_model_name("model<script>alert('xss')</script>")
 
 

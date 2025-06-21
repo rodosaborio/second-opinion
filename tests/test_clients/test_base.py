@@ -78,7 +78,7 @@ class TestModelInfo:
 
     def test_model_info_with_invalid_name(self):
         """Test ModelInfo with invalid model name."""
-        with pytest.raises(ValidationError):
+        with pytest.raises(SecurityError):
             ModelInfo(
                 name="invalid<script>name",
                 provider="test",
