@@ -948,5 +948,3 @@ def set_evaluator(evaluator: ResponseEvaluator) -> None:
     """
     global _global_evaluator
     _global_evaluator = evaluator
-
-

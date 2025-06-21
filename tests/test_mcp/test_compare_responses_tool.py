@@ -6,7 +6,6 @@ handles various comparison scenarios, and provides detailed analysis
 of two responses with cost optimization.
 """
 
-
 import pytest
 
 from src.second_opinion.mcp.tools.compare_responses import compare_responses_tool
