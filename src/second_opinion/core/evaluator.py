@@ -12,8 +12,8 @@ from decimal import Decimal
 from typing import Any
 
 from ..clients import detect_model_provider
-from ..utils.client_factory import create_client_from_config
 from ..prompts.manager import render_template
+from ..utils.client_factory import create_client_from_config
 from ..utils.cost_tracking import CostGuard
 from .models import (
     ComparisonResult,
@@ -527,8 +527,8 @@ class ResponseEvaluator:
                 )
             else:
                 recommendations.append(
-                    f"Both models provide similar quality. Choose based on your specific requirements "
-                    f"(cost data unavailable for detailed comparison)"
+                    "Both models provide similar quality. Choose based on your specific requirements "
+                    "(cost data unavailable for detailed comparison)"
                 )
             return recommendations
 

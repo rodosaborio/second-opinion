@@ -5,9 +5,7 @@ This module provides mock utilities for testing MCP tools without
 requiring real API keys or external dependencies.
 """
 
-import asyncio
 from decimal import Decimal
-from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -66,7 +64,7 @@ class MockClient(BaseClient):
             raise Exception(self.failure_message)
         return self.mock_costs
 
-    async def list_models(self) -> List[ModelInfo]:
+    async def list_models(self) -> list[ModelInfo]:
         """Return mock model list."""
         return [
             ModelInfo(
@@ -88,7 +86,7 @@ class MockClient(BaseClient):
             pricing={"prompt": 0.001, "completion": 0.002},
         )
 
-    async def get_available_models(self) -> List[ModelInfo]:
+    async def get_available_models(self) -> list[ModelInfo]:
         """Return mock available models."""
         return [
             ModelInfo(

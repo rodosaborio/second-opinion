@@ -5,21 +5,21 @@ This module tests the AI consultation functionality including session management
 model routing, multi-turn conversations, and cost optimization.
 """
 
-import pytest
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
 
-from second_opinion.core.models import ModelResponse, TokenUsage, TaskComplexity
+import pytest
+
+from second_opinion.core.models import ModelResponse, TaskComplexity, TokenUsage
 from second_opinion.mcp.tools.consult import (
-    consult_tool,
-    ConsultationSession,
     ConsultationModelRouter,
+    ConsultationSession,
     TurnController,
+    _consultation_sessions,
+    calculate_delegation_savings,
+    consult_tool,
     create_consultation_session,
     get_consultation_session,
-    calculate_delegation_savings,
-    _consultation_sessions,
 )
 
 

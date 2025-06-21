@@ -4,18 +4,19 @@ Tests for the domain classifier utility.
 This module tests the LLM-based domain classification functionality.
 """
 
-import pytest
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from second_opinion.core.models import ModelResponse, TokenUsage
 from second_opinion.utils.domain_classifier import (
     DomainClassifier,
-    get_domain_classifier,
+    _classification_cache,
     classify_consultation_domain,
     clear_classification_cache,
+    get_domain_classifier,
     get_domain_specialized_model,
-    _classification_cache,
 )
 
 

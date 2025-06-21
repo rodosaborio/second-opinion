@@ -4,8 +4,6 @@ Quick setup validation script for Second Opinion.
 Run this after setting up your .env file to validate configuration.
 """
 
-import os
-import sys
 from pathlib import Path
 
 

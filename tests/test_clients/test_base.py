@@ -23,7 +23,7 @@ from src.second_opinion.core.models import (
     ModelResponse,
     TokenUsage,
 )
-from src.second_opinion.utils.sanitization import SecurityError, ValidationError
+from src.second_opinion.utils.sanitization import SecurityError
 
 
 class MockClient(BaseClient):

@@ -1,11 +1,12 @@
 """Test MCP tool functionality."""
 
-import pytest
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from src.second_opinion.core.models import ModelResponse, TaskComplexity, TokenUsage
 from src.second_opinion.mcp.tools.second_opinion import second_opinion_tool
-from src.second_opinion.core.models import TaskComplexity, ModelResponse, TokenUsage
 
 
 class TestSecondOpinionTool:

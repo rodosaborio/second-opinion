@@ -1,10 +1,10 @@
 """Test MCP server functionality."""
 
-import pytest
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.second_opinion.mcp.server import mcp, get_mcp_session, cleanup_sessions
+import pytest
+
+from src.second_opinion.mcp.server import cleanup_sessions, get_mcp_session, mcp
 from src.second_opinion.mcp.session import MCPSession
 
 

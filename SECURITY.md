@@ -36,12 +36,6 @@ When reporting a vulnerability, please include:
 - **Suggested fix** (if you have one)
 - **Your contact information** for follow-up questions
 
-### Response Timeline
-
-- **Initial Response**: Within 48 hours of report
-- **Status Update**: Within 1 week with preliminary assessment
-- **Resolution**: Security fixes are prioritized and typically released within 2 weeks
-
 ### Security Best Practices for Users
 
 To use Second Opinion securely:

@@ -18,16 +18,15 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from second_opinion.clients import detect_model_provider
-from second_opinion.utils.client_factory import create_client_from_config
+from second_opinion.clients import detect_model_provider, get_client_for_model
 from second_opinion.config.model_configs import model_config_manager
 from second_opinion.config.settings import get_settings
 from second_opinion.core.evaluator import (
     TaskComplexity,
     get_evaluator,
-    get_client_for_model,
 )
 from second_opinion.core.models import EvaluationCriteria, Message, ModelRequest
+from second_opinion.utils.client_factory import create_client_from_config
 from second_opinion.utils.cost_tracking import get_cost_guard
 from second_opinion.utils.sanitization import SecurityContext, sanitize_prompt
 

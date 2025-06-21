@@ -6,11 +6,12 @@ handles both expensive and budget models, and provides actionable downgrade
 recommendations with accurate cost savings calculations.
 """
 
-import pytest
-from decimal import Decimal
 from unittest.mock import patch
 
+import pytest
+
 from src.second_opinion.mcp.tools.should_downgrade import should_downgrade_tool
+
 from .conftest import (
     SAMPLE_CODE_PROMPT,
     SAMPLE_CODE_RESPONSE,

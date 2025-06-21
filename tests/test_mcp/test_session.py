@@ -1,11 +1,10 @@
 """Test MCP session management."""
 
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from src.second_opinion.mcp.session import MCPSession
 from src.second_opinion.clients.base import ModelInfo
+from src.second_opinion.mcp.session import MCPSession
 
 
 class TestMCPSession:
@@ -202,7 +201,7 @@ class TestMCPSession:
         assert not session.is_expired(timeout_hours=24)
 
         # Manually set old timestamp
-        old_time = datetime.now(timezone.utc) - timedelta(hours=25)
+        old_time = datetime.now(UTC) - timedelta(hours=25)
         session.last_activity = old_time
 
         assert session.is_expired(timeout_hours=24)

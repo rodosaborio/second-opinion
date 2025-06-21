@@ -6,11 +6,12 @@ handles both OpenRouter and LM Studio clients, and processes code
 snippets without security errors.
 """
 
-import pytest
-from decimal import Decimal
 from unittest.mock import patch
 
+import pytest
+
 from src.second_opinion.mcp.tools.second_opinion import second_opinion_tool
+
 from .conftest import (
     SAMPLE_CODE_PROMPT,
     SAMPLE_CODE_RESPONSE,

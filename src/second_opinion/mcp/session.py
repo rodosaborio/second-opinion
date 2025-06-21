@@ -7,14 +7,12 @@ within an MCP session.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from ..clients.base import ModelInfo
-from ..config.settings import get_settings
-from ..core.models import Message
 
 logger = logging.getLogger(__name__)
 
@@ -43,30 +41,30 @@ class MCPSession:
             session_id: Optional session identifier. If None, generates a new UUID.
         """
         self.session_id = session_id or str(uuid4())
-        self.created_at = datetime.now(timezone.utc)
+        self.created_at = datetime.now(UTC)
         self.last_activity = self.created_at
 
         # Cost tracking for this session
         self.total_cost: Decimal = Decimal("0.0")
-        self.tool_costs: Dict[str, Decimal] = {}
+        self.tool_costs: dict[str, Decimal] = {}
         self.operation_count = 0
 
         # Model information cache
-        self.cached_model_info: Dict[str, ModelInfo] = {}
-        self.pricing_cache: Dict[str, tuple[Decimal, Decimal]] = (
+        self.cached_model_info: dict[str, ModelInfo] = {}
+        self.pricing_cache: dict[str, tuple[Decimal, Decimal]] = (
             {}
         )  # model -> (input_cost, output_cost)
 
         # Simple conversation context
-        self.conversation_history: List[Dict[str, Any]] = []
-        self.last_used_model: Optional[str] = None
-        self.user_preferences: Dict[str, Any] = {}
+        self.conversation_history: list[dict[str, Any]] = []
+        self.last_used_model: str | None = None
+        self.user_preferences: dict[str, Any] = {}
 
         logger.debug(f"Created MCP session {self.session_id}")
 
     def update_activity(self) -> None:
         """Update the last activity timestamp."""
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
 
     def record_cost(self, tool_name: str, cost: Decimal, model: str) -> None:
         """
@@ -109,7 +107,7 @@ class MCPSession:
 
         logger.debug(f"Session {self.session_id}: Cached info for model {model}")
 
-    def get_cached_model_info(self, model: str) -> Optional[ModelInfo]:
+    def get_cached_model_info(self, model: str) -> ModelInfo | None:
         """
         Get cached model information.
 
@@ -121,7 +119,7 @@ class MCPSession:
         """
         return self.cached_model_info.get(model)
 
-    def get_cached_pricing(self, model: str) -> Optional[tuple[Decimal, Decimal]]:
+    def get_cached_pricing(self, model: str) -> tuple[Decimal, Decimal] | None:
         """
         Get cached pricing information.
 
@@ -138,7 +136,7 @@ class MCPSession:
         tool_name: str,
         prompt: str,
         primary_model: str,
-        comparison_models: List[str],
+        comparison_models: list[str],
         result_summary: str,
     ) -> None:
         """
@@ -154,7 +152,7 @@ class MCPSession:
         self.update_activity()
 
         context_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "tool": tool_name,
             "prompt": prompt[:200],  # Truncate for privacy
             "primary_model": primary_model,
@@ -172,7 +170,7 @@ class MCPSession:
             f"Session {self.session_id}: Added conversation context for {tool_name}"
         )
 
-    def get_model_usage_patterns(self) -> Dict[str, int]:
+    def get_model_usage_patterns(self) -> dict[str, int]:
         """
         Get model usage patterns from conversation history.
 
@@ -191,7 +189,7 @@ class MCPSession:
 
         return usage
 
-    def suggest_primary_model(self) -> Optional[str]:
+    def suggest_primary_model(self) -> str | None:
         """
         Suggest primary model based on session history.
 
@@ -208,7 +206,7 @@ class MCPSession:
         # Return most frequently used model
         return max(usage_patterns.items(), key=lambda x: x[1])[0]
 
-    def get_session_summary(self) -> Dict[str, Any]:
+    def get_session_summary(self) -> dict[str, Any]:
         """
         Get a summary of session activity.
 
@@ -238,7 +236,7 @@ class MCPSession:
         Returns:
             True if session has expired
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         elapsed = (now - self.last_activity).total_seconds() / 3600
         return elapsed > timeout_hours
 

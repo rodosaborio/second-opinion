@@ -6,18 +6,17 @@ handles various comparison scenarios, and provides detailed analysis
 of two responses with cost optimization.
 """
 
+
 import pytest
-from decimal import Decimal
-from unittest.mock import patch
 
 from src.second_opinion.mcp.tools.compare_responses import compare_responses_tool
+
 from .conftest import (
     SAMPLE_CODE_PROMPT,
     SAMPLE_CODE_RESPONSE,
     SAMPLE_SHELL_PROMPT,
     SAMPLE_SHELL_RESPONSE,
 )
-
 
 # Additional test responses for comparison
 SAMPLE_CODE_RESPONSE_B = """

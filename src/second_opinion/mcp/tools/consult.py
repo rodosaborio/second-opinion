@@ -8,8 +8,7 @@ with specialized models.
 
 import logging
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
+from typing import Any
 
 from ...cli.main import filter_think_tags
 from ...clients import detect_model_provider
@@ -17,19 +16,19 @@ from ...core.evaluator import get_evaluator
 from ...core.models import Message, ModelRequest, TaskComplexity
 from ...utils.client_factory import create_client_from_config
 from ...utils.cost_tracking import get_cost_guard
+from ...utils.domain_classifier import classify_consultation_domain
 from ...utils.sanitization import (
     SecurityContext,
     sanitize_prompt,
     validate_cost_limit,
     validate_model_name,
 )
-from ...utils.domain_classifier import classify_consultation_domain
 from ..session import MCPSession
 
 logger = logging.getLogger(__name__)
 
 # Global consultation sessions storage
-_consultation_sessions: Dict[str, "ConsultationSession"] = {}
+_consultation_sessions: dict[str, "ConsultationSession"] = {}
 
 
 class ConsultationSession(MCPSession):
@@ -49,7 +48,7 @@ class ConsultationSession(MCPSession):
         super().__init__(session_id)
         self.consultation_type = consultation_type
         self.target_model = target_model
-        self.messages: List[Message] = []
+        self.messages: list[Message] = []
         self.turn_count = 0
         self.status = "active"  # active, paused, completed
         self.conversation_summary = ""
@@ -198,7 +197,7 @@ class TurnController:
         initial_query: str,
         max_turns: int,
         cost_limit: Decimal,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Conduct multi-turn consultation with intelligent flow control.
 
@@ -297,7 +296,7 @@ class TurnController:
 
     async def _get_consultation_response(
         self, session: ConsultationSession, query: str, turn: int
-    ) -> Tuple[str, Decimal]:
+    ) -> tuple[str, Decimal]:
         """
         Get response from consultation model.
 
@@ -370,7 +369,7 @@ Please provide a thoughtful response that builds on our previous discussion."""
 
     async def _assess_follow_up_need(
         self, session: ConsultationSession, response: str, turn: int, max_turns: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Intelligently assess if follow-up questions are needed.
 
@@ -443,7 +442,7 @@ Please provide a thoughtful response that builds on our previous discussion."""
         else:
             return f"Consultation completed with {session.target_model} in {session.turn_count} turn(s)."
 
-    async def _extract_recommendations(self, session: ConsultationSession) -> List[str]:
+    async def _extract_recommendations(self, session: ConsultationSession) -> list[str]:
         """
         Extract key recommendations from the consultation.
 
@@ -485,7 +484,7 @@ Please provide a thoughtful response that builds on our previous discussion."""
         return recommendations
 
 
-def get_consultation_session(session_id: str) -> Optional[ConsultationSession]:
+def get_consultation_session(session_id: str) -> ConsultationSession | None:
     """
     Get existing consultation session by ID.
 
@@ -786,7 +785,7 @@ async def _estimate_consultation_cost(
 
 def _format_consultation_response(
     consultation_type: str,
-    results: Dict[str, Any],
+    results: dict[str, Any],
     session: ConsultationSession,
     context: str = None,
 ) -> str:

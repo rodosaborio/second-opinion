@@ -6,11 +6,12 @@ premium model alternatives could provide quality improvements that justify
 additional cost.
 """
 
-import pytest
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
-from second_opinion.core.models import ModelResponse, TokenUsage, TaskComplexity
+import pytest
+
+from second_opinion.core.models import ModelResponse, TaskComplexity, TokenUsage
 from second_opinion.mcp.tools.should_upgrade import should_upgrade_tool
 
 

@@ -1,9 +1,9 @@
 """Integration tests for MCP server with Claude Code."""
 
-import pytest
-import asyncio
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.second_opinion.mcp.server import mcp
 
