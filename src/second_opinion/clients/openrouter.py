@@ -51,7 +51,8 @@ class OpenRouterClient(BaseClient):
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/anthropics/claude-code",
+                'HTTP-Referer': 'https://github.com/second-opinion-mcp',
+                "User-Agent": "Second Opinion AI Tool",
                 "X-Title": "Second Opinion AI Tool"
             },
             timeout=httpx.Timeout(self.timeout),
@@ -125,7 +126,7 @@ class OpenRouterClient(BaseClient):
 
         # Log cost estimation with more detail for debugging
         logger.info(f"Cost estimate for {request.model}: ${total_cost:.4f} (tokens: {input_tokens}+{output_tokens}, source: {source})")
-        
+
         # Print warning if pricing source is fallback
         if source == "conservative_fallback":
             print(f"No pricing data for model {request.model}, using conservative estimate")
