@@ -2,7 +2,7 @@
 
 An AI tool that provides "second opinion" functionality for AI responses via MCP (Model Context Protocol). Get smarter AI usage by comparing responses across different models, finding cost-effective alternatives, and tracking your usage patterns.
 
-## =� Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -30,7 +30,7 @@ An AI tool that provides "second opinion" functionality for AI responses via MCP
    uv run python setup_guide.py
    ```
 
-## = API Key Setup
+## API Key Setup
 
 ### Getting Your OpenRouter API Key
 
@@ -49,12 +49,12 @@ An AI tool that provides "second opinion" functionality for AI responses via MCP
    ```bash
    # Required: OpenRouter API Key
    OPENROUTER_API_KEY=sk-or-your_actual_api_key_here
-   
+
    # Recommended: Set conservative cost limits for testing
    DAILY_COST_LIMIT=1.00
    MONTHLY_COST_LIMIT=10.00
    DEFAULT_COST_LIMIT=0.05
-   
+
    # Optional: Generate encryption keys for data security
    # Run: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
    DATABASE_ENCRYPTION_KEY=your_generated_encryption_key_here
@@ -65,20 +65,20 @@ An AI tool that provides "second opinion" functionality for AI responses via MCP
    ```bash
    # Run the setup validation script
    uv run python setup_guide.py
-   
+
    # Or test directly with a simple prompt
    uv run second-opinion --primary-model "anthropic/claude-3-5-sonnet" "What's 2+2?"
    ```
 
 ### Security Best Practices
 
--  **Never commit `.env` to version control** (it's in `.gitignore`)
--  **Use different encryption keys** for database and sessions
--  **Set conservative cost limits** when starting out
--  **Regularly rotate your API keys**
--  **Monitor your usage** through OpenRouter dashboard
+- **Never commit `.env` to version control** (it's in `.gitignore`)
+- **Use different encryption keys** for database and sessions
+- **Set conservative cost limits** when starting out
+- **Regularly rotate your API keys**
+- **Monitor your usage** through OpenRouter dashboard
 
-## =� Cost Management
+## Cost Management
 
 Second Opinion includes comprehensive cost tracking and budget protection:
 
@@ -103,7 +103,7 @@ uv run second-opinion --primary-model "anthropic/claude-3-5-sonnet" \
   --verbose "Tell me about cost tracking"
 ```
 
-## =� Usage Examples
+## Usage Examples
 
 ### Basic Model Comparison
 ```bash
@@ -177,7 +177,7 @@ uv run second-opinion \
   "Perform complex data analysis"
 ```
 
-## <� Development
+## Development
 
 ### Setup Development Environment
 ```bash
@@ -217,7 +217,7 @@ uv run mypy src/
 uv run black . && uv run ruff check . --fix && uv run mypy src/
 ```
 
-## = MCP Integration
+## MCP Integration
 
 Second Opinion can run as an MCP server for integration with Claude Desktop and other MCP clients:
 
@@ -229,7 +229,7 @@ uv run python -m second_opinion.mcp.server
 uv run python -m second_opinion.mcp.server --dev
 ```
 
-## =� Security Features
+## Security Features
 
 - **Input sanitization**: Prevents prompt injection attacks
 - **Response filtering**: Removes sensitive information from outputs
@@ -238,7 +238,7 @@ uv run python -m second_opinion.mcp.server --dev
 - **Encryption**: Protects stored data and sessions
 - **Cost guards**: Prevents runaway spending
 
-## =� Available Models
+## Available Models
 
 Second Opinion supports 1,100+ models through OpenRouter, including:
 
@@ -255,7 +255,7 @@ Second Opinion supports 1,100+ models through OpenRouter, including:
 - **For creative writing**: Consider `anthropic/claude-3-haiku` or `meta-llama/llama-3.1-70b`
 - **For code generation**: Use `anthropic/claude-3-5-sonnet` or `openai/gpt-4o`
 
-## =� Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -316,7 +316,7 @@ This script will:
 - **Configuration Issues**: Check `CLAUDE.md` for detailed configuration guide
 - **Bug Reports**: Create an issue with detailed error messages and steps to reproduce
 
-## =� Configuration Options
+## Configuration Options
 
 ### Environment Variables
 
@@ -368,7 +368,7 @@ analytics:
   retention_days: 90
 ```
 
-## > Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature-name`
@@ -376,10 +376,10 @@ analytics:
 4. Run tests: `uv run pytest`
 5. Submit a pull request
 
-## =� License
+## License
 
 [Add your license information here]
 
 ---
 
-**<� Ready to get smarter AI responses?** Start with the [Quick Start](#-quick-start) guide above!
+**Ready to get smarter AI responses?** Start with the [Quick Start](#-quick-start) guide above!

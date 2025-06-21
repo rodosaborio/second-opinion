@@ -25,6 +25,10 @@ Always refer to IMPLEMENTATION.md when:
 - Adding new functionality
 - Troubleshooting implementation issues
 
+- Add new feature ideas to Future Features in IMPLEMENTATION.MD
+- Add bugs, todos and hacks in the relevant sectin in IMPLEMENTATION.MD
+- Do habitual cleanup of IMPLEMENTATION.MD. Keep detailed plans for the next feature or currently-being-implemented feature, but delete once completed save for important tidbits or insights learned from the features.
+
 ## Development Commands
 
 ### Setup and Installation
