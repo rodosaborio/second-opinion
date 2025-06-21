@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Second Opinion is an AI tool that provides "second opinion" functionality for AI responses via MCP (Model Context Protocol). It helps users optimize their AI model usage by comparing responses across different models, suggesting cost-effective alternatives, and tracking usage patterns.
+Second Opinion is an AI tool that provides "second opinion" functionality for AI responses via MCP (Model Context Protocol). It helps users pull in new perspectives from different models and optimize their usage by comparing responses across them, suggesting cost-effective alternatives, and tracking usage patterns.
 
 ## Implementation Guide
 
@@ -24,77 +24,6 @@ Always refer to IMPLEMENTATION.md when:
 - Implementing security features
 - Adding new functionality
 - Troubleshooting implementation issues
-
-## 🚀 Current Implementation Status
-
-### ✅ Completed Components (Phase 1)
-- **Core Models** (`src/second_opinion/core/models.py`) - Comprehensive Pydantic V2 models with validation
-- **Configuration System** (`src/second_opinion/config/`) - Environment variables, YAML configs, security
-- **Test Infrastructure** - 90%+ coverage with security-focused testing
-
-### ✅ Completed Components (Phase 2)
-- **Security Utils** (`src/second_opinion/utils/sanitization.py`) - Multi-layer input validation and sanitization
-- **Abstract Client Interface** (`src/second_opinion/clients/base.py`) - Standardized provider interface with error handling
-- **Cost Tracking Framework** (`src/second_opinion/utils/cost_tracking.py`) - Comprehensive budget management system
-- **Enhanced Testing** - 183 total tests with 95%+ functional coverage, extensive security testing
-
-### ✅ Completed Components (Phase 3)
-- **Prompt System** (`src/second_opinion/prompts/manager.py`) - Template loading, caching, parameter injection with security-aware rendering
-- **Response Evaluation Engine** (`src/second_opinion/core/evaluator.py`) - Response comparison, quality scoring, cost-benefit analysis
-- **Task Complexity Classification** - Intelligent algorithm with weighted scoring and technical term detection
-- **Model Recommendation System** - Quality-first logic with cost-aware upgrade/downgrade/maintain recommendations
-- **Enhanced Templates** - 6 comprehensive prompt templates including cost-benefit analysis and model recommendations
-- **Integration Testing** - 84 total tests passing with comprehensive end-to-end verification
-
-### ✅ Completed Components (Phase 4a: OpenRouter Client)
-- **OpenRouter Client** (`src/second_opinion/clients/openrouter.py`) - Complete OpenRouter API integration with cost tracking, model discovery, and error handling
-- **Client Factory System** (`src/second_opinion/clients/__init__.py`, `src/second_opinion/utils/client_factory.py`) - Dynamic provider instantiation and configuration-based client creation
-- **Production-Ready Implementation** - Full OpenRouter API compliance, security validation, type safety, and comprehensive testing
-- **Enhanced Testing** - 58 additional tests (39 OpenRouter + 19 factory) with 95%+ functional coverage and security scenarios
-
-### ✅ Completed Components (Phase 4b: Dynamic Pricing Integration)
-- **Dynamic Pricing Manager** (`src/second_opinion/utils/pricing.py`) - LiteLLM integration with 1,117+ models, real-time pricing, caching, and intelligent fallbacks
-- **Pricing Configuration** (`src/second_opinion/config/settings.py`) - Full configuration system with TTL, auto-update, and backup settings
-- **OpenRouter Integration** - Real-time cost estimates using comprehensive pricing data instead of hardcoded values
-- **Cost Tracking Enhancement** - Updated to use pricing manager with backward compatibility for legacy systems
-- **Comprehensive Testing** - 50+ additional tests covering pricing manager, integration scenarios, security, and edge cases
-
-### ✅ Completed Components (Phase 5: CLI Interface Implementation)
-- **CLI Main Interface** (`src/second_opinion/cli/main.py`) - Complete Typer-based CLI with rich output formatting and comparison model flag support
-- **--existing-response Flag** - Users can provide existing primary model response to save API calls and tokens
-- **--verbose Flag** - Full response display mode for detailed analysis (helpful for thinking models)
-- **Multiple Comparison Models** - Support for `--comparison-model` flag used multiple times for comprehensive analysis
-- **Rich User Experience** - Beautiful terminal UI with tables, panels, progress indicators, and cost transparency
-- **Intelligent Model Selection** - Smart auto-selection based on primary model tier and task complexity with priority hierarchy
-- **Cost Protection Integration** - Full integration with existing cost tracking and budget management systems
-- **Comprehensive Testing** - 17+ test scenarios covering CLI functionality, model selection, error handling, and user experience
-
-### ✅ Completed Components (Phase 6: Evaluation Engine Enhancements)
-- **Real Evaluation API Integration** - Replaced simulation with actual model-based evaluation using OpenRouter client
-- **Cost Integration** - Integrated real budget tracking from cost guard system with fallback protection
-- **Task Complexity Detection** - Added intelligent task complexity classification to CLI workflow with user feedback
-- **Think Tag Filtering** - Implemented filtering of `<think>`, `<thinking>`, and similar reasoning tags from responses
-- **Enhanced Response Processing** - Applied filtering in both summary and verbose display modes for cleaner output
-- **Robust Error Handling** - Graceful fallback to simulation when evaluation API calls fail
-- **Comprehensive Testing** - All existing tests pass, new functionality validated
-
-### ✅ Completed Components (Phase 7: MCP Tools & Configuration-Driven Design)
-- **MCP Tool Implementation** (`src/second_opinion/mcp/tools/second_opinion.py`) - Fixed hardcoded providers, now uses `detect_model_provider()` for config-driven client selection
-- **Security Enhancements** (`src/second_opinion/utils/sanitization.py`) - Updated prompt injection detection to allow code snippets while maintaining security
-- **Budget Configuration Fixes** (`src/second_opinion/utils/cost_tracking.py`) - Fixed hierarchy to use config-based limits with per-request overrides  
-- **Comprehensive Test Infrastructure** (`tests/test_mcp/`) - Created proper mock utilities and unit tests independent of real API keys
-- **Enhanced Testing** - 15 MCP tool tests + existing test suite all passing with improved mock strategies
-
-### ✅ Completed Components (Phase 8: Compare Responses Tool Implementation)
-- **Compare Responses Tool** (`src/second_opinion/mcp/tools/compare_responses.py`) - Complete side-by-side response comparison with detailed quality analysis
-- **Zero-Cost Analysis** - Optimized for comparing existing responses without additional API calls
-- **Quality Criteria Breakdown** - Comprehensive scoring across accuracy, completeness, clarity, and usefulness
-- **Model Tier Analysis** - Intelligent comparison between local, budget, mid-tier, and premium models
-- **Actionable Recommendations** - Strategic guidance for model selection based on quality vs cost analysis
-- **Comprehensive Testing** - 15+ test scenarios covering comparison logic, cost optimization, and edge cases
-
-### ✅ Complete MCP Integration
-MCP server tools fully implemented with comprehensive model comparison capabilities using the complete evaluation engine, CLI interface, and OpenRouter foundation.
 
 ## Development Commands
 
@@ -149,7 +78,7 @@ uv run black .
 uv run ruff check .
 uv run ruff check . --fix
 
-# Manual type checking (if needed)  
+# Manual type checking (if needed)
 uv run mypy src/
 
 # Run ALL quality checks manually
@@ -192,21 +121,12 @@ uv run python -m second_opinion.mcp.server
 uv run python -m second_opinion.mcp.server --dev
 ```
 
+## Development Guidelines and Rules
+* No Emoji use in code or prompts or output of any kind. It distracts from what we are trying to do and may not display properly on all devices and output modes.
+* No adding TODOs or HACKS without explicit user approval and documentation as required work on IMPLEMENTATION.MD
+* No hardcoding any model names on actual class implementations. Defaults must come from configuration files
+* Breaking tests should neither simply get patched at the test layer or immediately change core implementations, but rather should be an opportunity to think hard, reflect and analyze why they broke. Some cases are easy and other not so much
 ## 🔧 Development Patterns & Learnings
-
-### MCP Implementation Blueprint
-For implementing new MCP tools, follow the proven patterns documented in **[IMPLEMENTATION.md](IMPLEMENTATION.md)**:
-
-- **FastMCP Server Foundation**: Established server setup with lifecycle management and session tracking
-- **Tool Implementation Pattern**: Standard 9-step flow for cost-efficient, secure tool development
-- **Response Reuse Optimization**: 50-80% cost reduction through existing response evaluation
-- **Configuration-Driven Design**: No hardcoding - use `detect_model_provider()` for dynamic provider selection
-- **Comprehensive Testing**: Reusable mock strategies and fixtures for reliable test coverage
-
-**✅ Completed Tools**: `second_opinion`, `should_downgrade`, `should_upgrade`, `compare_responses`
-
-**Ready for Implementation**: `usage_analytics`, `batch_comparison`, `model_benchmark`
-
 ### Core Development Patterns
 
 **Configuration-Driven Design**:
@@ -253,7 +173,7 @@ The test suite now includes comprehensive global state reset to prevent test iso
 
 ```python
 # Automatic global state reset between tests (tests/conftest.py)
-@pytest.fixture(autouse=True, scope="function") 
+@pytest.fixture(autouse=True, scope="function")
 def reset_global_state():
     # Resets: config_manager, pricing_manager, cost_guard
     # Clears: module caches, HTTP clients, async resources
@@ -293,7 +213,7 @@ def mock_http_client():
 # Development testing (fast feedback)
 uv run pytest  # No coverage, optimized for speed
 
-# Production testing (complete validation)  
+# Production testing (complete validation)
 uv run pytest --cov=second_opinion --cov-report=html --cov-fail-under=85
 
 # Test execution improvements:
@@ -304,23 +224,6 @@ uv run pytest --cov=second_opinion --cov-report=html --cov-fail-under=85
 ✅ Isolated temp directories prevent data pollution
 ✅ Optimized pytest configuration for development
 ```
-
-### Test Debugging Tools
-
-```bash
-# Debug hanging tests
-uv run pytest -v --tb=long --setup-show
-
-# Fast continuous testing
-uv run pytest --timeout=30 -x --tb=short
-
-# Monitor test isolation
-uv run pytest -v --setup-show tests/test_clients/test_openrouter.py
-
-# Profile test performance
-uv run pytest --durations=10 --timeout=30
-```
-
 ## Testing Best Practices
 
 - Always use async-friendly testing techniques
@@ -372,7 +275,7 @@ return ModelResponse(
 )
 ```
 
-### Dependency Injection Patterns  
+### Dependency Injection Patterns
 - Prefer interfaces and abstract base classes for easier mocking
 - Use `unittest.mock` or `pytest-mock` for creating mock objects
 - Implement dependency injection to allow easy substitution of real implementations with mocks
@@ -407,13 +310,12 @@ The successful `second_opinion` tool provides a proven blueprint for implementin
 7. Actual cost recording
 8. Response formatting for MCP clients
 9. Error handling with cost cleanup
-
 ### ✅ Completed MCP Tools
 
 **Production-Ready Tools** (all implemented and tested):
 
 **1. `second_opinion`** - ✅ Core comparison and model recommendation engine
-**2. `should_downgrade`** - ✅ Cost optimization through cheaper alternatives  
+**2. `should_downgrade`** - ✅ Cost optimization through cheaper alternatives
 **3. `should_upgrade`** - ✅ Quality improvement analysis for premium models
 **4. `compare_responses`** - ✅ Detailed side-by-side response analysis
 
