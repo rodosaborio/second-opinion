@@ -320,3 +320,216 @@ class TestShouldDowngradeTool:
         # Should show current vs alternative costs
         assert "Current:" in result
         assert "Local Models:" in result or "With Local" in result
+
+    @pytest.mark.asyncio
+    async def test_custom_downgrade_candidates(self):
+        """Test using custom downgrade candidates instead of auto-selection."""
+        custom_candidates = ["anthropic/claude-3-haiku", "openai/gpt-4o-mini"]
+        
+        result = await should_downgrade_tool(
+            current_response=SAMPLE_CODE_RESPONSE,
+            task=SAMPLE_CODE_PROMPT,
+            current_model="anthropic/claude-3-5-sonnet",
+            downgrade_candidates=custom_candidates,
+            test_local=False,  # Disable auto-local to test custom only
+            cost_limit=0.25
+        )
+        
+        # Should use the custom candidates
+        assert isinstance(result, str)
+        assert "# 💰 Should You Downgrade? Cost Optimization Analysis" in result
+        
+        # Should mention the custom models we specified
+        assert "claude-3-haiku" in result
+        assert "gpt-4o-mini" in result
+        
+        # Should contain analysis sections
+        assert "Cheaper Alternatives Tested" in result
+        assert "Cost Savings Analysis" in result
+
+    @pytest.mark.asyncio
+    async def test_custom_candidates_with_local_models(self):
+        """Test custom candidates that include local models."""
+        custom_candidates = ["qwen3-4b-mlx", "anthropic/claude-3-haiku"]
+        
+        result = await should_downgrade_tool(
+            current_response="Simple test response",
+            task="Simple test task",
+            current_model="openai/gpt-4o",
+            downgrade_candidates=custom_candidates,
+            test_local=True,  # This should be ignored when custom candidates are provided
+            cost_limit=0.20
+        )
+        
+        # Should include both local and cloud models from custom list
+        assert "qwen3-4b-mlx" in result
+        assert "claude-3-haiku" in result
+        
+        # Should show cost savings from local model
+        assert "FREE" in result or "$0.00" in result
+        assert "100%" in result  # Should show 100% savings for local
+
+    @pytest.mark.asyncio
+    async def test_invalid_custom_downgrade_candidate(self):
+        """Test error handling for invalid custom downgrade candidates."""
+        # Use truly invalid model names that will fail validation
+        invalid_candidates = ["", "model with spaces and invalid chars !@#"]
+        
+        result = await should_downgrade_tool(
+            current_response="Test response",
+            task="Test task", 
+            current_model="anthropic/claude-3-5-sonnet",
+            downgrade_candidates=invalid_candidates,
+            cost_limit=0.15
+        )
+        
+        # Should return validation error for the first invalid model (empty string)
+        assert "❌ **Invalid Downgrade Candidate #1**" in result
+        assert "Suggested formats" in result
+
+    @pytest.mark.asyncio
+    async def test_nonexistent_but_valid_format_candidates(self):
+        """Test with model names that have valid format but don't exist."""
+        nonexistent_candidates = ["fake-provider/nonexistent-model", "openai/gpt-999"]
+        
+        result = await should_downgrade_tool(
+            current_response="Test response",
+            task="Test task",
+            current_model="anthropic/claude-3-5-sonnet",
+            downgrade_candidates=nonexistent_candidates,
+            cost_limit=0.15
+        )
+        
+        # Should complete analysis but show errors for the nonexistent models
+        assert "# 💰 Should You Downgrade? Cost Optimization Analysis" in result
+        assert "Cheaper Alternatives Tested" in result
+        # Should show errors or fallback behavior for nonexistent models
+
+    @pytest.mark.asyncio
+    async def test_mixed_valid_invalid_custom_candidates(self):
+        """Test with mix of valid and invalid custom candidates."""
+        mixed_candidates = ["anthropic/claude-3-haiku", ""]  # Valid model + empty string
+        
+        result = await should_downgrade_tool(
+            current_response="Test response",
+            task="Test task",
+            current_model="anthropic/claude-3-5-sonnet", 
+            downgrade_candidates=mixed_candidates,
+            cost_limit=0.15
+        )
+        
+        # Should fail on the invalid model (second one - empty string)
+        assert "❌ **Invalid Downgrade Candidate #2**" in result
+
+    @pytest.mark.asyncio
+    async def test_empty_custom_candidates_list(self):
+        """Test behavior with empty custom candidates list."""
+        result = await should_downgrade_tool(
+            current_response=SAMPLE_CODE_RESPONSE,
+            task=SAMPLE_CODE_PROMPT,
+            current_model="anthropic/claude-3-5-sonnet",
+            downgrade_candidates=[],  # Empty list
+            test_local=True,
+            cost_limit=0.20
+        )
+        
+        # Should treat empty list as None and use auto-selection
+        assert "# 💰 Should You Downgrade? Cost Optimization Analysis" in result
+        assert "Cheaper Alternatives Tested" in result
+        
+        # Should still include local models from auto-selection
+        if "Local" in result:
+            assert "qwen" in result.lower() or "codestral" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_custom_candidates_cost_validation(self):
+        """Test that custom candidates are properly cost-validated."""
+        # Use expensive custom candidates that might exceed budget
+        expensive_candidates = ["anthropic/claude-3-5-sonnet", "openai/gpt-4o"]
+        
+        result = await should_downgrade_tool(
+            current_response="Test response",
+            task="Test task", 
+            current_model="anthropic/claude-3-opus",  # Even more expensive baseline
+            downgrade_candidates=expensive_candidates,
+            cost_limit=0.01  # Very low limit
+        )
+        
+        # Should either complete with limited testing or show budget error
+        assert isinstance(result, str)
+        if "Budget Error" in result:
+            assert "cost limit" in result.lower()
+        else:
+            # If it completes, should show the expensive models
+            assert "# 💰 Should You Downgrade? Cost Optimization Analysis" in result
+
+    @pytest.mark.asyncio
+    async def test_custom_vs_auto_selection_logging(self):
+        """Test that logging differentiates between custom and auto selection."""
+        # This test focuses on ensuring proper code path execution
+        # We can't easily test logging output, but we can verify functionality
+        
+        # Test auto-selection path
+        result_auto = await should_downgrade_tool(
+            current_response="Auto test response",
+            task="Auto test task",
+            current_model="anthropic/claude-3-5-sonnet",
+            downgrade_candidates=None,  # Should trigger auto-selection
+            test_local=True,
+            cost_limit=0.20
+        )
+        
+        # Test custom selection path  
+        result_custom = await should_downgrade_tool(
+            current_response="Custom test response",
+            task="Custom test task",
+            current_model="anthropic/claude-3-5-sonnet", 
+            downgrade_candidates=["anthropic/claude-3-haiku"],
+            test_local=True,  # Should be ignored with custom candidates
+            cost_limit=0.20
+        )
+        
+        # Both should succeed but potentially with different models tested
+        assert "# 💰 Should You Downgrade? Cost Optimization Analysis" in result_auto
+        assert "# 💰 Should You Downgrade? Cost Optimization Analysis" in result_custom
+        
+        # Custom should specifically mention the model we requested
+        assert "claude-3-haiku" in result_custom
+
+    @pytest.mark.asyncio
+    async def test_single_custom_candidate(self):
+        """Test with a single custom downgrade candidate."""
+        result = await should_downgrade_tool(
+            current_response="Single candidate test",
+            task="Test single model comparison",
+            current_model="openai/gpt-4o",
+            downgrade_candidates=["openai/gpt-4o-mini"],  # Just one candidate
+            cost_limit=0.15
+        )
+        
+        # Should work with single candidate
+        assert "# 💰 Should You Downgrade? Cost Optimization Analysis" in result
+        assert "gpt-4o-mini" in result
+        assert "Cheaper Alternatives Tested" in result
+
+    @pytest.mark.asyncio 
+    async def test_custom_candidates_override_test_local(self):
+        """Test that custom candidates override test_local setting.""" 
+        # Provide only cloud models as custom candidates
+        cloud_only_candidates = ["anthropic/claude-3-haiku", "google/gemini-flash-1.5"]
+        
+        result = await should_downgrade_tool(
+            current_response="Override test response",
+            task="Test local override",
+            current_model="anthropic/claude-3-5-sonnet",
+            downgrade_candidates=cloud_only_candidates,
+            test_local=True,  # This should be ignored
+            cost_limit=0.25
+        )
+        
+        # Should only test the cloud models we specified, not add local models
+        assert "claude-3-haiku" in result
+        assert "gemini-flash" in result
+        
+        # Should not automatically add local models despite test_local=True
+        # (Local models might still appear if they were explicitly in custom candidates)

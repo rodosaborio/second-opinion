@@ -30,6 +30,7 @@ async def should_downgrade_tool(
     current_response: str,
     task: str,
     current_model: str | None = None,
+    downgrade_candidates: list[str] | None = None,
     test_local: bool = True,
     cost_limit: float | None = None,
 ) -> str:
@@ -54,6 +55,10 @@ async def should_downgrade_tool(
                       - ChatGPT: "openai/gpt-4o", "openai/gpt-4"
                       - Gemini: "google/gemini-pro-1.5"
                       - Local: "qwen3-4b-mlx", "codestral-22b-v0.1"
+        downgrade_candidates: Specific cheaper models to test instead of auto-selection.
+                             Use OpenRouter format for cloud models or local model names.
+                             Examples: ["anthropic/claude-3-haiku", "openai/gpt-4o-mini"]
+                             If None, will auto-select based on current model and complexity.
         test_local: Whether to include local models in the comparison (recommended: True)
         cost_limit: Maximum cost limit for testing in USD (default: $0.15)
 
@@ -66,12 +71,21 @@ async def should_downgrade_tool(
         - Actionable cost optimization steps
 
     RECOMMENDED USAGE:
-        # Test if expensive model can be downgraded
+        # Test if expensive model can be downgraded (auto-selection)
         result = await should_downgrade_tool(
             current_response="<response from expensive model>",
             task="Write a Python function to calculate fibonacci",
             current_model="anthropic/claude-3-5-sonnet",
             test_local=True
+        )
+
+        # Test specific cheaper models (custom selection)
+        result = await should_downgrade_tool(
+            current_response="<response from expensive model>",
+            task="Write a Python function to calculate fibonacci",
+            current_model="anthropic/claude-3-5-sonnet",
+            downgrade_candidates=["anthropic/claude-3-haiku", "openai/gpt-4o-mini"],
+            test_local=False
         )
 
     COST OPTIMIZATION FOCUS:
@@ -96,6 +110,19 @@ async def should_downgrade_tool(
                 suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
                 return f"❌ **Invalid Current Model**: {str(e)}{suggestion_text}"
 
+        # Validate downgrade candidates if provided
+        validated_downgrade_candidates = None
+        if downgrade_candidates is not None and len(downgrade_candidates) > 0:
+            validated_downgrade_candidates = []
+            for i, model in enumerate(downgrade_candidates):
+                try:
+                    validated_model = validate_model_name(model)
+                    validated_downgrade_candidates.append(validated_model)
+                except Exception as e:
+                    suggestions = _get_model_name_suggestions(model)
+                    suggestion_text = f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
+                    return f"❌ **Invalid Downgrade Candidate #{i+1}** ({model}): {str(e)}{suggestion_text}"
+
         # Validate cost limit
         if cost_limit is not None:
             cost_limit_decimal = validate_cost_limit(cost_limit)
@@ -110,6 +137,7 @@ async def should_downgrade_tool(
 
         logger.info(f"Starting should_downgrade tool: response length={len(clean_current_response)}, "
                    f"current_model={current_model}, test_local={test_local}")
+        logger.info(f"Custom downgrade candidates: {validated_downgrade_candidates}")
         logger.info(f"Cost limit: ${cost_limit_decimal:.2f}")
 
         # Get core systems
@@ -131,12 +159,18 @@ async def should_downgrade_tool(
             logger.warning(f"Failed to classify task complexity: {e}")
 
         # Select cheaper alternative models for testing
-        downgrade_candidates = _select_downgrade_candidates(
-            current_model=current_model,
-            test_local=test_local,
-            task_complexity=task_complexity
-        )
-        logger.info(f"Selected downgrade candidates: {downgrade_candidates}")
+        if validated_downgrade_candidates and len(validated_downgrade_candidates) > 0:
+            # Use user-specified models for testing
+            downgrade_candidates = validated_downgrade_candidates
+            logger.info(f"Using custom downgrade candidates: {downgrade_candidates}")
+        else:
+            # Auto-select based on current model and task complexity
+            downgrade_candidates = _select_downgrade_candidates(
+                current_model=current_model,
+                test_local=test_local,
+                task_complexity=task_complexity
+            )
+            logger.info(f"Auto-selected downgrade candidates: {downgrade_candidates}")
 
         # Estimate total cost for testing
         estimated_cost = Decimal("0.0")
