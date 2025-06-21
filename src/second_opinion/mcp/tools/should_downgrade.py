@@ -8,10 +8,12 @@ focus on cost optimization through local models and budget cloud alternatives.
 
 import logging
 from decimal import Decimal
+from typing import Any
 
 from ...cli.main import filter_think_tags
 from ...clients import detect_model_provider
-from ...config.model_configs import model_config_manager
+
+# from ...config.model_configs import model_config_manager  # Not yet implemented
 from ...core.evaluator import get_evaluator
 from ...core.models import EvaluationCriteria, Message, ModelRequest, TaskComplexity
 from ...utils.client_factory import create_client_from_config
@@ -129,8 +131,8 @@ async def should_downgrade_tool(
         else:
             # Get default from configuration (lower default for downgrade testing)
             try:
-                tool_config = model_config_manager.get_tool_config("should_downgrade")
-                cost_limit_decimal = Decimal(str(tool_config.cost_limit_per_request))
+                # For now, use a default since tool-specific config isn't implemented yet
+                cost_limit_decimal = Decimal("0.15")  # Lower default for downgrade testing
             except Exception:
                 # Use lower default for downgrade testing
                 cost_limit_decimal = Decimal("0.15")
@@ -184,7 +186,8 @@ async def should_downgrade_tool(
                     model=model,
                     messages=[Message(role="user", content=clean_task)],
                     max_tokens=len(clean_current_response.split()) * 2,  # Estimate based on current response
-                    temperature=0.1
+                    temperature=0.1,
+                    system_prompt=""
                 )
                 model_cost = await client.estimate_cost(request)
                 estimated_cost += model_cost
@@ -224,7 +227,8 @@ async def should_downgrade_tool(
                     model=model,
                     messages=[Message(role="user", content=clean_task)],
                     max_tokens=len(clean_current_response.split()) * 2,
-                    temperature=0.1
+                    temperature=0.1,
+                    system_prompt=""
                 )
                 response = await client.complete(request)
                 downgrade_responses.append(response)
@@ -245,7 +249,7 @@ async def should_downgrade_tool(
                 downgrade_costs.append(Decimal("0.0"))
 
         # Perform evaluation against current response
-        evaluation_results = []
+        evaluation_results: list[tuple[str, dict[str, Any]]] = []
         evaluation_cost_actual = Decimal("0.0")
 
         # Create ModelResponse object for current response to use in evaluation
@@ -256,7 +260,8 @@ async def should_downgrade_tool(
                 model=current_model,
                 messages=[Message(role="user", content=clean_task)],
                 max_tokens=len(clean_current_response.split()) * 2,
-                temperature=0.1
+                temperature=0.1,
+                system_prompt=""
             )
             current_cost_estimate = await current_client.estimate_cost(current_request)
         except Exception:
@@ -448,7 +453,7 @@ async def _format_downgrade_report(
     downgrade_candidates: list[str],
     downgrade_responses: list[str],
     downgrade_costs: list[Decimal],
-    evaluation_results: list[tuple[str, dict]],
+    evaluation_results: list[tuple[str, dict[str, Any]]],
     task_complexity: TaskComplexity,
     actual_cost: Decimal,
     cost_limit: Decimal,
@@ -506,13 +511,13 @@ async def _format_downgrade_report(
         # Cost savings calculation
         if is_local:
             cost_savings = current_cost_estimate  # 100% savings
-            savings_percent = "100%"
+            savings_percent_str = "100%"
         else:
             cost_savings = current_cost_estimate - cost
-            savings_percent = f"{(cost_savings / current_cost_estimate * 100):.0f}%" if current_cost_estimate > 0 else "N/A"
+            savings_percent_str = f"{(cost_savings / current_cost_estimate * 100):.0f}%" if current_cost_estimate > 0 else "N/A"
 
         report.append(f"### {model}")
-        report.append(f"**Cost**: ${cost:.4f} ({'FREE' if is_local else f'${cost:.4f}'}) | **Savings**: {savings_percent}")
+        report.append(f"**Cost**: ${cost:.4f} ({'FREE' if is_local else f'${cost:.4f}'}) | **Savings**: {savings_percent_str}")
         report.append(f"**Quality vs Current**: {score:.1f}/10 ({quality_drop} degradation)")
         report.append(f"**Winner**: {winner}")
         report.append("")

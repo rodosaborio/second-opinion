@@ -106,6 +106,8 @@ def test_critical_imports():
         'second_opinion.mcp',
         'second_opinion.mcp.tools',
         'second_opinion.mcp.tools.second_opinion',
+        'second_opinion.mcp.tools.should_downgrade',
+        'second_opinion.mcp.tools.should_upgrade',
         'second_opinion.core.models',
         'second_opinion.clients',
         'second_opinion.utils.cost_tracking',
@@ -574,6 +576,187 @@ async def should_downgrade(
 
         # Return user-friendly error message
         return f"❌ **Should Downgrade Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
+
+
+# Register the should_upgrade tool
+@mcp.tool(
+    name="should_upgrade",
+    description="Analyze whether premium model alternatives could provide quality improvements that justify additional cost"
+)
+async def should_upgrade(
+    current_response: str = Field(
+        ...,
+        description="The response to analyze for potential quality improvements. This is the output from your current (budget/mid-tier) model that you want to test for upgrade opportunities.",
+        examples=["def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"]
+    ),
+    task: str = Field(
+        ...,
+        description="The original task/question that generated the current response. This provides context for comparing quality across models.",
+        examples=["Write a Python function to calculate fibonacci", "Explain quantum computing", "Debug this code snippet"]
+    ),
+    current_model: str | None = Field(
+        None,
+        description="The model that generated the current response. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-haiku', 'openai/gpt-4o-mini') or model name for local models (e.g. 'qwen3-4b-mlx').",
+        examples=["anthropic/claude-3-haiku", "openai/gpt-4o-mini", "google/gemini-flash-1.5", "qwen3-4b-mlx"]
+    ),
+    upgrade_candidates: list[str] | None = Field(
+        None,
+        description="Specific premium models to test instead of auto-selection. Use OpenRouter format for cloud models. If not provided, will auto-select based on current model and task complexity.",
+        examples=[["anthropic/claude-3-opus", "openai/gpt-4o"], ["anthropic/claude-3-5-sonnet", "google/gemini-pro-1.5"]]
+    ),
+    include_premium: bool = Field(
+        True,
+        description="Whether to include premium models in the comparison for maximum quality improvement. Premium models provide the best quality but at higher cost."
+    ),
+    cost_limit: float | None = Field(
+        None,
+        description="Maximum cost limit for testing upgrade options in USD. Defaults to $0.50 for comprehensive quality testing. Set higher for complex tasks requiring premium models.",
+        examples=[0.50, 1.00, 2.00],
+        ge=0.01,
+        le=10.00
+    ),
+) -> str:
+    """
+    Analyze whether premium model alternatives could provide quality improvements.
+
+    This tool helps optimize AI quality by testing if premium models can provide
+    significant quality improvements that justify additional cost. It focuses on
+    quality enhancement while providing transparent cost analysis.
+
+    QUALITY OPTIMIZATION FOCUS:
+    - Tests premium models for maximum quality improvement
+    - Evaluates cross-provider alternatives for diverse perspectives
+    - Provides quality vs cost trade-off analysis
+    - Gives specific upgrade recommendations with ROI analysis
+
+    Args:
+        current_response: The response to analyze for quality improvement potential
+        task: The original task that generated the response (for context)
+        current_model: Model that generated the current response (for comparison)
+        upgrade_candidates: Specific premium models to test (None = auto-select)
+        include_premium: Include premium models for maximum quality (recommended: True)
+        cost_limit: Maximum cost for testing alternatives (default: $0.50)
+
+    Returns:
+        A quality enhancement report with specific upgrade recommendations,
+        quality assessments, cost vs benefit analysis, and actionable next steps.
+
+    USAGE PATTERN:
+        # Test if budget model can be upgraded (auto-selection)
+        result = await should_upgrade(
+            current_response="<response from budget model>",
+            task="Write a Python function to calculate fibonacci",
+            current_model="anthropic/claude-3-haiku",
+            include_premium=True
+        )
+
+        # Test specific premium models (custom selection)
+        result = await should_upgrade(
+            current_response="<response from budget model>",
+            task="Write a Python function to calculate fibonacci",
+            current_model="anthropic/claude-3-haiku",
+            upgrade_candidates=["anthropic/claude-3-opus", "openai/gpt-4o"]
+        )
+    """
+    # Get or create session for this request
+    session = get_mcp_session()
+    session.update_activity()
+
+    logger.info("=== MCP Tool Call: should_upgrade ===")
+    logger.info(f"Task: {task[:100]}...")
+    logger.info(f"Current model: {current_model}")
+    logger.info(f"Response length: {len(current_response) if current_response else 0}")
+    logger.info(f"Include premium: {include_premium}")
+    logger.info(f"Cost limit: {cost_limit}")
+
+    try:
+        # Import should_upgrade_tool with multiple strategies (same as other tools)
+        logger.info("Attempting to import should_upgrade_tool...")
+        should_upgrade_tool = None
+        import_strategies = [
+            # Strategy 1: Relative import
+            lambda: __import__('.tools.should_upgrade', package=__package__, fromlist=['should_upgrade_tool']).should_upgrade_tool,
+            # Strategy 2: Absolute import
+            lambda: __import__('second_opinion.mcp.tools.should_upgrade', fromlist=['should_upgrade_tool']).should_upgrade_tool,
+            # Strategy 3: Direct module import
+            lambda: __import__('second_opinion.mcp.tools.should_upgrade').should_upgrade_tool,
+        ]
+
+        for i, strategy in enumerate(import_strategies, 1):
+            try:
+                logger.info(f"Trying import strategy {i}...")
+                should_upgrade_tool = strategy()
+                logger.info(f"✓ Successfully imported should_upgrade_tool using strategy {i}")
+                break
+            except Exception as e:
+                logger.warning(f"✗ Import strategy {i} failed: {e}")
+                continue
+
+        if should_upgrade_tool is None:
+            # Final fallback: manual importlib approach
+            logger.info("All import strategies failed, trying manual step-by-step import...")
+            try:
+                import importlib
+                module = importlib.import_module('second_opinion.mcp.tools.should_upgrade')
+                should_upgrade_tool = module.should_upgrade_tool
+                logger.info("✓ Successfully imported using manual importlib approach")
+            except Exception as final_error:
+                logger.error(f"✗ All import methods failed. Final error: {final_error}")
+                import traceback
+                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
+                raise ImportError(f"Unable to import should_upgrade_tool after trying multiple strategies. Last error: {final_error}")
+
+        if should_upgrade_tool is None:
+            raise ImportError("should_upgrade_tool is None after all import attempts")
+
+        # Call the tool implementation
+        logger.info("Calling should_upgrade_tool implementation...")
+        logger.info(f"Tool function type: {type(should_upgrade_tool)}")
+        logger.info(f"Tool function module: {getattr(should_upgrade_tool, '__module__', 'unknown')}")
+
+        result = await should_upgrade_tool(
+            current_response=current_response,
+            task=task,
+            current_model=current_model,
+            upgrade_candidates=upgrade_candidates,
+            include_premium=include_premium,
+            cost_limit=cost_limit,
+        )
+        logger.info("✓ should_upgrade_tool completed successfully")
+        logger.info(f"Result length: {len(result) if result else 0}")
+
+        # Add to conversation context
+        session.add_conversation_context(
+            tool_name="should_upgrade",
+            prompt=task,
+            primary_model=current_model or "unknown",
+            comparison_models=[],  # Upgrade candidates are selected internally
+            result_summary="Upgrade analysis completed successfully"
+        )
+
+        return result
+
+    except Exception as e:
+        # Log comprehensive error information
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error("=== Error in should_upgrade MCP tool ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full traceback:\n{error_details}")
+        logger.error("=== End Error Details ===")
+
+        # Add to context for debugging
+        session.add_conversation_context(
+            tool_name="should_upgrade",
+            prompt=task,
+            primary_model=current_model or "unknown",
+            comparison_models=[],
+            result_summary=f"Error: {str(e)}"
+        )
+
+        # Return user-friendly error message
+        return f"❌ **Should Upgrade Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
 
 
 def get_mcp_session(session_id: str | None = None) -> MCPSession:

@@ -286,11 +286,11 @@ def patch_mcp_dependencies(
         mock_client_factory
     )
     
-    # Patch model configs
-    monkeypatch.setattr(
-        "src.second_opinion.mcp.tools.second_opinion.model_config_manager",
-        mock_model_configs
-    )
+    # Patch model configs - commented out since model_config_manager not yet implemented
+    # monkeypatch.setattr(
+    #     "src.second_opinion.mcp.tools.second_opinion.model_config_manager",
+    #     mock_model_configs
+    # )
     
     # Mock model provider detection
     def mock_detect_provider(model: str) -> str:

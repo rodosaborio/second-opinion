@@ -7,8 +7,10 @@ integrating with the existing evaluation engine, cost tracking, and client syste
 
 from .second_opinion import second_opinion_tool
 from .should_downgrade import should_downgrade_tool
+from .should_upgrade import should_upgrade_tool
 
 __all__ = [
     "second_opinion_tool",
     "should_downgrade_tool",
+    "should_upgrade_tool",
 ]
