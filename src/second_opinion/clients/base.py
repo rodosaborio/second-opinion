@@ -186,14 +186,14 @@ class BaseClient(ABC):
         for message in request.messages:
             sanitized_content = sanitize_prompt(
                 message.content,
-                SecurityContext.USER_PROMPT if message.role == "user" else SecurityContext.SYSTEM_PROMPT
+                SecurityContext.API_REQUEST  # Use strict validation for all client API requests
             )
             sanitized_messages.append(message.model_copy(update={"content": sanitized_content}))
 
         # Sanitize system prompt if present
         system_prompt = None
         if request.system_prompt:
-            system_prompt = sanitize_prompt(request.system_prompt, SecurityContext.SYSTEM_PROMPT)
+            system_prompt = sanitize_prompt(request.system_prompt, SecurityContext.API_REQUEST)
 
         # Create validated request
         validated_request = request.model_copy(update={

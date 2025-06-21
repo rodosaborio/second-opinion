@@ -30,13 +30,13 @@ class TestSecondOpinionTool:
         
         # Should return a formatted report
         assert isinstance(result, str)
-        assert "# 🔍 Second Opinion Analysis" in result
+        assert "# 🤔 Second Opinion: Should You Stick or Switch?" in result
         assert "Task Summary" in result
         assert "Cost Analysis" in result
         assert "Primary Response" in result
         assert "Alternative Responses" in result
         assert "Quality Assessment" in result
-        assert "Recommendations" in result
+        assert "My Recommendation" in result
         
         # Should not contain error messages
         assert "❌" not in result
@@ -55,7 +55,7 @@ class TestSecondOpinionTool:
         
         # Should process successfully
         assert isinstance(result, str)
-        assert "# 🔍 Second Opinion Analysis" in result
+        assert "# 🤔 Second Opinion: Should You Stick or Switch?" in result
         
         # Should not reject shell commands
         assert "❌" not in result
@@ -77,7 +77,7 @@ class TestSecondOpinionTool:
             assert mock_detect.call_count >= 3  # Primary + 2 comparison models
             
             # Should contain analysis
-            assert "# 🔍 Second Opinion Analysis" in result
+            assert "# 🤔 Second Opinion: Should You Stick or Switch?" in result
 
     @pytest.mark.asyncio
     async def test_lmstudio_model_detection(self):
@@ -95,7 +95,7 @@ class TestSecondOpinionTool:
             assert mock_detect.called
             
             # Should contain analysis
-            assert "# 🔍 Second Opinion Analysis" in result
+            assert "# 🤔 Second Opinion: Should You Stick or Switch?" in result
 
     @pytest.mark.asyncio
     async def test_cost_limit_enforcement(self):
@@ -220,7 +220,7 @@ class TestSecondOpinionTool:
         )
         
         # Should process successfully
-        assert "# 🔍 Second Opinion Analysis" in result
+        assert "# 🤔 Second Opinion: Should You Stick or Switch?" in result
         assert "anthropic/claude-3-5-sonnet" in result
 
     @pytest.mark.asyncio 
@@ -237,7 +237,7 @@ class TestSecondOpinionTool:
         )
         
         # Should process code-related prompts successfully  
-        assert "# 🔍 Second Opinion Analysis" in result
+        assert "# 🤔 Second Opinion: Should You Stick or Switch?" in result
         assert "git status" in result
 
     @pytest.mark.asyncio
@@ -267,5 +267,5 @@ class TestSecondOpinionTool:
         )
         
         # Should include recommendations
-        assert "Recommendations" in result
+        assert "My Recommendation" in result
         assert ("✅" in result or "💡" in result or "💰" in result)  # Should have recommendation indicators

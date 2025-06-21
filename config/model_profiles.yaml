@@ -9,10 +9,10 @@ tools:
   second_opinion:
     description: "Get alternative perspectives on responses"
     comparison_models:
-      # Models to use for comparison (rotated based on primary model)
-      - "anthropic/claude-sonnet-4"
-      - "google/gemini-2.5-flash"
-      - "deepseek/deepseek-r1-0528"
+      # Models to use for comparison (using valid OpenRouter model names)
+      - "anthropic/claude-3-5-sonnet"
+      - "openai/gpt-4o"
+      - "google/gemini-flash-1.5"
     max_tokens: 2000
     temperature: 0.1
     cost_limit_per_request: 0.50
@@ -69,6 +69,8 @@ model_tiers:
     - "anthropic/claude-3-5-sonnet"
     - "openai/gpt-4o"
     - "google/gemini-pro"
+    - "google/gemini-pro-1.5"  # Current model
+    - "google/gemini-2.5-flash-preview"  # Current model
 
   premium:
     - "anthropic/claude-3-opus"

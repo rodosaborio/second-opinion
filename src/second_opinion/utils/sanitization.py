@@ -105,13 +105,13 @@ class InputSanitizer:
 
     def validate_model_name(self, model_name: str) -> str:
         """
-        Validate and normalize model names.
+        Validate and normalize model names with intelligent format conversion.
         
         Args:
             model_name: The model name to validate
             
         Returns:
-            Normalized model name
+            Normalized model name in standard format
             
         Raises:
             ValidationError: If model name is invalid
@@ -120,23 +120,103 @@ class InputSanitizer:
             raise ValidationError("Model name must be a string")
 
         # Remove extra whitespace
-        model_name = model_name.strip()
+        original_model_name = model_name.strip()
 
-        if not model_name:
+        if not original_model_name:
             raise ValidationError("Model name cannot be empty")
 
-        if len(model_name) > self.MAX_MODEL_NAME_LENGTH:
+        if len(original_model_name) > self.MAX_MODEL_NAME_LENGTH:
             raise ValidationError(f"Model name exceeds maximum length of {self.MAX_MODEL_NAME_LENGTH}")
+
+        # Try to normalize common model name patterns
+        normalized_name = self._normalize_model_name(original_model_name)
 
         # Check for valid model name format (provider/model or just model)
         # Allow alphanumeric start, alphanumeric/hyphen/underscore/dot/slash/colon in middle
-        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-_./:]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$', model_name):
-            raise ValidationError("Model name contains invalid characters")
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-_./:]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$', normalized_name):
+            raise ValidationError(f"Model name '{original_model_name}' contains invalid characters. Normalized to '{normalized_name}' but still invalid.")
 
         # Prevent injection through model names
-        if self._contains_injection_pattern(model_name):
+        if self._contains_injection_pattern(normalized_name):
             raise SecurityError("Potential injection attempt in model name")
 
+        return normalized_name
+
+    def _normalize_model_name(self, model_name: str) -> str:
+        """
+        Normalize model names to standard OpenRouter format.
+        
+        Args:
+            model_name: Original model name
+            
+        Returns:
+            Normalized model name
+        """
+        # Convert common display names to OpenRouter format
+        normalization_map = {
+            # Claude variants
+            "claude": "anthropic/claude-3-5-sonnet",
+            "claude 3.5 sonnet": "anthropic/claude-3-5-sonnet",
+            "claude-3.5-sonnet": "anthropic/claude-3-5-sonnet",
+            "claude 3 haiku": "anthropic/claude-3-haiku",
+            "claude-3-haiku": "anthropic/claude-3-haiku",
+            
+            # ChatGPT variants
+            "gpt-4o": "openai/gpt-4o",
+            "gpt 4o": "openai/gpt-4o",
+            "chatgpt": "openai/gpt-4o",
+            "gpt-4o-mini": "openai/gpt-4o-mini",
+            "gpt 4o mini": "openai/gpt-4o-mini",
+            "gpt4o": "openai/gpt-4o",
+            "gpt4o-mini": "openai/gpt-4o-mini",
+            
+            # Gemini variants
+            "gemini": "google/gemini-pro-1.5",
+            "gemini pro": "google/gemini-pro-1.5",
+            "gemini 1.5 pro": "google/gemini-pro-1.5",
+            "gemini-1.5-pro": "google/gemini-pro-1.5",
+            "gemini 2.5 flash": "google/gemini-2.5-flash-preview",  # Updated for current model
+            "gemini 2.5": "google/gemini-2.5-flash-preview",
+            "gemini flash": "google/gemini-flash-1.5",
+            "gemini-flash": "google/gemini-flash-1.5",
+            "gemini-flash-1.5": "google/gemini-flash-1.5",
+            
+            # Local model variants (keep as-is, just normalize spacing/hyphens)
+            "qwen 3 4b mlx": "qwen3-4b-mlx",
+            "qwen3 4b mlx": "qwen3-4b-mlx",
+            "qwen 3 0.6b mlx": "qwen3-0.6b-mlx",
+            "qwen3 0.6b mlx": "qwen3-0.6b-mlx",
+            "codestral 22b": "codestral-22b-v0.1",
+            "codestral-22b": "codestral-22b-v0.1",
+        }
+        
+        # If already in provider/model format, keep as-is (check first to avoid unwanted normalization)
+        if "/" in model_name and re.match(r'^[a-zA-Z0-9][a-zA-Z0-9\-_.]*\/[a-zA-Z0-9][a-zA-Z0-9\-_.]*$', model_name):
+            return model_name
+        
+        # Convert to lowercase for mapping lookup
+        lower_name = model_name.lower().strip()
+        
+        # Check exact match first
+        if lower_name in normalization_map:
+            return normalization_map[lower_name]
+        
+        # Check partial matches for common patterns
+        for pattern, normalized in normalization_map.items():
+            if pattern in lower_name:
+                return normalized
+        
+        # For local models, normalize spacing and special characters
+        if any(keyword in lower_name for keyword in ["qwen", "codestral", "llama", "mlx", "gguf"]):
+            # Replace spaces with hyphens, keep alphanumeric, hyphens, dots
+            normalized = re.sub(r'[^a-zA-Z0-9\-.]', '-', model_name)
+            # Remove multiple consecutive hyphens
+            normalized = re.sub(r'-+', '-', normalized)
+            # Remove leading/trailing hyphens
+            normalized = normalized.strip('-')
+            return normalized
+        
+        # Return original if no normalization needed
         return model_name
 
     def sanitize_metadata(self, metadata: dict[str, Any]) -> dict[str, Any]:

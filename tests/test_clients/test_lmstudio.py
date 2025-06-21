@@ -98,7 +98,7 @@ class TestLMStudioClient:
     def test_init_default_base_url(self):
         """Test client initialization with default base URL."""
         client = LMStudioClient()
-        assert client.base_url == "http://localhost:1234"
+        assert client.base_url == "http://localhost:1234/v1"  # Updated to include /v1 endpoint
         assert client.provider_name == "lmstudio"
         assert client.api_key is None
 
@@ -106,12 +106,12 @@ class TestLMStudioClient:
         """Test client initialization with custom base URL."""
         custom_url = "http://192.168.1.100:1234"
         client = LMStudioClient(base_url=custom_url)
-        assert client.base_url == custom_url
+        assert client.base_url == custom_url + "/v1"  # /v1 is automatically appended
 
     def test_init_strips_trailing_slash(self):
         """Test that trailing slash is stripped from base URL."""
         client = LMStudioClient(base_url="http://localhost:1234/")
-        assert client.base_url == "http://localhost:1234"
+        assert client.base_url == "http://localhost:1234/v1"  # Trailing slash removed, /v1 added
 
     @pytest.mark.asyncio
     async def test_estimate_cost_always_zero(self, client, sample_request):
@@ -527,7 +527,7 @@ async def test_lmstudio_client_factory_integration():
     client = create_lmstudio_client()
 
     assert isinstance(client, LMStudioClient)
-    assert client.base_url == "http://localhost:1234"
+    assert client.base_url == "http://localhost:1234/v1"
 
 
 @pytest.mark.asyncio
@@ -539,4 +539,4 @@ async def test_lmstudio_client_factory_custom_url():
     client = create_lmstudio_client(base_url=custom_url)
 
     assert isinstance(client, LMStudioClient)
-    assert client.base_url == custom_url
+    assert client.base_url == custom_url + "/v1"

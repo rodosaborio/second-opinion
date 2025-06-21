@@ -7,25 +7,134 @@ OpenRouter client infrastructure.
 """
 
 import logging
+import os
+import sys
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict
 
 from fastmcp import FastMCP
+from pydantic import Field
 
 from ..config.settings import get_settings
 from ..utils.cost_tracking import get_cost_guard
 from ..utils.pricing import get_pricing_manager
 from .session import MCPSession
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Configure comprehensive logging for MCP server debugging
+def setup_mcp_logging(debug: bool = False) -> logging.Logger:
+    """Set up comprehensive logging for MCP server debugging."""
+    logger = logging.getLogger(__name__)
+    
+    # Clear any existing handlers
+    logger.handlers.clear()
+    
+    # Set logging level
+    level = logging.DEBUG if debug else logging.INFO
+    logger.setLevel(level)
+    
+    # Create formatter with more detail
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - [MCP] %(message)s'
+    )
+    
+    # Add stderr handler (MCP servers should log to stderr)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    
+    return logger
+
+# Set up logger
+logger = setup_mcp_logging(debug=True)  # Enable debug for troubleshooting
+
+def setup_python_path():
+    """Set up Python path for MCP server context."""
+    import pathlib
+    
+    # Get the project root (should be /Users/rsc/second-opinion)
+    current_file = pathlib.Path(__file__)
+    project_root = current_file.parent.parent.parent.parent  # Go up to project root
+    src_path = project_root / "src"
+    
+    logger.info(f"Current file: {current_file}")
+    logger.info(f"Calculated project root: {project_root}")
+    logger.info(f"Calculated src path: {src_path}")
+    
+    # Add src directory to Python path if not already there
+    src_path_str = str(src_path)
+    if src_path_str not in sys.path:
+        sys.path.insert(0, src_path_str)
+        logger.info(f"Added to sys.path: {src_path_str}")
+    else:
+        logger.info(f"Already in sys.path: {src_path_str}")
+    
+    # Also add project root
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+        logger.info(f"Added to sys.path: {project_root_str}")
+    else:
+        logger.info(f"Already in sys.path: {project_root_str}")
+
+def log_environment_info():
+    """Log comprehensive environment information for debugging."""
+    logger.info("=== MCP Server Environment Information ===")
+    logger.info(f"Python executable: {sys.executable}")
+    logger.info(f"Python version: {sys.version}")
+    logger.info(f"Working directory: {os.getcwd()}")
+    logger.info(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}")
+    logger.info(f"sys.path entries: {len(sys.path)}")
+    for i, path in enumerate(sys.path):
+        logger.info(f"  [{i}] {path}")
+    
+    # Log key environment variables
+    env_vars = ['PATH', 'UV_PROJECT_ENVIRONMENT', 'VIRTUAL_ENV', 'CONDA_DEFAULT_ENV']
+    for var in env_vars:
+        value = os.environ.get(var, 'Not set')
+        logger.info(f"{var}: {value}")
+    
+    logger.info("=== End Environment Information ===")
+
+def test_critical_imports():
+    """Test importing critical modules and log results."""
+    logger.info("=== Testing Critical Imports ===")
+    
+    critical_modules = [
+        'second_opinion',
+        'second_opinion.mcp',
+        'second_opinion.mcp.tools',
+        'second_opinion.mcp.tools.second_opinion',
+        'second_opinion.core.models',
+        'second_opinion.clients',
+        'second_opinion.utils.cost_tracking',
+    ]
+    
+    successful_imports = []
+    failed_imports = []
+    
+    for module_name in critical_modules:
+        try:
+            __import__(module_name)
+            logger.info(f"✓ Successfully imported: {module_name}")
+            successful_imports.append(module_name)
+        except Exception as e:
+            logger.error(f"✗ Failed to import {module_name}: {e}")
+            logger.error(f"  Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"  Traceback:\n{traceback.format_exc()}")
+            failed_imports.append((module_name, str(e)))
+    
+    logger.info(f"Import summary: {len(successful_imports)} successful, {len(failed_imports)} failed")
+    logger.info("=== End Import Tests ===")
+    
+    return successful_imports, failed_imports
 
 # Global session storage (in production, this would be more sophisticated)
 _sessions: Dict[str, MCPSession] = {}
 
 
 @asynccontextmanager
-async def mcp_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
+async def mcp_lifespan(_: FastMCP) -> AsyncIterator[Dict[str, Any]]:
     """
     Manage MCP server lifecycle with resource initialization and cleanup.
     
@@ -36,6 +145,18 @@ async def mcp_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
     - Session cleanup on shutdown
     """
     logger.info("Starting Second Opinion MCP server...")
+    
+    # Set up Python path for proper module resolution
+    setup_python_path()
+    
+    # Log comprehensive environment information for debugging
+    log_environment_info()
+    
+    # Test critical imports before proceeding
+    successful_imports, failed_imports = test_critical_imports()
+    
+    if failed_imports:
+        logger.warning(f"Some imports failed, but continuing startup. Failed: {[name for name, _ in failed_imports]}")
     
     try:
         # Initialize core systems
@@ -82,7 +203,8 @@ mcp = FastMCP(
 )
 
 # Import and register tools after server creation
-from .tools.second_opinion import second_opinion_tool
+# Move this import to inside the function to debug import issues
+# from .tools.second_opinion import second_opinion_tool
 
 
 # Register the core second_opinion tool
@@ -91,12 +213,38 @@ from .tools.second_opinion import second_opinion_tool
     description="Get a second opinion on an AI response by comparing it against alternative models for quality assessment and cost optimization"
 )
 async def second_opinion(
-    prompt: str,
-    primary_model: str | None = None,
-    primary_response: str | None = None,
-    context: str | None = None,
-    comparison_models: list[str] | None = None,
-    cost_limit: float | None = None,
+    prompt: str = Field(
+        ..., 
+        description="The original question or task that was asked. This helps provide context for comparison quality.",
+        examples=["Write a Python function to calculate fibonacci", "Explain quantum computing", "Debug this code snippet"]
+    ),
+    primary_model: str | None = Field(
+        None,
+        description="The model that provided the original response. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o', 'google/gemini-pro-1.5') or model name for local models (e.g. 'qwen3-4b-mlx', 'codestral-22b-v0.1').",
+        examples=["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "google/gemini-pro-1.5", "qwen3-4b-mlx"]
+    ),
+    primary_response: str | None = Field(
+        None,
+        description="The response to evaluate (RECOMMENDED). When provided, saves costs and evaluates the actual response the user saw. If not provided, will generate a new response from the primary model.",
+        examples=["def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"]
+    ),
+    context: str | None = Field(
+        None,
+        description="Additional context about the task domain for better comparison quality. Helps select appropriate comparison models and evaluation criteria.",
+        examples=["coding task", "academic research", "creative writing", "technical documentation", "educational content"]
+    ),
+    comparison_models: list[str] | None = Field(
+        None,
+        description="Specific models to compare against. If not provided, will auto-select alternatives including cost-effective local options. Use OpenRouter format for cloud models.",
+        examples=[["openai/gpt-4o", "google/gemini-pro-1.5"], ["qwen3-4b-mlx", "anthropic/claude-3-haiku"]]
+    ),
+    cost_limit: float | None = Field(
+        None,
+        description="Maximum cost limit for this operation in USD. Defaults to $0.25. Set higher for complex tasks requiring multiple model calls.",
+        examples=[0.25, 0.50, 1.00],
+        ge=0.01,
+        le=10.00
+    ),
 ) -> str:
     """
     Get a second opinion on an AI response by comparing it against alternative models.
@@ -146,8 +294,59 @@ async def second_opinion(
     # Update session activity
     session.update_activity()
     
+    logger.info(f"=== MCP Tool Call: second_opinion ===")
+    logger.info(f"Prompt length: {len(prompt) if prompt else 0}")
+    logger.info(f"Primary model: {primary_model}")
+    logger.info(f"Has primary response: {primary_response is not None}")
+    logger.info(f"Context: {context}")
+    logger.info(f"Comparison models: {comparison_models}")
+    logger.info(f"Cost limit: {cost_limit}")
+    
     try:
+        # Test import of second_opinion_tool with multiple strategies
+        logger.info("Attempting to import second_opinion_tool...")
+        second_opinion_tool = None
+        import_strategies = [
+            # Strategy 1: Relative import (current approach)
+            lambda: __import__('.tools.second_opinion', package=__package__, fromlist=['second_opinion_tool']).second_opinion_tool,
+            # Strategy 2: Absolute import
+            lambda: __import__('second_opinion.mcp.tools.second_opinion', fromlist=['second_opinion_tool']).second_opinion_tool,
+            # Strategy 3: Direct module import
+            lambda: getattr(__import__('second_opinion.mcp.tools.second_opinion'), 'second_opinion_tool'),
+        ]
+        
+        for i, strategy in enumerate(import_strategies, 1):
+            try:
+                logger.info(f"Trying import strategy {i}...")
+                second_opinion_tool = strategy()
+                logger.info(f"✓ Successfully imported second_opinion_tool using strategy {i}")
+                break
+            except Exception as e:
+                logger.warning(f"✗ Import strategy {i} failed: {e}")
+                continue
+        
+        if second_opinion_tool is None:
+            # Final fallback: try to import manually step by step
+            logger.info("All import strategies failed, trying manual step-by-step import...")
+            try:
+                import importlib
+                module = importlib.import_module('second_opinion.mcp.tools.second_opinion')
+                second_opinion_tool = getattr(module, 'second_opinion_tool')
+                logger.info("✓ Successfully imported using manual importlib approach")
+            except Exception as final_error:
+                logger.error(f"✗ All import methods failed. Final error: {final_error}")
+                import traceback
+                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
+                raise ImportError(f"Unable to import second_opinion_tool after trying multiple strategies. Last error: {final_error}")
+                
+        if second_opinion_tool is None:
+            raise ImportError("second_opinion_tool is None after all import attempts")
+        
         # Call the tool implementation
+        logger.info("Calling second_opinion_tool implementation...")
+        logger.info(f"Tool function type: {type(second_opinion_tool)}")
+        logger.info(f"Tool function module: {getattr(second_opinion_tool, '__module__', 'unknown')}")
+        
         result = await second_opinion_tool(
             prompt=prompt,
             primary_model=primary_model,
@@ -156,6 +355,8 @@ async def second_opinion(
             comparison_models=comparison_models,
             cost_limit=cost_limit,
         )
+        logger.info("✓ second_opinion_tool completed successfully")
+        logger.info(f"Result length: {len(result) if result else 0}")
         
         # Add to conversation context
         session.add_conversation_context(
@@ -169,7 +370,15 @@ async def second_opinion(
         return result
         
     except Exception as e:
-        logger.error(f"Tool execution failed: {e}")
+        # Log comprehensive error information
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"=== Error in second_opinion MCP tool ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full traceback:\n{error_details}")
+        logger.error("=== End Error Details ===")
+        
         # Still add to context for debugging
         session.add_conversation_context(
             tool_name="second_opinion",
@@ -178,7 +387,9 @@ async def second_opinion(
             comparison_models=comparison_models or [],
             result_summary=f"Error: {str(e)}"
         )
-        raise
+        
+        # Return user-friendly error message instead of raising
+        return f"❌ **Second Opinion Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
 
 
 def get_mcp_session(session_id: str | None = None) -> MCPSession:
@@ -240,11 +451,22 @@ if __name__ == "__main__":
         ]
     }
     """
+    import argparse
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Second Opinion MCP Server")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    args = parser.parse_args()
+    
     # Configure logging for standalone mode
+    log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
-        level=logging.INFO,
+        level=log_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     
-    logger.info("Starting Second Opinion MCP server in standalone mode")
+    # Update our MCP logger setup
+    logger = setup_mcp_logging(debug=args.debug)
+    
+    logger.info(f"Starting Second Opinion MCP server in standalone mode (debug={'on' if args.debug else 'off'})")
     mcp.run()

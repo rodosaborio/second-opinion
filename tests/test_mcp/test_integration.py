@@ -28,18 +28,23 @@ class TestMCPIntegration:
     async def test_second_opinion_tool_execution_mock(self):
         """Test second_opinion tool execution with mocked dependencies."""
         # Mock all external dependencies
-        with patch("src.second_opinion.mcp.tools.second_opinion.get_evaluator") as mock_evaluator, \
-             patch("src.second_opinion.mcp.tools.second_opinion.get_cost_guard") as mock_cost_guard, \
-             patch("src.second_opinion.mcp.tools.second_opinion.create_client_from_config") as mock_client_factory:
+        with patch("second_opinion.mcp.tools.second_opinion.get_evaluator") as mock_evaluator, \
+             patch("second_opinion.mcp.tools.second_opinion.get_cost_guard") as mock_cost_guard, \
+             patch("second_opinion.mcp.tools.second_opinion.create_client_from_config") as mock_client_factory:
             
             # Setup evaluator mock
             mock_eval = MagicMock()
-            mock_eval.classify_task_complexity = AsyncMock(return_value=MagicMock(value="SIMPLE"))
-            mock_eval.compare_responses = AsyncMock(return_value={
-                'overall_winner': 'primary',
-                'overall_score': 8.0,
-                'reasoning': 'Primary response was more accurate'
-            })
+            
+            # Mock task complexity with proper enum value
+            from second_opinion.core.evaluator import TaskComplexity
+            mock_eval.classify_task_complexity = AsyncMock(return_value=TaskComplexity.SIMPLE)
+            
+            # Mock comparison result as object with required attributes
+            mock_comparison_result = MagicMock()
+            mock_comparison_result.winner = 'primary'
+            mock_comparison_result.overall_score = 8.0
+            mock_comparison_result.reasoning = 'Primary response was more accurate'
+            mock_eval.compare_responses = AsyncMock(return_value=mock_comparison_result)
             mock_evaluator.return_value = mock_eval
             
             # Setup cost guard mock
@@ -58,13 +63,15 @@ class TestMCPIntegration:
             # Setup client mock
             mock_client = MagicMock()
             
-            # Mock model response
+            # Mock model response with proper attributes
             mock_response = MagicMock()
             mock_response.content = "Paris is the capital of France."
+            mock_response.model = "gpt-4"  # Add model attribute
             mock_response.cost_estimate = Decimal("0.002")
             mock_response.usage = MagicMock()
             mock_response.usage.total_tokens = 18
             
+            # Mock client with all required methods
             mock_client.complete = AsyncMock(return_value=mock_response)
             mock_client.estimate_cost = AsyncMock(return_value=Decimal("0.002"))
             mock_client_factory.return_value = mock_client
@@ -86,11 +93,11 @@ class TestMCPIntegration:
             # Get the text content
             content = result[0].text if hasattr(result[0], 'text') else str(result[0])
             
-            assert "Second Opinion Analysis" in content
+            assert "Second Opinion: Should You Stick or Switch?" in content
             assert "Paris is the capital of France" in content
             assert "Cost Analysis" in content
             assert "Quality Assessment" in content
-            assert "Recommendations" in content
+            assert "My Recommendation" in content
             
             # Verify that external systems were called correctly
             mock_eval.classify_task_complexity.assert_called_once()
@@ -100,18 +107,23 @@ class TestMCPIntegration:
     @pytest.mark.asyncio
     async def test_response_reuse_feature(self):
         """Test the response reuse feature for cost optimization."""
-        with patch("src.second_opinion.mcp.tools.second_opinion.get_evaluator") as mock_evaluator, \
-             patch("src.second_opinion.mcp.tools.second_opinion.get_cost_guard") as mock_cost_guard, \
-             patch("src.second_opinion.mcp.tools.second_opinion.create_client_from_config") as mock_client_factory:
+        with patch("second_opinion.mcp.tools.second_opinion.get_evaluator") as mock_evaluator, \
+             patch("second_opinion.mcp.tools.second_opinion.get_cost_guard") as mock_cost_guard, \
+             patch("second_opinion.mcp.tools.second_opinion.create_client_from_config") as mock_client_factory:
             
             # Setup mocks (similar to above)
             mock_eval = MagicMock()
-            mock_eval.classify_task_complexity = AsyncMock(return_value=MagicMock(value="SIMPLE"))
-            mock_eval.compare_responses = AsyncMock(return_value={
-                'overall_winner': 'comparison',
-                'overall_score': 7.5,
-                'reasoning': 'Comparison response was clearer'
-            })
+            
+            # Mock task complexity with proper enum value
+            from second_opinion.core.evaluator import TaskComplexity
+            mock_eval.classify_task_complexity = AsyncMock(return_value=TaskComplexity.SIMPLE)
+            
+            # Mock comparison result as object with required attributes
+            mock_comparison_result = MagicMock()
+            mock_comparison_result.winner = 'comparison'
+            mock_comparison_result.overall_score = 7.5
+            mock_comparison_result.reasoning = 'Comparison response was clearer'
+            mock_eval.compare_responses = AsyncMock(return_value=mock_comparison_result)
             mock_evaluator.return_value = mock_eval
             
             mock_guard = MagicMock()
@@ -128,6 +140,7 @@ class TestMCPIntegration:
             mock_client = MagicMock()
             mock_response = MagicMock()
             mock_response.content = "The capital city of France is Paris."
+            mock_response.model = "claude-3"  # Add model attribute
             mock_response.cost_estimate = Decimal("0.003")
             mock_client.complete = AsyncMock(return_value=mock_response)
             mock_client.estimate_cost = AsyncMock(return_value=Decimal("0.003"))
@@ -185,7 +198,8 @@ class TestMCPIntegration:
             
             # Should return budget error message
             assert "Budget Error" in content
-            assert "Cost limit of $0.01 would be exceeded" in content
+            assert "exceeds per-request limit" in content
+            assert "$0.01" in content
             
     @pytest.mark.asyncio
     async def test_invalid_input_handling(self):

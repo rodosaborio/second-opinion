@@ -226,6 +226,12 @@ class ModelConfigManager:
             return []
         return self._config.model_tiers.get_models_for_tier(tier)
 
+    def get_comparison_models(self, tool_name: str, primary_model: str) -> list[str]:
+        """Get comparison models for a tool, excluding the primary model."""
+        if not self._config:
+            self._load_default_config()
+        return self._config.get_comparison_models(tool_name, primary_model) if self._config else []
+
     def estimate_cost(self, model: str, input_tokens: int, output_tokens: int) -> Decimal:
         """Estimate cost for a model request."""
         if not self._config:
@@ -285,6 +291,22 @@ class ModelConfigManager:
         if self._config is None:
             self._config = ModelProfilesConfig()
         return self._config
+
+    def _load_default_config(self):
+        """Load the default configuration file."""
+        try:
+            from pathlib import Path
+            # Try to find config in standard locations
+            project_root = Path(__file__).parent.parent.parent.parent
+            config_path = project_root / "config" / "model_profiles.yaml"
+            if config_path.exists():
+                self.load_config(config_path)
+            else:
+                # Fallback to default configuration
+                self._config = ModelProfilesConfig()
+        except Exception:
+            # Last resort: empty config
+            self._config = ModelProfilesConfig()
 
     def reset(self):
         """Reset the configuration manager (useful for testing)."""

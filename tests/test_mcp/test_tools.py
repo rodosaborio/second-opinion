@@ -57,7 +57,7 @@ class TestSecondOpinionTool:
             
             # Verify result
             assert isinstance(result, str)
-            assert "Second Opinion Analysis" in result
+            assert "Second Opinion: Should You Stick or Switch?" in result
             assert "Paris is the capital of France" in result
             assert "Cost Analysis" in result
             assert "Quality Assessment" in result
@@ -109,7 +109,7 @@ class TestSecondOpinionTool:
             
             # Verify result
             assert isinstance(result, str)
-            assert "Second Opinion Analysis" in result
+            assert "Second Opinion: Should You Stick or Switch?" in result
             assert "Paris is the capital of France" in result
             assert "The capital city of France is Paris" in result
             
@@ -251,6 +251,7 @@ class TestSecondOpinionTool:
             mock_client = MagicMock()
             mock_response = MagicMock()
             mock_response.content = "<think>reasoning here</think>Paris is the capital."
+            mock_response.model = "gpt-4"  # Add model attribute
             mock_response.cost_estimate = Decimal("0.002")
             mock_client.complete = AsyncMock(return_value=mock_response)
             mock_client.estimate_cost = AsyncMock(return_value=Decimal("0.002"))
