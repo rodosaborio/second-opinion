@@ -937,6 +937,225 @@ async def compare_responses(
         return f"❌ **Compare Responses Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
 
 
+# Register the consult tool
+@mcp.tool(
+    name="consult",
+    description="Consult with AI models for expert opinions, task delegation, and multi-turn problem solving"
+)
+async def consult(
+    query: str = Field(
+        ...,
+        description="The question or task to consult about. This can be a request for expert opinion, task delegation, or complex problem-solving.",
+        examples=["Should I use async/await or threading for this I/O operation?", "Write unit tests for this function", "Help me design a scalable authentication system"]
+    ),
+    consultation_type: str = Field(
+        "quick",
+        description="Type of consultation: 'quick' (single-turn expert opinion), 'deep' (multi-turn analysis), 'delegate' (task completion), 'brainstorm' (creative exploration)",
+        examples=["quick", "deep", "delegate", "brainstorm"]
+    ),
+    target_model: str | None = Field(
+        None,
+        description="Specific model to consult with. Auto-selected if not provided. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o') or model name for local models (e.g. 'qwen3-4b-mlx').",
+        examples=["anthropic/claude-3-5-sonnet", "openai/gpt-4o-mini", "google/gemini-pro-1.5", "qwen3-4b-mlx"]
+    ),
+    session_id: str | None = Field(
+        None,
+        description="Continue existing consultation session (for multi-turn). Use the session ID from a previous consultation to continue the conversation.",
+        examples=["abc123-session-id"]
+    ),
+    max_turns: int = Field(
+        3,
+        description="Maximum conversation turns for multi-turn consultations (1-5). Only applies to 'deep' and 'brainstorm' types.",
+        ge=1,
+        le=5,
+        examples=[1, 3, 5]
+    ),
+    context: str | None = Field(
+        None,
+        description="Additional context about the task domain for better model routing and consultation quality.",
+        examples=["coding task", "system architecture", "performance optimization", "creative writing"]
+    ),
+    cost_limit: float | None = Field(
+        None,
+        description="Maximum cost limit for this consultation in USD. Defaults vary by consultation type: delegate ($0.10), deep ($0.50), others ($0.25).",
+        examples=[0.10, 0.25, 0.50],
+        ge=0.01,
+        le=10.00
+    ),
+) -> str:
+    """
+    Consult with AI models for expert opinions, task delegation, and problem solving.
+
+    This tool enables AI-to-AI consultation across different specialized models,
+    supporting both single-turn expert opinions and multi-turn collaborative
+    problem-solving sessions.
+
+    CONSULTATION TYPES:
+    - **quick**: Single-turn expert opinion with focused advice
+    - **deep**: Multi-turn comprehensive analysis and problem exploration  
+    - **delegate**: Task completion using cost-effective models (60-80% savings)
+    - **brainstorm**: Creative collaborative exploration with multiple perspectives
+
+    SMART MODEL ROUTING:
+    - Automatically selects optimal models based on consultation type and task complexity
+    - delegate + simple → GPT-4o-mini (cost optimization)
+    - expert + complex → Claude Opus (premium quality)
+    - brainstorm → GPT-4o (creative balance)
+    - quick → Claude 3.5 Sonnet (reliable default)
+
+    COST OPTIMIZATION:
+    - Task delegation: 60-80% cost savings vs premium models
+    - Multi-turn conversations: Intelligent context management
+    - Transparent cost tracking with session management
+    - Per-consultation cost limits with auto-stop protection
+
+    Args:
+        query: The question or task to consult about
+        consultation_type: Type of consultation (quick/deep/delegate/brainstorm)
+        target_model: Specific model to consult (auto-selected if None)
+        session_id: Continue existing session for multi-turn conversations
+        max_turns: Maximum turns for multi-turn consultations (1-5)
+        context: Additional context for better routing and quality
+        cost_limit: Maximum cost for this consultation (type-specific defaults)
+
+    Returns:
+        Consultation results with expert insights, cost analysis, session management,
+        and actionable recommendations for follow-up.
+
+    USAGE PATTERNS:
+        # Quick expert opinion
+        result = await consult(
+            query="Should I use async/await or threading for this I/O operation?",
+            consultation_type="quick",
+            context="performance optimization"
+        )
+
+        # Task delegation for cost savings
+        result = await consult(
+            query="Write unit tests for this function: def fibonacci(n): ...",
+            consultation_type="delegate",
+            target_model="openai/gpt-4o-mini"
+        )
+
+        # Deep problem solving (multi-turn)
+        result = await consult(
+            query="Help me design a scalable authentication system",
+            consultation_type="deep",
+            max_turns=3,
+            context="system architecture"
+        )
+
+        # Continue existing conversation
+        result = await consult(
+            query="Now help me implement the OAuth2 flow",
+            consultation_type="deep",
+            session_id="abc123-session-id"
+        )
+    """
+    # Get or create session for this request
+    session = get_mcp_session()
+    session.update_activity()
+
+    logger.info("=== MCP Tool Call: consult ===")
+    logger.info(f"Query: {query[:100]}...")
+    logger.info(f"Consultation type: {consultation_type}")
+    logger.info(f"Target model: {target_model}")
+    logger.info(f"Session ID: {session_id}")
+    logger.info(f"Max turns: {max_turns}")
+    logger.info(f"Context: {context}")
+    logger.info(f"Cost limit: {cost_limit}")
+
+    try:
+        # Import consult_tool with multiple strategies (same as other tools)
+        logger.info("Attempting to import consult_tool...")
+        consult_tool = None
+        import_strategies = [
+            # Strategy 1: Relative import
+            lambda: __import__('.tools.consult', package=__package__, fromlist=['consult_tool']).consult_tool,
+            # Strategy 2: Absolute import
+            lambda: __import__('second_opinion.mcp.tools.consult', fromlist=['consult_tool']).consult_tool,
+            # Strategy 3: Direct module import
+            lambda: __import__('second_opinion.mcp.tools.consult').consult_tool,
+        ]
+
+        for i, strategy in enumerate(import_strategies, 1):
+            try:
+                logger.info(f"Trying import strategy {i}...")
+                consult_tool = strategy()
+                logger.info(f"✓ Successfully imported consult_tool using strategy {i}")
+                break
+            except Exception as e:
+                logger.warning(f"✗ Import strategy {i} failed: {e}")
+                continue
+
+        if consult_tool is None:
+            # Final fallback: manual importlib approach
+            logger.info("All import strategies failed, trying manual step-by-step import...")
+            try:
+                import importlib
+                module = importlib.import_module('second_opinion.mcp.tools.consult')
+                consult_tool = module.consult_tool
+                logger.info("✓ Successfully imported using manual importlib approach")
+            except Exception as final_error:
+                logger.error(f"✗ All import methods failed. Final error: {final_error}")
+                import traceback
+                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
+                raise ImportError(f"Unable to import consult_tool after trying multiple strategies. Last error: {final_error}")
+
+        if consult_tool is None:
+            raise ImportError("consult_tool is None after all import attempts")
+
+        # Call the tool implementation
+        logger.info("Calling consult_tool implementation...")
+        logger.info(f"Tool function type: {type(consult_tool)}")
+        logger.info(f"Tool function module: {getattr(consult_tool, '__module__', 'unknown')}")
+
+        result = await consult_tool(
+            query=query,
+            consultation_type=consultation_type,
+            target_model=target_model,
+            session_id=session_id,
+            max_turns=max_turns,
+            context=context,
+            cost_limit=cost_limit,
+        )
+        logger.info("✓ consult_tool completed successfully")
+        logger.info(f"Result length: {len(result) if result else 0}")
+
+        # Add to conversation context
+        session.add_conversation_context(
+            tool_name="consult",
+            prompt=query,
+            primary_model=target_model or "auto-selected",
+            comparison_models=[],  # Consultation uses single model
+            result_summary=f"Consultation ({consultation_type}) completed successfully"
+        )
+
+        return result
+
+    except Exception as e:
+        # Log comprehensive error information
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error("=== Error in consult MCP tool ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full traceback:\n{error_details}")
+        logger.error("=== End Error Details ===")
+
+        # Add to context for debugging
+        session.add_conversation_context(
+            tool_name="consult",
+            prompt=query,
+            primary_model=target_model or "unknown",
+            comparison_models=[],
+            result_summary=f"Error: {str(e)}"
+        )
+
+        # Return user-friendly error message
+        return f"❌ **Consult Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
+
+
 def get_mcp_session(session_id: str | None = None) -> MCPSession:
     """
     Get or create an MCP session for the current request.

@@ -781,11 +781,13 @@ async def new_tool(
 
 ### Next MCP Tools Pipeline
 
-**Ready for Implementation**:
-1. **`should_downgrade`** - Test cheaper alternatives using existing responses
-2. **`should_upgrade`** - Evaluate premium model benefits with cost-benefit analysis
-3. **`compare_responses`** - Detailed side-by-side analysis of provided responses
-4. **`usage_analytics`** - Session and historical usage analysis
+**Priority 1: AI Consultation Platform** (Phase 9):
+1. **`consult`** - AI-to-AI consultation for expert opinions, task delegation, and problem solving
+
+**Priority 2: Advanced Analytics**:
+2. **`usage_analytics`** - Session and historical usage analysis with cost insights
+3. **`batch_comparison`** - Multi-response comparison and quality ranking
+4. **`model_benchmark`** - Systematic model testing across task categories
 
 Each tool can leverage the complete infrastructure built for `second_opinion`, requiring only tool-specific logic while reusing:
 - Session management and cost tracking
@@ -795,3 +797,489 @@ Each tool can leverage the complete infrastructure built for `second_opinion`, r
 - Testing infrastructure and mock utilities
 
 This blueprint ensures consistent quality, reliable cost optimization, and excellent developer experience across all MCP tools.
+
+## Phase 9: AI Consultation Platform - `consult` Tool
+
+### Strategic Vision
+
+Transform Second Opinion into the first AI consultation platform enabling true AI-to-AI interaction, where MCP clients can delegate tasks, seek expert opinions, and engage in multi-turn problem-solving conversations with specialized models.
+
+### Core Value Propositions
+
+**Consultation Patterns**:
+- **Task Delegation**: "Have GPT-4o-mini write unit tests" → 60-80% cost savings
+- **Expert Opinion**: "Get Claude Opus's take on this architecture" → Premium insights
+- **Multi-turn Problem Solving**: Iterative collaboration on complex problems
+- **Specialized Routing**: Domain-specific model recommendations
+
+### Tool Interface Design
+
+```python
+@mcp.tool(name="consult", description="Consult with AI models for expert opinions, task delegation, and problem solving")
+async def consult(
+    query: str,                        # Question/task to consult about
+    consultation_type: str = "quick",  # "quick", "deep", "delegate", "brainstorm"  
+    target_model: str | None = None,   # Auto-select or specify model
+    session_id: str | None = None,     # Continue existing conversation
+    max_turns: int = 3,               # Conversation turn limit
+    context: str | None = None,       # Additional task context
+    cost_limit: float | None = None   # Budget protection
+) -> str:
+```
+
+### Consultation Types & Use Cases
+
+**1. Quick Expert Opinion** (Single-turn consultation):
+```
+Use Case: "Should I use async/await or threading for this I/O operation?"
+Flow: Query → Auto-route to performance expert model → Expert opinion with reasoning
+Cost: ~$0.01-0.05 depending on model tier
+Value: Expert guidance without research time
+```
+
+**2. Task Delegation** (Cost optimization):
+```
+Use Case: "Write unit tests for this function"
+Flow: Query → Route to cost-effective model (GPT-4o-mini) → Completed task
+Cost: 60-80% savings vs premium models
+Value: Efficient completion of routine tasks
+```
+
+**3. Deep Consultation** (Multi-turn problem solving):
+```
+Use Case: "Help me design a scalable authentication system"
+Flow: 
+  Turn 1: Explain requirements and constraints
+  Turn 2: Explore architecture options
+  Turn 3: Refine chosen approach with implementation details
+Cost: $0.05-0.20 depending on model and complexity
+Value: Collaborative problem solving with expert AI
+```
+
+**4. Brainstorming** (Creative collaboration):
+```
+Use Case: "Help me explore different approaches to this performance problem"
+Flow: Creative exploration → Multiple perspective generation → Solution synthesis
+Cost: $0.03-0.15 for comprehensive exploration
+Value: Enhanced creativity and solution diversity
+```
+
+### Technical Architecture
+
+#### 1. Consultation Session Management
+
+```python
+class ConsultationSession:
+    """Extended session management for multi-turn conversations."""
+    
+    def __init__(self, consultation_type: str, target_model: str):
+        # Inherit from MCPSession for cost tracking
+        super().__init__()
+        self.consultation_type = consultation_type
+        self.target_model = target_model
+        self.messages: List[Message] = []
+        self.turn_count = 0
+        self.status = "active"  # active, paused, completed
+        self.conversation_summary = ""
+        
+    async def add_turn(self, query: str, response: str, cost: Decimal):
+        """Add a conversation turn with cost tracking."""
+        self.messages.extend([
+            Message(role="user", content=query),
+            Message(role="assistant", content=response)
+        ])
+        self.turn_count += 1
+        self.record_cost("consult", cost, self.target_model)
+        
+    def can_continue(self, max_turns: int, cost_limit: Decimal) -> bool:
+        """Check if conversation can continue."""
+        return (self.turn_count < max_turns and 
+                self.total_cost < cost_limit and
+                self.status == "active")
+```
+
+#### 2. Intelligent Model Router
+
+```python
+class ConsultationModelRouter:
+    """Smart model selection based on consultation type and context."""
+    
+    def recommend_model(
+        self, 
+        consultation_type: str, 
+        context: str = None,
+        task_complexity: TaskComplexity = TaskComplexity.MODERATE
+    ) -> str:
+        """
+        Recommend optimal model for consultation needs.
+        
+        Strategy:
+        - delegate + simple → GPT-4o-mini (cost optimization)
+        - expert + high complexity → Claude Opus (premium quality)
+        - brainstorm → GPT-4o (creative balance)
+        - quick → Claude 3.5 Sonnet (reliable default)
+        """
+        
+        if consultation_type == "delegate":
+            if task_complexity in [TaskComplexity.SIMPLE, TaskComplexity.MODERATE]:
+                return "openai/gpt-4o-mini"  # Cost-effective for routine tasks
+            else:
+                return "anthropic/claude-3-5-sonnet"  # Quality for complex delegation
+                
+        elif consultation_type == "expert" or task_complexity == TaskComplexity.COMPLEX:
+            return "anthropic/claude-3-opus"  # Premium for expert consultation
+            
+        elif consultation_type == "brainstorm":
+            return "openai/gpt-4o"  # Creative and collaborative
+            
+        else:  # quick consultation
+            return "anthropic/claude-3-5-sonnet"  # Reliable default
+    
+    def detect_domain_specialization(self, query: str, context: str = None) -> str:
+        """Detect if query needs domain-specific model routing."""
+        query_lower = query.lower()
+        context_lower = (context or "").lower()
+        
+        # Code-related queries
+        if any(term in query_lower for term in ["code", "function", "algorithm", "debug", "programming"]):
+            return "coding"
+        
+        # Performance/infrastructure queries  
+        elif any(term in query_lower for term in ["performance", "scale", "infrastructure", "optimization"]):
+            return "performance"
+            
+        # Creative/writing queries
+        elif any(term in query_lower for term in ["write", "creative", "story", "content"]):
+            return "creative"
+            
+        else:
+            return "general"
+```
+
+#### 3. Turn Controller for Multi-Turn Conversations
+
+```python
+class TurnController:
+    """Manage multi-turn conversation flow and context."""
+    
+    async def conduct_consultation(
+        self,
+        session: ConsultationSession,
+        initial_query: str,
+        max_turns: int,
+        cost_limit: Decimal
+    ) -> Dict[str, Any]:
+        """
+        Conduct multi-turn consultation with intelligent flow control.
+        
+        Returns detailed consultation results with conversation summary.
+        """
+        
+        results = {
+            "conversation_turns": [],
+            "total_cost": Decimal("0.0"),
+            "consultation_summary": "",
+            "recommendations": [],
+            "next_steps": []
+        }
+        
+        current_query = initial_query
+        
+        for turn in range(max_turns):
+            if not session.can_continue(max_turns, cost_limit):
+                break
+                
+            # Get response from target model
+            response, cost = await self._get_consultation_response(
+                session, current_query, turn
+            )
+            
+            # Record turn
+            await session.add_turn(current_query, response, cost)
+            results["conversation_turns"].append({
+                "turn": turn + 1,
+                "query": current_query,
+                "response": response,
+                "cost": float(cost)
+            })
+            results["total_cost"] += cost
+            
+            # Determine if follow-up is needed
+            follow_up = await self._assess_follow_up_need(
+                session, response, turn, max_turns
+            )
+            
+            if not follow_up["needed"]:
+                break
+                
+            current_query = follow_up["query"]
+        
+        # Generate consultation summary
+        results["consultation_summary"] = await self._generate_summary(session)
+        results["recommendations"] = await self._extract_recommendations(session)
+        
+        return results
+    
+    async def _assess_follow_up_need(
+        self, session: ConsultationSession, response: str, turn: int, max_turns: int
+    ) -> Dict[str, Any]:
+        """Intelligently assess if follow-up questions are needed."""
+        
+        # Simple heuristics for follow-up detection
+        follow_up_indicators = [
+            "would you like me to elaborate",
+            "need more details",
+            "want me to explore",
+            "should we dive deeper",
+            "any specific aspects"
+        ]
+        
+        response_lower = response.lower()
+        needs_follow_up = any(indicator in response_lower for indicator in follow_up_indicators)
+        
+        if needs_follow_up and turn < max_turns - 1:
+            # Generate intelligent follow-up query based on consultation type
+            if session.consultation_type == "deep":
+                return {
+                    "needed": True,
+                    "query": "Please elaborate on the most important considerations and provide specific implementation guidance."
+                }
+            elif session.consultation_type == "brainstorm":
+                return {
+                    "needed": True,
+                    "query": "What are 2-3 alternative approaches we should consider, and what are their trade-offs?"
+                }
+        
+        return {"needed": False, "query": None}
+```
+
+#### 4. Response Formatting for Consultations
+
+```python
+def format_consultation_response(
+    consultation_type: str,
+    results: Dict[str, Any],
+    session: ConsultationSession
+) -> str:
+    """Format consultation results for optimal MCP client display."""
+    
+    sections = []
+    
+    # Header based on consultation type
+    if consultation_type == "quick":
+        sections.append("# 🎯 Quick Expert Consultation")
+    elif consultation_type == "delegate":
+        sections.append("# 📋 Task Delegation Results")
+    elif consultation_type == "deep":
+        sections.append("# 🔍 Deep Consultation Session")
+    elif consultation_type == "brainstorm":
+        sections.append("# 💡 Brainstorming Session")
+    
+    sections.append("")
+    
+    # Consultation summary
+    sections.append("## 📝 Consultation Summary")
+    sections.append(results["consultation_summary"])
+    sections.append("")
+    
+    # Multi-turn conversation display
+    if len(results["conversation_turns"]) > 1:
+        sections.append("## 💬 Conversation Flow")
+        for turn_data in results["conversation_turns"]:
+            sections.append(f"### Turn {turn_data['turn']}")
+            sections.append(f"**Query**: {turn_data['query'][:200]}...")
+            sections.append(f"**Response**: {turn_data['response'][:500]}...")
+            sections.append(f"**Cost**: ${turn_data['cost']:.4f}")
+            sections.append("")
+    
+    # Key recommendations
+    if results["recommendations"]:
+        sections.append("## 🎯 Key Recommendations")
+        for i, rec in enumerate(results["recommendations"], 1):
+            sections.append(f"{i}. {rec}")
+        sections.append("")
+    
+    # Cost analysis
+    sections.append("## 💰 Consultation Cost Analysis")
+    sections.append(f"**Total Cost**: ${results['total_cost']:.4f}")
+    sections.append(f"**Model Used**: {session.target_model}")
+    sections.append(f"**Turns**: {session.turn_count}")
+    
+    # Value assessment
+    if consultation_type == "delegate":
+        estimated_savings = calculate_delegation_savings(session.target_model)
+        sections.append(f"**Estimated Savings**: ${estimated_savings:.4f} vs premium model")
+    
+    sections.append("")
+    
+    # Next steps
+    sections.append("## 🚀 Next Steps")
+    if consultation_type == "delegate":
+        sections.append("1. **Review the completed task** for accuracy and completeness")
+        sections.append("2. **Integrate the results** into your workflow")
+        sections.append("3. **Consider similar delegations** for routine tasks")
+    elif consultation_type == "expert":
+        sections.append("1. **Implement the recommended approach** with confidence")
+        sections.append("2. **Monitor results** and iterate as needed")
+        sections.append("3. **Document learnings** for future reference")
+    elif consultation_type == "deep":
+        sections.append("1. **Review the comprehensive analysis** and choose your approach")
+        sections.append("2. **Start with the highest-priority recommendations**")
+        sections.append("3. **Schedule follow-up consultation** if needed")
+    
+    return "\n".join(sections)
+```
+
+### Implementation Timeline
+
+**Phase A: Core Engine** (2-3 days):
+- ConsultationSession management with multi-turn support
+- ConsultationModelRouter with intelligent model selection
+- Basic single-turn consultation implementation
+- Integration with existing cost tracking and provider systems
+
+**Phase B: Multi-Turn & Advanced Features** (2-3 days):
+- TurnController for conversation flow management
+- Advanced consultation types (deep, brainstorm)
+- Conversation summarization and recommendation extraction
+- Specialized domain routing
+
+**Phase C: Polish & Integration** (1-2 days):
+- Comprehensive response formatting
+- Enhanced error handling and fallback mechanisms
+- Testing infrastructure (15+ test scenarios)
+- MCP server integration and documentation
+
+### Success Metrics
+
+**User Value Metrics**:
+- **Task Delegation Adoption**: Frequency of "delegate" consultations
+- **Cost Optimization**: Measurable savings through smart model routing
+- **Problem Solving Effectiveness**: Success rate of multi-turn consultations
+- **Expert Consultation Quality**: User satisfaction with domain expertise
+
+**Technical Metrics**:
+- **Conversation Completion Rate**: % of multi-turn sessions completed successfully
+- **Model Selection Accuracy**: Appropriate model choice for consultation type
+- **Cost Efficiency**: Average cost per consultation by type
+- **Response Time**: Consultation latency across different model tiers
+
+This AI consultation platform positions Second Opinion as the premier AI-to-AI collaboration tool, enabling unprecedented productivity through intelligent task delegation and expert consultation.
+
+## Phase 9a: LLM-Based Domain Classification Enhancement
+
+### Overview
+
+Replaced brittle string-matching domain classification with intelligent LLM-based classification using small, cost-effective models. This eliminates maintenance burden and provides scalable, accurate domain detection for consultation routing.
+
+### Problem Solved
+
+**Previous Approach Issues**:
+- Hardcoded string lists requiring manual maintenance
+- Substring matching causing false positives ("capital" → "api" → "coding")
+- Order-dependent classification logic
+- Limited context awareness
+- Brittle edge case handling
+
+**New LLM-Based Solution**:
+- Dynamic classification using `openai/gpt-4o-mini` (~$0.001 per query)
+- Multi-shot prompt with clear examples and guidelines
+- Confidence scoring with fallback to "general" domain
+- Caching for repeated queries to minimize costs
+- Graceful degradation when classification fails
+
+### Implementation
+
+**Domain Classifier** (`src/second_opinion/utils/domain_classifier.py`):
+```python
+class DomainClassifier:
+    """Intelligent domain classification using small language models."""
+    
+    def __init__(self, model: str = "openai/gpt-4o-mini"):
+        self.model = model
+        self.classification_prompt = self._get_classification_prompt()
+    
+    async def classify_domain(self, query: str, context: str = None) -> Tuple[str, float]:
+        """Classify domain with confidence scoring and caching."""
+        # Implementation with JSON-structured output and error handling
+        
+    async def get_domain_with_fallback(
+        self, query: str, context: str = None, confidence_threshold: float = 0.7
+    ) -> str:
+        """Get domain with confidence-based fallback to 'general'."""
+```
+
+**Multi-Shot Classification Prompt**:
+```
+You are a domain classifier for AI consultation queries. Classify each query into exactly one of these domains:
+
+DOMAINS:
+- coding: Programming, software development, debugging, algorithms, APIs
+- performance: System optimization, scalability, infrastructure, databases  
+- creative: Writing, content creation, marketing, storytelling, design
+- general: Everything else (knowledge questions, advice, explanations)
+
+EXAMPLES:
+Query: "Write a Python function to sort a list"
+Domain: coding
+
+Query: "What is the capital of France?"
+Domain: general
+
+OUTPUT FORMAT:
+{"domain": "domain_name", "confidence": 0.95}
+```
+
+### Cost Analysis
+
+**Operational Costs**:
+- Classification cost: ~$0.001 per query using gpt-4o-mini
+- Caching reduces repeat classifications to zero cost
+- Fallback to "general" when classification fails (robust)
+
+**Development Savings**:
+- Eliminated 40+ lines of brittle string matching code
+- No more manual pattern maintenance for new domains
+- Self-improving through better examples vs code changes
+
+### Benefits Realized
+
+**Reliability Improvements**:
+- ✅ Fixed false positive: "What is the capital of France?" → "general" (not "coding")
+- ✅ Contextual awareness: Considers both query and additional context
+- ✅ Confidence scoring: Falls back to "general" for ambiguous queries
+- ✅ Graceful degradation: Always returns valid domain even on API failures
+
+**Maintainability Gains**:
+- ✅ No more hardcoded string lists to maintain
+- ✅ Easy domain expansion through prompt examples
+- ✅ Centralized classification logic
+- ✅ Comprehensive test coverage with predictable mocks
+
+**Performance Characteristics**:
+- ✅ ~100ms classification latency (acceptable for consultation use case)
+- ✅ In-memory caching for repeated queries
+- ✅ Minimal cost impact: $0.001 vs potential consultation savings of $0.01-0.10
+
+### Architecture Pattern
+
+**KISS Principle Application**:
+- **Simple**: Single responsibility domain classification utility
+- **Scalable**: Add domains through prompt examples, not code
+- **Reliable**: Confidence scoring with fallback mechanisms
+- **Cost-Effective**: Small model with intelligent caching
+
+**Integration Pattern**:
+```python
+# ConsultationModelRouter updated to use async classification
+async def detect_domain_specialization(self, query: str, context: str = None) -> str:
+    try:
+        domain = await classify_consultation_domain(query, context)
+        logger.debug(f"LLM classified domain as '{domain}' for query: {query[:50]}...")
+        return domain
+    except Exception as e:
+        logger.warning(f"Domain classification failed, using 'general': {e}")
+        return "general"
+```
+
+This enhancement exemplifies the KISS principle in practice: replacing complex, brittle code with a simple, reliable, and maintainable LLM-based solution that scales naturally.
