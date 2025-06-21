@@ -759,6 +759,184 @@ async def should_upgrade(
         return f"❌ **Should Upgrade Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
 
 
+# Register the compare_responses tool
+@mcp.tool(
+    name="compare_responses",
+    description="Compare two AI responses with detailed side-by-side analysis across quality criteria"
+)
+async def compare_responses(
+    response_a: str = Field(
+        ...,
+        description="The first response to compare. This is one of the responses you want to analyze for quality, accuracy, and usefulness.",
+        examples=["def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"]
+    ),
+    response_b: str = Field(
+        ...,
+        description="The second response to compare. This is the other response you want to analyze for quality, accuracy, and usefulness.",
+        examples=["def fibonacci(n):\n    return n if n <= 1 else fibonacci(n-1) + fibonacci(n-2)"]
+    ),
+    task: str = Field(
+        ...,
+        description="The original task/question that generated both responses. This provides context for comparing quality and relevance.",
+        examples=["Write a Python function to calculate fibonacci", "Explain quantum computing", "Debug this code snippet"]
+    ),
+    model_a: str | None = Field(
+        None,
+        description="The model that generated response_a. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o') or model name for local models (e.g. 'qwen3-4b-mlx').",
+        examples=["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "google/gemini-pro-1.5", "qwen3-4b-mlx"]
+    ),
+    model_b: str | None = Field(
+        None,
+        description="The model that generated response_b. Use OpenRouter format for cloud models or model name for local models (same format as model_a).",
+        examples=["anthropic/claude-3-haiku", "openai/gpt-4o-mini", "google/gemini-flash-1.5", "codestral-22b-v0.1"]
+    ),
+    cost_limit: float | None = Field(
+        None,
+        description="Maximum cost limit for evaluation in USD. Defaults to $0.25. Note: No additional API costs when comparing existing responses.",
+        examples=[0.25, 0.50, 1.00],
+        ge=0.01,
+        le=10.00
+    ),
+) -> str:
+    """
+    Compare two AI responses with detailed side-by-side analysis.
+
+    This tool provides comprehensive comparison of two responses across multiple
+    quality criteria, enabling informed decisions about model selection, response
+    quality, and cost optimization. Perfect for A/B testing different models
+    or comparing responses from different AI systems.
+
+    KEY BENEFITS:
+    - Zero additional API costs when comparing existing responses
+    - Detailed quality scoring across accuracy, completeness, clarity, usefulness
+    - Side-by-side analysis with winner determination
+    - Cost analysis for both models with tier comparison
+    - Actionable recommendations for future model selection
+
+    Args:
+        response_a: The first response to compare
+        response_b: The second response to compare  
+        task: The original task that generated both responses (for context)
+        model_a: Model that generated response_a (optional, for cost analysis)
+        model_b: Model that generated response_b (optional, for cost analysis)
+        cost_limit: Maximum cost for evaluation (default: $0.25)
+
+    Returns:
+        A detailed comparison report with quality analysis, winner determination,
+        cost comparison, and actionable recommendations for model selection.
+
+    USAGE PATTERN:
+        # Compare responses from two different models
+        result = await compare_responses(
+            response_a="Response from Model A...",
+            response_b="Response from Model B...",
+            task="Write a Python function to calculate fibonacci",
+            model_a="anthropic/claude-3-5-sonnet",
+            model_b="openai/gpt-4o"
+        )
+    """
+    # Get or create session for this request
+    session = get_mcp_session()
+    session.update_activity()
+
+    logger.info("=== MCP Tool Call: compare_responses ===")
+    logger.info(f"Task: {task[:100]}...")
+    logger.info(f"Response A length: {len(response_a) if response_a else 0}")
+    logger.info(f"Response B length: {len(response_b) if response_b else 0}")
+    logger.info(f"Model A: {model_a}")
+    logger.info(f"Model B: {model_b}")
+    logger.info(f"Cost limit: {cost_limit}")
+
+    try:
+        # Import compare_responses_tool with multiple strategies (same as other tools)
+        logger.info("Attempting to import compare_responses_tool...")
+        compare_responses_tool = None
+        import_strategies = [
+            # Strategy 1: Relative import
+            lambda: __import__('.tools.compare_responses', package=__package__, fromlist=['compare_responses_tool']).compare_responses_tool,
+            # Strategy 2: Absolute import
+            lambda: __import__('second_opinion.mcp.tools.compare_responses', fromlist=['compare_responses_tool']).compare_responses_tool,
+            # Strategy 3: Direct module import
+            lambda: __import__('second_opinion.mcp.tools.compare_responses').compare_responses_tool,
+        ]
+
+        for i, strategy in enumerate(import_strategies, 1):
+            try:
+                logger.info(f"Trying import strategy {i}...")
+                compare_responses_tool = strategy()
+                logger.info(f"✓ Successfully imported compare_responses_tool using strategy {i}")
+                break
+            except Exception as e:
+                logger.warning(f"✗ Import strategy {i} failed: {e}")
+                continue
+
+        if compare_responses_tool is None:
+            # Final fallback: manual importlib approach
+            logger.info("All import strategies failed, trying manual step-by-step import...")
+            try:
+                import importlib
+                module = importlib.import_module('second_opinion.mcp.tools.compare_responses')
+                compare_responses_tool = module.compare_responses_tool
+                logger.info("✓ Successfully imported using manual importlib approach")
+            except Exception as final_error:
+                logger.error(f"✗ All import methods failed. Final error: {final_error}")
+                import traceback
+                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
+                raise ImportError(f"Unable to import compare_responses_tool after trying multiple strategies. Last error: {final_error}")
+
+        if compare_responses_tool is None:
+            raise ImportError("compare_responses_tool is None after all import attempts")
+
+        # Call the tool implementation
+        logger.info("Calling compare_responses_tool implementation...")
+        logger.info(f"Tool function type: {type(compare_responses_tool)}")
+        logger.info(f"Tool function module: {getattr(compare_responses_tool, '__module__', 'unknown')}")
+
+        result = await compare_responses_tool(
+            response_a=response_a,
+            response_b=response_b,
+            task=task,
+            model_a=model_a,
+            model_b=model_b,
+            cost_limit=cost_limit,
+        )
+        logger.info("✓ compare_responses_tool completed successfully")
+        logger.info(f"Result length: {len(result) if result else 0}")
+
+        # Add to conversation context
+        session.add_conversation_context(
+            tool_name="compare_responses",
+            prompt=task,
+            primary_model=model_a or "unknown",
+            comparison_models=[model_b] if model_b else [],
+            result_summary="Response comparison completed successfully"
+        )
+
+        return result
+
+    except Exception as e:
+        # Log comprehensive error information
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error("=== Error in compare_responses MCP tool ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full traceback:\n{error_details}")
+        logger.error("=== End Error Details ===")
+
+        # Add to context for debugging
+        session.add_conversation_context(
+            tool_name="compare_responses",
+            prompt=task,
+            primary_model=model_a or "unknown",
+            comparison_models=[model_b] if model_b else [],
+            result_summary=f"Error: {str(e)}"
+        )
+
+        # Return user-friendly error message
+        return f"❌ **Compare Responses Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
+
+
 def get_mcp_session(session_id: str | None = None) -> MCPSession:
     """
     Get or create an MCP session for the current request.
