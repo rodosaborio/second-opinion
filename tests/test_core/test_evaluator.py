@@ -157,7 +157,7 @@ class TestResponseEvaluator:
         ]
 
     @pytest.mark.asyncio
-    @patch("second_opinion.core.evaluator.get_client_for_model")
+    @patch("second_opinion.clients.get_client_for_model")
     @patch("second_opinion.core.evaluator.create_client_from_config")
     async def test_compare_responses_basic(
         self,
@@ -205,7 +205,7 @@ class TestResponseEvaluator:
         assert result.cost_analysis is not None
 
     @pytest.mark.asyncio
-    @patch("second_opinion.core.evaluator.get_client_for_model")
+    @patch("second_opinion.clients.get_client_for_model")
     @patch("second_opinion.core.evaluator.create_client_from_config")
     async def test_compare_responses_default_criteria(
         self,

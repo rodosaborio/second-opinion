@@ -326,10 +326,8 @@ class TestAsyncExecution:
     @patch("second_opinion.cli.main.get_cost_guard")
     @patch("second_opinion.cli.main.get_evaluator")
     @patch("second_opinion.cli.main.get_client_for_model")
-    @patch("second_opinion.cli.main.create_client_from_config")
     async def test_execute_second_opinion_success(
         self,
-        mock_create_client_from_config,
         mock_get_client_for_model,
         mock_get_evaluator,
         mock_get_cost_guard,
@@ -359,7 +357,6 @@ class TestAsyncExecution:
         mock_client.estimate_cost.return_value = Decimal("0.025")
         mock_client.complete.return_value = mock_model_response
         mock_get_client_for_model.return_value = mock_client
-        mock_create_client_from_config.return_value = mock_client
 
         # Execute
         result = await execute_second_opinion(
@@ -381,10 +378,8 @@ class TestAsyncExecution:
     @patch("second_opinion.cli.main.sanitize_prompt")
     @patch("second_opinion.cli.main.get_cost_guard")
     @patch("second_opinion.cli.main.get_client_for_model")
-    @patch("second_opinion.cli.main.create_client_from_config")
     async def test_execute_second_opinion_cost_limit_exceeded(
         self,
-        mock_create_client_from_config,
         mock_get_client_for_model,
         mock_get_cost_guard,
         mock_sanitize_prompt,
@@ -398,7 +393,6 @@ class TestAsyncExecution:
         mock_client = AsyncMock()
         mock_client.estimate_cost.return_value = Decimal("0.15")  # Exceeds limit
         mock_get_client_for_model.return_value = mock_client
-        mock_create_client_from_config.return_value = mock_client
 
         # Execute and verify error
         with pytest.raises(CLIError) as exc_info:

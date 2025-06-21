@@ -952,29 +952,3 @@ def set_evaluator(evaluator: ResponseEvaluator) -> None:
     _global_evaluator = evaluator
 
 
-def get_client_for_model(model: str):
-    """
-    Create a client for a specific model by detecting its provider.
-
-    This function is used by tests and provides a convenient interface
-    for creating clients based on model names.
-
-    Args:
-        model: Model name (e.g., "gpt-4", "claude-3-sonnet")
-
-    Returns:
-        Configured client instance for the model's provider
-
-    Raises:
-        EvaluationError: If client creation fails
-    """
-    try:
-        provider = detect_model_provider(model)
-        client = create_client_from_config(provider)
-        return client
-    except Exception as e:
-        raise EvaluationError(
-            f"Failed to create client for model '{model}': {str(e)}",
-            model=model,
-            cause=e,
-        ) from e

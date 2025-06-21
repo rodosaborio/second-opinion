@@ -18,7 +18,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from second_opinion.clients import detect_model_provider, get_client_for_model
+from second_opinion.clients import get_client_for_model
 from second_opinion.config.model_configs import model_config_manager
 from second_opinion.config.settings import get_settings
 from second_opinion.core.evaluator import (
@@ -26,7 +26,6 @@ from second_opinion.core.evaluator import (
     get_evaluator,
 )
 from second_opinion.core.models import EvaluationCriteria, Message, ModelRequest
-from second_opinion.utils.client_factory import create_client_from_config
 from second_opinion.utils.cost_tracking import get_cost_guard
 from second_opinion.utils.sanitization import SecurityContext, sanitize_prompt
 
@@ -414,8 +413,7 @@ async def execute_second_opinion(
 
     for model in models_to_run:
         try:
-            provider = detect_model_provider(model)
-            client = create_client_from_config(provider)
+            client = get_client_for_model(model)
             estimated_cost = await client.estimate_cost(
                 request.model_copy(update={"model": model})
             )
@@ -464,16 +462,14 @@ async def execute_second_opinion(
             )
         else:
             # Execute normal primary model request
-            provider = detect_model_provider(primary_model)
-            primary_client = create_client_from_config(provider)
+            primary_client = get_client_for_model(primary_model)
             primary_response = await primary_client.complete(request)
 
         # Execute comparison model requests
         comparison_responses = []
         for model in comparison_models:
             try:
-                provider = detect_model_provider(model)
-                client = create_client_from_config(provider)
+                client = get_client_for_model(model)
                 response = await client.complete(
                     request.model_copy(update={"model": model})
                 )
