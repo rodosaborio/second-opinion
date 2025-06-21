@@ -205,6 +205,7 @@ mcp = FastMCP(
 # Import and register tools after server creation
 # Move this import to inside the function to debug import issues
 # from .tools.second_opinion import second_opinion_tool
+# from .tools.should_downgrade import should_downgrade_tool
 
 
 # Register the core second_opinion tool
@@ -390,6 +391,172 @@ async def second_opinion(
         
         # Return user-friendly error message instead of raising
         return f"❌ **Second Opinion Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
+
+
+# Register the should_downgrade tool
+@mcp.tool(
+    name="should_downgrade",
+    description="Analyze whether cheaper model alternatives could achieve similar quality for cost optimization"
+)
+async def should_downgrade(
+    current_response: str = Field(
+        ...,
+        description="The response to analyze for potential cost savings. This is the output from your current (expensive) model that you want to test for downgrade opportunities.",
+        examples=["def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"]
+    ),
+    task: str = Field(
+        ...,
+        description="The original task/question that generated the current response. This provides context for comparing quality across models.",
+        examples=["Write a Python function to calculate fibonacci", "Explain quantum computing", "Debug this code snippet"]
+    ),
+    current_model: str | None = Field(
+        None,
+        description="The model that generated the current response. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o') or model name for local models (e.g. 'qwen3-4b-mlx').",
+        examples=["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "google/gemini-pro-1.5", "qwen3-4b-mlx"]
+    ),
+    test_local: bool = Field(
+        True,
+        description="Whether to include local models in the comparison for maximum cost savings. Local models have zero marginal cost but may have quality trade-offs."
+    ),
+    cost_limit: float | None = Field(
+        None,
+        description="Maximum cost limit for testing downgrade options in USD. Defaults to $0.15 for cost-focused testing. Set higher for more comprehensive analysis.",
+        examples=[0.15, 0.25, 0.50],
+        ge=0.01,
+        le=5.00
+    ),
+) -> str:
+    """
+    Analyze whether cheaper model alternatives could achieve similar quality.
+    
+    This tool helps optimize AI costs by testing if cheaper models (especially local ones)
+    can provide similar quality responses to more expensive cloud models. It focuses on
+    cost reduction while maintaining acceptable quality standards.
+    
+    COST OPTIMIZATION FOCUS:
+    - Tests local models for maximum savings (100% cost reduction)
+    - Evaluates budget cloud alternatives (50-80% cost reduction)
+    - Provides quality vs cost trade-off analysis
+    - Gives specific downgrade recommendations with savings projections
+    
+    Args:
+        current_response: The response to analyze for cost savings potential
+        task: The original task that generated the response (for context)
+        current_model: Model that generated the current response (for cost comparison)
+        test_local: Include local models for maximum cost savings (recommended: True)
+        cost_limit: Maximum cost for testing alternatives (default: $0.15)
+    
+    Returns:
+        A cost optimization report with specific downgrade recommendations,
+        quality assessments, cost savings projections, and actionable next steps.
+        
+    USAGE PATTERN:
+        # Test if expensive model can be downgraded
+        result = await should_downgrade(
+            current_response="<response from expensive model>",
+            task="Write a Python function to calculate fibonacci",
+            current_model="anthropic/claude-3-5-sonnet",
+            test_local=True
+        )
+    """
+    # Get or create session for this request
+    session = get_mcp_session()
+    session.update_activity()
+    
+    logger.info(f"=== MCP Tool Call: should_downgrade ===")
+    logger.info(f"Task: {task[:100]}...")
+    logger.info(f"Current model: {current_model}")
+    logger.info(f"Response length: {len(current_response) if current_response else 0}")
+    logger.info(f"Test local: {test_local}")
+    logger.info(f"Cost limit: {cost_limit}")
+    
+    try:
+        # Import should_downgrade_tool with multiple strategies (same as second_opinion)
+        logger.info("Attempting to import should_downgrade_tool...")
+        should_downgrade_tool = None
+        import_strategies = [
+            # Strategy 1: Relative import
+            lambda: __import__('.tools.should_downgrade', package=__package__, fromlist=['should_downgrade_tool']).should_downgrade_tool,
+            # Strategy 2: Absolute import
+            lambda: __import__('second_opinion.mcp.tools.should_downgrade', fromlist=['should_downgrade_tool']).should_downgrade_tool,
+            # Strategy 3: Direct module import
+            lambda: getattr(__import__('second_opinion.mcp.tools.should_downgrade'), 'should_downgrade_tool'),
+        ]
+        
+        for i, strategy in enumerate(import_strategies, 1):
+            try:
+                logger.info(f"Trying import strategy {i}...")
+                should_downgrade_tool = strategy()
+                logger.info(f"✓ Successfully imported should_downgrade_tool using strategy {i}")
+                break
+            except Exception as e:
+                logger.warning(f"✗ Import strategy {i} failed: {e}")
+                continue
+        
+        if should_downgrade_tool is None:
+            # Final fallback: manual importlib approach
+            logger.info("All import strategies failed, trying manual step-by-step import...")
+            try:
+                import importlib
+                module = importlib.import_module('second_opinion.mcp.tools.should_downgrade')
+                should_downgrade_tool = getattr(module, 'should_downgrade_tool')
+                logger.info("✓ Successfully imported using manual importlib approach")
+            except Exception as final_error:
+                logger.error(f"✗ All import methods failed. Final error: {final_error}")
+                import traceback
+                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
+                raise ImportError(f"Unable to import should_downgrade_tool after trying multiple strategies. Last error: {final_error}")
+        
+        if should_downgrade_tool is None:
+            raise ImportError("should_downgrade_tool is None after all import attempts")
+        
+        # Call the tool implementation
+        logger.info("Calling should_downgrade_tool implementation...")
+        logger.info(f"Tool function type: {type(should_downgrade_tool)}")
+        logger.info(f"Tool function module: {getattr(should_downgrade_tool, '__module__', 'unknown')}")
+        
+        result = await should_downgrade_tool(
+            current_response=current_response,
+            task=task,
+            current_model=current_model,
+            test_local=test_local,
+            cost_limit=cost_limit,
+        )
+        logger.info("✓ should_downgrade_tool completed successfully")
+        logger.info(f"Result length: {len(result) if result else 0}")
+        
+        # Add to conversation context
+        session.add_conversation_context(
+            tool_name="should_downgrade",
+            prompt=task,
+            primary_model=current_model or "unknown",
+            comparison_models=[],  # Downgrade candidates are selected internally
+            result_summary="Downgrade analysis completed successfully"
+        )
+        
+        return result
+        
+    except Exception as e:
+        # Log comprehensive error information
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"=== Error in should_downgrade MCP tool ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full traceback:\n{error_details}")
+        logger.error("=== End Error Details ===")
+        
+        # Add to context for debugging
+        session.add_conversation_context(
+            tool_name="should_downgrade",
+            prompt=task,
+            primary_model=current_model or "unknown",
+            comparison_models=[],
+            result_summary=f"Error: {str(e)}"
+        )
+        
+        # Return user-friendly error message
+        return f"❌ **Should Downgrade Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
 
 
 def get_mcp_session(session_id: str | None = None) -> MCPSession:

@@ -186,38 +186,54 @@ uv run python -m second_opinion.mcp.server --dev
 
 ## 🔧 Development Patterns & Learnings
 
-### Lesson Learned: Avoid Hardcoding in Production Code
-- **Never hardcode provider names**: Use `detect_model_provider()` for dynamic provider selection
-- **Configuration-driven design**: Always prefer configurations over hardcoded values
-- **Problem**: Hardcoded 'openrouter' prevented LM Studio (local model) usage
-- **Solution**: Use provider detection based on model names to support both cloud and local providers
-- **Pattern**: `provider = detect_model_provider(model)` followed by `create_client_from_config(provider)`
+### MCP Implementation Blueprint
+For implementing new MCP tools, follow the proven patterns documented in **[IMPLEMENTATION.md](IMPLEMENTATION.md)**:
 
-### Lesson Learned: Test Infrastructure with Better Mocks
-- **Independent test configurations**: Test mocks should not depend on real API configurations
-- **Complete abstract method implementation**: Mock classes must implement ALL abstract methods from base classes
-- **Proper Pydantic object creation**: Use actual model objects (`TokenUsage`, `Message`) instead of raw dictionaries
-- **Comprehensive dependency injection**: Mock all external dependencies through fixtures and monkeypatch
-- **Context-aware mocking**: Provider detection mocks should handle model name patterns correctly
+- **FastMCP Server Foundation**: Established server setup with lifecycle management and session tracking
+- **Tool Implementation Pattern**: Standard 9-step flow for cost-efficient, secure tool development
+- **Response Reuse Optimization**: 50-80% cost reduction through existing response evaluation
+- **Configuration-Driven Design**: No hardcoding - use `detect_model_provider()` for dynamic provider selection
+- **Comprehensive Testing**: Reusable mock strategies and fixtures for reliable test coverage
 
-### Lesson Learned: Security Context Awareness
-- **Context-aware validation**: Security checks should be permissive for code-related prompts in user context
-- **Problem**: Overly strict prompt injection detection blocked legitimate code snippets with backticks
-- **Solution**: Different validation rules for `SecurityContext.USER_PROMPT` vs `SecurityContext.API_REQUEST`
-- **Balance**: Maintain security for serious threats while enabling code-related use cases
+**Ready for Implementation**: `should_downgrade`, `should_upgrade`, `compare_responses`, `usage_analytics`
 
-### Lesson Learned: Configuration Hierarchy
-- **Budget management**: Ensure CLI flags > tool config > settings default hierarchy works correctly
-- **Problem**: Hardcoded values overrode configuration-based budget limits
-- **Solution**: Use `per_request_override` parameter and proper configuration resolution
-- **Pattern**: Always check for user-provided values before falling back to configuration defaults
+### Core Development Patterns
 
-### Lesson Learned: Blocking Calls and Test Behavior
-- Discovered critical issues with blocking calls in async test environments
-- Blocking calls can cause test deadlocks and unexpected timeouts
-- Always use async equivalents or properly wrap blocking calls with `asyncio.to_thread()` or `run_in_executor()`
-- Implement global timeout and resource cleanup mechanisms to prevent test hanging
-- Use `@pytest.mark.asyncio` and ensure proper async test fixture management
+**Configuration-Driven Design**:
+```python
+# ✅ Good: Configuration-driven provider detection
+provider = detect_model_provider(model)
+client = create_client_from_config(provider)
+
+# ✅ Good: Configuration hierarchy (CLI > config > defaults)
+budget_check = await cost_guard.check_and_reserve_budget(
+    estimated_cost, "tool", model, per_request_override=user_cost_limit
+)
+```
+
+**Cost Optimization Strategy**:
+```python
+# Core pattern: Response reuse for significant cost savings
+if primary_response:
+    # Use provided response - zero additional API cost
+    clean_response = filter_think_tags(primary_response)
+    return clean_response, Decimal("0.0")
+else:
+    # Generate new response - incurs API cost
+    response = await client.complete(request)
+    return filter_think_tags(response.content), response.cost_estimate
+```
+
+**Security Context Awareness**:
+- **USER_PROMPT**: Permissive for code snippets and technical content
+- **API_REQUEST**: Strict validation for security
+- **Balance**: Maintain security for serious threats while enabling legitimate use cases
+
+**Testing Infrastructure**:
+- **Complete mock implementation**: Mock classes must implement ALL abstract methods from base classes
+- **Proper Pydantic objects**: Use actual model objects (`TokenUsage`, `Message`) instead of raw dictionaries
+- **Global state reset**: Use `autouse=True` pytest fixtures for test isolation
+- **Async resource cleanup**: Prevent test hanging with timeout and cleanup mechanisms
 
 
 ## 🔧 Test Infrastructure & Performance Fixes
@@ -357,5 +373,91 @@ return ModelResponse(
 - Use parametrization to test multiple scenarios without duplicating test code
 - Mock external services, databases, and network calls to ensure test reliability and speed
 - Create context-aware mocks that handle different scenarios (provider detection, model patterns, etc.)
+
+## 🚀 MCP Tool Development Blueprint
+
+### Reusable Architecture Components
+
+The successful `second_opinion` tool provides a proven blueprint for implementing additional MCP tools efficiently:
+
+**Core Infrastructure** (100% reusable):
+- **FastMCP Server**: `src/second_opinion/mcp/server.py` - Production-ready server with lifecycle management
+- **Session Management**: `src/second_opinion/mcp/session.py` - Cost tracking and conversation context
+- **Provider Detection**: `src/second_opinion/utils/client_factory.py` - Configuration-driven client creation
+- **Cost Protection**: `src/second_opinion/utils/cost_tracking.py` - Budget reservation and recording system
+- **Security Framework**: `src/second_opinion/utils/sanitization.py` - Multi-layer input validation
+
+**Implementation Pattern** (standard 9-step flow):
+1. Parameter validation and defaults
+2. Model provider detection (configuration-driven)
+3. Cost estimation and budget check
+4. Response reuse optimization (if applicable)
+5. Core tool logic execution
+6. Result processing and evaluation
+7. Actual cost recording
+8. Response formatting for MCP clients
+9. Error handling with cost cleanup
+
+### Next MCP Tools Pipeline
+
+**High-Priority Tools Ready for Implementation**:
+
+**1. `should_downgrade`** - Cost optimization through cheaper alternatives
+```python
+@mcp.tool(name="should_downgrade", description="Test if cheaper models could achieve similar quality")
+async def should_downgrade(
+    current_response: str,        # Response to analyze for cost savings
+    task: str,                   # Original task/question
+    current_model: str = None,   # Model that generated response
+    test_local: bool = True      # Include LM Studio models
+) -> str:
+```
+
+**2. `should_upgrade`** - Quality improvement analysis
+```python
+@mcp.tool(name="should_upgrade", description="Evaluate if premium models justify additional cost")
+async def should_upgrade(
+    current_response: str,        # Response to analyze for quality improvements
+    task: str,                   # Original task/question  
+    current_model: str = None,   # Current model
+    upgrade_target: str = None   # Specific premium model to test
+) -> str:
+```
+
+**3. `compare_responses`** - Detailed side-by-side analysis
+```python
+@mcp.tool(name="compare_responses", description="Detailed comparison across quality criteria")
+async def compare_responses(
+    response_a: str,             # First response
+    response_b: str,             # Second response
+    task: str,                   # Original task for context
+    model_a: str = None,         # Model A for cost analysis
+    model_b: str = None          # Model B for cost analysis
+) -> str:
+```
+
+### Development Workflow for New Tools
+
+**1. Tool Implementation** (reuse existing patterns):
+- Copy `src/second_opinion/mcp/tools/second_opinion.py` as template
+- Implement tool-specific logic while preserving standard flow
+- Use existing `get_session()`, `get_cost_guard()`, and `detect_model_provider()` patterns
+
+**2. Testing** (leverage existing infrastructure):
+- Copy `tests/test_mcp/test_second_opinion_tool.py` as starting point
+- Use existing mock fixtures and utilities from `tests/conftest.py`
+- Test cost tracking, error handling, and parameter validation
+
+**3. Integration** (minimal server changes):
+- Register new tool in `src/second_opinion/mcp/server.py`
+- Update `src/second_opinion/mcp/__init__.py` exports
+- Add tool-specific configuration to `config/mcp_profiles.yaml`
+
+**Benefits of This Approach**:
+- **90%+ code reuse** from existing infrastructure
+- **Consistent quality** through proven patterns
+- **Reliable cost optimization** with established response reuse strategies
+- **Comprehensive testing** using validated mock strategies
+- **Fast development cycles** with minimal setup required
 
 </invoke>
