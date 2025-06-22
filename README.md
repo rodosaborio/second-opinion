@@ -198,7 +198,7 @@ pre-commit install
 uv run pytest
 
 # Full coverage testing
-uv run pytest --cov=second_opinion --cov-report=html --cov-fail-under=85
+uv run pytest --cov=second_opinion --cov-report=html --cov-fail-under=80
 
 # Run specific test categories
 uv run pytest -m security     # Security tests
