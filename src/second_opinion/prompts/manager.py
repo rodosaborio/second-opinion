@@ -26,10 +26,10 @@ class PromptTemplate:
     content: str
     parameters: list[str]
     description: str | None = None
-    model_optimizations: dict[str, str] = None
+    model_optimizations: dict[str, str] | None = None
     last_modified: datetime | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.model_optimizations is None:
             self.model_optimizations = {}
 
@@ -159,7 +159,7 @@ class PromptManager:
 
         # Use model-specific optimization if available
         content = template.content
-        if model and model in template.model_optimizations:
+        if model and template.model_optimizations and model in template.model_optimizations:
             content = template.model_optimizations[model]
             logger.debug(f"Using model-specific optimization for {model}")
 
@@ -301,6 +301,7 @@ def get_prompt_manager() -> PromptManager:
     global _global_prompt_manager
     if _global_prompt_manager is None:
         _global_prompt_manager = PromptManager()
+    assert _global_prompt_manager is not None  # Type checker hint
     return _global_prompt_manager
 
 

@@ -124,9 +124,9 @@ class ConsultationModelRouter:
     def recommend_model(
         self,
         consultation_type: str,
-        context: str = None,
+        context: str | None = None,
         task_complexity: TaskComplexity = TaskComplexity.MODERATE,
-        user_specified_model: str = None,
+        user_specified_model: str | None = None,
     ) -> str:
         """
         Recommend optimal model for consultation needs.
@@ -162,7 +162,7 @@ class ConsultationModelRouter:
             return "anthropic/claude-3-5-sonnet"  # Reliable default
 
     async def detect_domain_specialization(
-        self, query: str, context: str = None
+        self, query: str, context: str | None = None
     ) -> str:
         """
         Detect if query needs domain-specific model routing using LLM classification.
@@ -498,7 +498,7 @@ def get_consultation_session(session_id: str) -> ConsultationSession | None:
 
 
 def create_consultation_session(
-    consultation_type: str, target_model: str, session_id: str = None
+    consultation_type: str, target_model: str, session_id: str | None = None
 ) -> ConsultationSession:
     """
     Create and store a new consultation session.
@@ -665,14 +665,14 @@ async def consult_tool(
             # Select target model
             recommended_model = model_router.recommend_model(
                 consultation_type=consultation_type,
-                context=clean_context,
+                context=clean_context or "",
                 task_complexity=task_complexity,
-                user_specified_model=target_model,
+                user_specified_model=target_model or "",
             )
 
             # Detect domain for specialized routing
             domain = await model_router.detect_domain_specialization(
-                clean_query, clean_context
+                clean_query, clean_context or ""
             )
 
             # Create new session
@@ -688,7 +688,7 @@ async def consult_tool(
 
         # Estimate total cost for the consultation
         estimated_cost = await _estimate_consultation_cost(
-            session, clean_query, max_turns, clean_context
+            session, clean_query, max_turns, clean_context or ""
         )
 
         # Check budget and reserve
@@ -723,12 +723,12 @@ async def consult_tool(
                 consultation_type=consultation_type,
                 results=results,
                 session=session,
-                context=clean_context,
+                context=clean_context or "",
             )
 
         except Exception as e:
             logger.error(f"Consultation failed for session {session.session_id}: {e}")
-            await cost_guard.release_reservation(reservation_id)
+            # Note: Cost reservation cleanup happens automatically on context exit
             return f"❌ **Consultation Error**: {str(e)}\n\nPlease try again with simpler parameters or check the logs for details."
 
     except Exception as e:
@@ -739,7 +739,7 @@ async def consult_tool(
 
 
 async def _estimate_consultation_cost(
-    session: ConsultationSession, query: str, max_turns: int, context: str = None
+    session: ConsultationSession, query: str, max_turns: int, context: str | None = None
 ) -> Decimal:
     """
     Estimate the total cost for a consultation.
@@ -787,7 +787,7 @@ def _format_consultation_response(
     consultation_type: str,
     results: dict[str, Any],
     session: ConsultationSession,
-    context: str = None,
+    context: str | None = None,
 ) -> str:
     """
     Format consultation results for optimal MCP client display.

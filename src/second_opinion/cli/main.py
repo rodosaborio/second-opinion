@@ -585,7 +585,10 @@ def second_opinion_command(
             from second_opinion.config.model_configs import model_config_manager
 
             tool_config = model_config_manager.get_tool_config("second_opinion")
-            cost_limit = float(tool_config.cost_limit_per_request)
+            if tool_config:
+                cost_limit = float(tool_config.cost_limit_per_request)
+            else:
+                raise ValueError("No tool config found")
         except Exception:
             # Fall back to settings default
             settings = get_settings()
@@ -621,9 +624,8 @@ def second_opinion_command(
         try:
             from second_opinion.config.model_configs import model_config_manager
 
-            config_evaluator = model_config_manager.get_tool_config(
-                "second_opinion"
-            ).evaluator_model
+            tool_config = model_config_manager.get_tool_config("second_opinion")
+            config_evaluator = tool_config.evaluator_model if tool_config else None
             if config_evaluator:
                 evaluator_model = config_evaluator
         except Exception as e:

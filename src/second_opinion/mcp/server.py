@@ -6,6 +6,7 @@ integrating with the existing evaluation engine, cost tracking, and
 OpenRouter client infrastructure.
 """
 
+import importlib
 import logging
 import os
 import sys
@@ -51,7 +52,7 @@ def setup_mcp_logging(debug: bool = False) -> logging.Logger:
 logger = setup_mcp_logging(debug=True)  # Enable debug for troubleshooting
 
 
-def setup_python_path():
+def setup_python_path() -> None:
     """Set up Python path for MCP server context."""
     import pathlib
 
@@ -81,7 +82,7 @@ def setup_python_path():
         logger.info(f"Already in sys.path: {project_root_str}")
 
 
-def log_environment_info():
+def log_environment_info() -> None:
     """Log comprehensive environment information for debugging."""
     logger.info("=== MCP Server Environment Information ===")
     logger.info(f"Python executable: {sys.executable}")
@@ -101,7 +102,7 @@ def log_environment_info():
     logger.info("=== End Environment Information ===")
 
 
-def test_critical_imports():
+def test_critical_imports() -> tuple[list[str], list[str]]:
     """Test importing critical modules and log results."""
     logger.info("=== Testing Critical Imports ===")
 
@@ -146,7 +147,7 @@ _sessions: dict[str, MCPSession] = {}
 
 
 @asynccontextmanager
-async def mcp_lifespan(_: FastMCP) -> AsyncIterator[dict[str, Any]]:
+async def mcp_lifespan(_: FastMCP[Any]) -> AsyncIterator[dict[str, Any]]:
     """
     Manage MCP server lifecycle with resource initialization and cleanup.
 
@@ -186,9 +187,9 @@ async def mcp_lifespan(_: FastMCP) -> AsyncIterator[dict[str, Any]]:
 
         # Initialize pricing data
         try:
-            await pricing_manager.load_pricing_data()
+            await pricing_manager.fetch_latest_pricing()
             logger.info(
-                f"Pricing manager initialized with {len(pricing_manager._pricing_data)} models"
+                f"Pricing manager initialized with {len(pricing_manager._cache.pricing_data) if pricing_manager._cache else 0} models"
             )
         except Exception as e:
             logger.warning(f"Failed to load pricing data: {e}")
@@ -347,11 +348,7 @@ async def second_opinion(
         second_opinion_tool = None
         import_strategies = [
             # Strategy 1: Relative import (current approach)
-            lambda: __import__(
-                ".tools.second_opinion",
-                package=__package__,
-                fromlist=["second_opinion_tool"],
-            ).second_opinion_tool,
+            lambda: importlib.import_module(".tools.second_opinion", package=__package__).second_opinion_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.second_opinion",
@@ -565,11 +562,7 @@ async def should_downgrade(
         should_downgrade_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: __import__(
-                ".tools.should_downgrade",
-                package=__package__,
-                fromlist=["should_downgrade_tool"],
-            ).should_downgrade_tool,
+            lambda: importlib.import_module(".tools.should_downgrade", package=__package__).should_downgrade_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.should_downgrade",
@@ -782,11 +775,7 @@ async def should_upgrade(
         should_upgrade_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: __import__(
-                ".tools.should_upgrade",
-                package=__package__,
-                fromlist=["should_upgrade_tool"],
-            ).should_upgrade_tool,
+            lambda: importlib.import_module(".tools.should_upgrade", package=__package__).should_upgrade_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.should_upgrade",
@@ -1000,11 +989,7 @@ async def compare_responses(
         compare_responses_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: __import__(
-                ".tools.compare_responses",
-                package=__package__,
-                fromlist=["compare_responses_tool"],
-            ).compare_responses_tool,
+            lambda: importlib.import_module(".tools.compare_responses", package=__package__).compare_responses_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.compare_responses",
@@ -1256,9 +1241,7 @@ async def consult(
         consult_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: __import__(
-                ".tools.consult", package=__package__, fromlist=["consult_tool"]
-            ).consult_tool,
+            lambda: importlib.import_module(".tools.consult", package=__package__).consult_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.consult", fromlist=["consult_tool"]

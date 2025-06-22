@@ -197,6 +197,7 @@ def get_domain_classifier() -> DomainClassifier:
     global _classifier
     if _classifier is None:
         _classifier = DomainClassifier()
+    assert _classifier is not None  # Type checker hint
     return _classifier
 
 

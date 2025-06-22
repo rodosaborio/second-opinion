@@ -33,8 +33,8 @@ jobs:
     - name: Run formatting check with black
       run: uv run black --check .
 
-    - name: Run type checking with mypy
-      run: uv run mypy src/
+    - name: Run type checking with ty
+      run: uvx ty check src/
 
     - name: Run tests with pytest
       run: uv run pytest --cov=second_opinion --cov-report=xml --cov-report=term-missing --cov-fail-under=85

@@ -399,7 +399,6 @@ class OpenRouterClient(BaseClient):
                 output_cost_per_1k=pricing_info.output_cost_per_1k_tokens,
                 max_tokens=pricing_info.max_tokens,
                 context_window=pricing_info.max_tokens,
-                supports_function_calling=pricing_info.supports_function_calling,
             )
 
         # Ultimate fallback with conservative estimates

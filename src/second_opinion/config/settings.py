@@ -76,7 +76,7 @@ class CostManagementConfig(BaseModel):
 
     @field_validator("currency")
     @classmethod
-    def validate_currency(cls, v):
+    def validate_currency(cls, v: str) -> str:
         valid_currencies = {"USD", "EUR", "GBP", "CAD", "AUD"}
         if v not in valid_currencies:
             raise ValueError(f"Currency must be one of {valid_currencies}")
@@ -108,7 +108,7 @@ class MCPConfig(BaseModel):
 
     @field_validator("host")
     @classmethod
-    def validate_host(cls, v):
+    def validate_host(cls, v: str) -> str:
         # Basic host validation - allow localhost, IP addresses, domain names
         if not v or len(v.strip()) == 0:
             raise ValueError("Host cannot be empty")
@@ -231,7 +231,7 @@ class AppSettings(BaseSettings):
 
     @field_validator("environment")
     @classmethod
-    def validate_environment(cls, v):
+    def validate_environment(cls, v: str) -> str:
         valid_environments = {"development", "staging", "production"}
         if v not in valid_environments:
             raise ValueError(f"Environment must be one of {valid_environments}")
@@ -239,14 +239,14 @@ class AppSettings(BaseSettings):
 
     @field_validator("log_level")
     @classmethod
-    def validate_log_level(cls, v):
+    def validate_log_level(cls, v: str) -> str:
         valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if v.upper() not in valid_levels:
             raise ValueError(f"Log level must be one of {valid_levels}")
         return v.upper()
 
     @model_validator(mode="after")
-    def validate_api_keys(self):
+    def validate_api_keys(self) -> "AppSettings":
         """Validate that OpenRouter API key is configured."""
         if not self.openrouter_api_key and self.environment != "development":
             raise ValueError(
@@ -256,7 +256,7 @@ class AppSettings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def validate_encryption_keys(self):
+    def validate_encryption_keys(self) -> "AppSettings":
         """Validate encryption keys are present when encryption is enabled."""
         if (
             self.database.encryption_enabled
@@ -296,7 +296,7 @@ class AppSettings(BaseSettings):
 class ConfigurationManager:
     """Manages hierarchical configuration loading and validation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._settings: AppSettings | None = None
         self._user_config: dict[str, Any] = {}
 
@@ -349,7 +349,7 @@ class ConfigurationManager:
         except Exception as e:
             raise ValueError(f"Failed to load configuration: {e}") from e
 
-    def _validate_configuration(self):
+    def _validate_configuration(self) -> None:
         """Perform additional configuration validation."""
         if not self._settings:
             raise ValueError("Configuration not loaded")
@@ -362,7 +362,7 @@ class ConfigurationManager:
         # Validate API key formats
         self._validate_api_key_formats()
 
-    def _ensure_directory(self, dir_path: str):
+    def _ensure_directory(self, dir_path: str) -> None:
         """Ensure directory exists, create if necessary."""
         path = Path(dir_path)
         try:
@@ -370,7 +370,7 @@ class ConfigurationManager:
         except Exception as e:
             raise ValueError(f"Cannot create directory {dir_path}: {e}") from e
 
-    def _validate_api_key_formats(self):
+    def _validate_api_key_formats(self) -> None:
         """Validate API key formats for security."""
         if not self._settings:
             return
@@ -389,12 +389,12 @@ class ConfigurationManager:
             self._settings = self.load_configuration()
         return self._settings
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the configuration manager (useful for testing)."""
         self._settings = None
         self._user_config = {}
 
-    def update_setting(self, path: str, value: Any):
+    def update_setting(self, path: str, value: Any) -> None:
         """Update a specific setting using dot notation (e.g., 'cost_management.daily_limit')."""
         if not self._settings:
             raise ValueError("Configuration not loaded")
@@ -409,7 +409,7 @@ class ConfigurationManager:
         # Set the final value
         setattr(obj, parts[-1], value)
 
-    def export_config_template(self, output_path: Path):
+    def export_config_template(self, output_path: Path) -> None:
         """Export a configuration template file."""
         template = {
             "app_name": "Second Opinion",

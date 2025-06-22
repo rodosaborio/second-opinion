@@ -10,6 +10,7 @@ import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 from ..core.models import ModelRequest, ModelResponse, TokenUsage
 from ..utils.sanitization import SecurityContext, sanitize_prompt, validate_model_name
@@ -42,7 +43,7 @@ class ModelInfo:
         self.context_window = context_window
         self.description = description or f"{provider} model: {name}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ModelInfo(name='{self.name}', provider='{self.provider}', input_cost=${self.input_cost_per_1k}/1k)"
 
 
@@ -54,7 +55,7 @@ class ClientError(Exception):
         message: str,
         provider: str,
         model: str | None = None,
-        details: dict | None = None,
+        details: dict[str, Any] | None = None,
     ):
         self.message = message
         self.provider = provider
@@ -62,7 +63,7 @@ class ClientError(Exception):
         self.details = details or {}
         super().__init__(message)
 
-    def __str__(self):
+    def __str__(self) -> str:
         parts = [f"{self.provider}: {self.message}"]
         if self.model:
             parts.append(f"Model: {self.model}")
@@ -79,8 +80,8 @@ class RateLimitError(ClientError):
     """Rate limit exceeded."""
 
     def __init__(
-        self, message: str, provider: str, retry_after: int | None = None, **kwargs
-    ):
+        self, message: str, provider: str, retry_after: int | None = None, **kwargs: Any
+    ) -> None:
         super().__init__(message, provider, **kwargs)
         self.retry_after = retry_after
 
@@ -100,8 +101,8 @@ class CostLimitExceededError(ClientError):
         provider: str,
         estimated_cost: Decimal,
         cost_limit: Decimal,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         super().__init__(message, provider, **kwargs)
         self.estimated_cost = estimated_cost
         self.cost_limit = cost_limit
@@ -121,7 +122,7 @@ class BaseClient(ABC):
     must implement to ensure consistent behavior across the application.
     """
 
-    def __init__(self, provider_name: str, api_key: str | None = None, **kwargs):
+    def __init__(self, provider_name: str, api_key: str | None = None, **kwargs: Any) -> None:
         self.provider_name = provider_name
         self.api_key = api_key
         self._models_cache: list[ModelInfo] | None = None
@@ -279,7 +280,7 @@ class BaseClient(ABC):
         self._models_cache = models
         self._cache_timestamp = datetime.now(UTC)
 
-    async def retry_with_backoff(self, operation, *args, **kwargs):
+    async def retry_with_backoff(self, operation: Any, *args: Any, **kwargs: Any) -> Any:
         """
         Execute operation with exponential backoff retry logic.
 
@@ -293,7 +294,7 @@ class BaseClient(ABC):
         Raises:
             ClientError: If all retries are exhausted
         """
-        last_exception = None
+        last_exception: RetryableError | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -318,7 +319,10 @@ class BaseClient(ABC):
                 raise
 
         # All retries exhausted
-        raise last_exception
+        if last_exception is not None:
+            raise last_exception
+        else:
+            raise ClientError("Operation failed without retryable errors", self.provider_name)
 
     def _calculate_token_cost(
         self, input_tokens: int, output_tokens: int, model_info: ModelInfo
@@ -376,15 +380,15 @@ class BaseClient(ABC):
             metadata={"error": True, "error_type": type(error).__name__},
         )
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "BaseClient":
         """Async context manager entry."""
         return self
 
     @abstractmethod
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit."""
         # Cleanup resources if needed
         pass
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}(provider='{self.provider_name}')"

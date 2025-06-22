@@ -45,7 +45,7 @@ class ToolConfig(BaseModel):
 
     @field_validator("comparison_models", "downgrade_targets")
     @classmethod
-    def validate_model_lists(cls, v):
+    def validate_model_lists(cls, v: list[str] | None) -> list[str] | None:
         if v is not None and len(v) == 0:
             raise ValueError("Model lists cannot be empty if specified")
         return v
@@ -206,7 +206,7 @@ class ModelProfilesConfig(BaseModel):
 class ModelConfigManager:
     """Manages model configurations and capabilities."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._config: ModelProfilesConfig | None = None
         self._capabilities: dict[str, ModelCapabilities] = {}
 
@@ -227,6 +227,12 @@ class ModelConfigManager:
             raise ValueError(f"Invalid YAML in model config: {e}") from e
         except Exception as e:
             raise ValueError(f"Failed to load model config: {e}") from e
+
+    def get_tool_config(self, tool_name: str) -> ToolConfig | None:
+        """Get tool configuration by name."""
+        if not self._config:
+            self._load_default_config()
+        return self._config.get_tool_config(tool_name)
 
     def get_model_config(
         self, tool_name: str, primary_model: str | None = None
@@ -324,7 +330,7 @@ class ModelConfigManager:
 
         return cost
 
-    def register_model_capability(self, capability: ModelCapabilities):
+    def register_model_capability(self, capability: ModelCapabilities) -> None:
         """Register capability information for a model."""
         self._capabilities[capability.model] = capability
 
@@ -350,7 +356,7 @@ class ModelConfigManager:
         self, model: str, max_tokens: int, has_system_prompt: bool
     ) -> list[str]:
         """Validate a model request against capabilities."""
-        warnings = []
+        warnings: list[str] = []
         capability = self.get_model_capability(model)
 
         if not capability:
@@ -373,7 +379,7 @@ class ModelConfigManager:
             self._config = ModelProfilesConfig()
         return self._config
 
-    def _load_default_config(self):
+    def _load_default_config(self) -> None:
         """Load the default configuration file."""
         try:
             from pathlib import Path
@@ -390,14 +396,14 @@ class ModelConfigManager:
             # Last resort: empty config
             self._config = ModelProfilesConfig()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the configuration manager (useful for testing)."""
         self._config = None
         self._capabilities = {}
 
 
 # Global model config manager instance
-model_config_manager = ModelConfigManager()
+model_config_manager: ModelConfigManager = ModelConfigManager()
 
 
 def get_model_config(

@@ -177,7 +177,7 @@ class MCPSession:
         Returns:
             Dictionary mapping model names to usage counts
         """
-        usage = {}
+        usage: dict[str, int] = {}
 
         for entry in self.conversation_history:
             primary = entry.get("primary_model")

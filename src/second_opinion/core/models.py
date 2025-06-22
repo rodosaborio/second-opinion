@@ -82,7 +82,7 @@ class Message(BaseModel):
 
     @field_validator("role")
     @classmethod
-    def validate_role(cls, v):
+    def validate_role(cls, v: str) -> str:
         valid_roles = {"user", "assistant", "system"}
         if v not in valid_roles:
             raise ValueError(f"Role must be one of {valid_roles}")
@@ -90,7 +90,7 @@ class Message(BaseModel):
 
     @field_validator("content")
     @classmethod
-    def validate_content(cls, v):
+    def validate_content(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("Message content cannot be empty")
         if len(v) > 100000:  # 100KB limit
@@ -106,7 +106,7 @@ class TokenUsage(BaseModel):
     total_tokens: int = Field(..., ge=0, description="Total tokens used")
 
     @model_validator(mode="after")
-    def validate_total(self):
+    def validate_total(self) -> "TokenUsage":
         if self.total_tokens != self.input_tokens + self.output_tokens:
             raise ValueError("Total tokens must equal input_tokens + output_tokens")
         return self
@@ -168,14 +168,14 @@ class ModelRequest(BaseModel):
 
     @field_validator("max_tokens")
     @classmethod
-    def validate_max_tokens(cls, v):
+    def validate_max_tokens(cls, v: int | None) -> int | None:
         if v is not None and v > 32000:
             raise ValueError("max_tokens cannot exceed 32000")
         return v
 
     @field_validator("system_prompt")
     @classmethod
-    def validate_system_prompt(cls, v):
+    def validate_system_prompt(cls, v: str | None) -> str | None:
         if v is not None and len(v) > 10000:  # 10KB limit for system prompts
             raise ValueError("System prompt exceeds maximum length")
         return v
@@ -237,7 +237,7 @@ class EvaluationCriteria(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_weights_sum(self):
+    def validate_weights_sum(self) -> "EvaluationCriteria":
         total_weight = (
             self.accuracy_weight
             + self.completeness_weight
@@ -287,7 +287,7 @@ class ComparisonResult(BaseModel):
 
     @field_validator("winner")
     @classmethod
-    def validate_winner(cls, v):
+    def validate_winner(cls, v: str) -> str:
         valid_winners = {"primary", "comparison", "tie"}
         if v not in valid_winners:
             raise ValueError(f"Winner must be one of {valid_winners}")

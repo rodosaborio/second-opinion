@@ -472,6 +472,8 @@ class PricingManager:
             return None
 
         # Score each cached model
+        if not self._cache:
+            return None
         for cached_name in self._cache.data.keys():
             cached_lower = cached_name.lower()
             score = 0
@@ -589,6 +591,7 @@ def get_pricing_manager() -> PricingManager:
     with _global_pricing_lock:
         if _global_pricing_manager is None:
             _global_pricing_manager = PricingManager()
+        assert _global_pricing_manager is not None  # Type checker hint
         return _global_pricing_manager
 
 

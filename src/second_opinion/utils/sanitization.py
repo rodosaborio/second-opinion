@@ -59,7 +59,7 @@ class InputSanitizer:
         r"\$\([^)]*\)",  # Command substitution
     ]
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._api_key_regex = re.compile("|".join(self.API_KEY_PATTERNS), re.IGNORECASE)
         self._injection_regex = re.compile(
             "|".join(self.INJECTION_PATTERNS), re.IGNORECASE
@@ -259,7 +259,7 @@ class InputSanitizer:
         if not isinstance(metadata, dict):
             raise ValidationError("Metadata must be a dictionary")
 
-        sanitized = {}
+        sanitized: dict[str, Any] = {}
         for key, value in metadata.items():
             # Sanitize keys
             if not isinstance(key, str):
