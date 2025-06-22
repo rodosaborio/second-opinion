@@ -116,18 +116,31 @@ class ConversationOrchestrator:
                 conversation_result.storage_error = "No primary response to store"
                 return conversation_result
 
-            # Store conversation using existing ConversationStore interface
-            conversation_id = await self.conversation_store.store_conversation(
-                user_prompt=prompt,
-                primary_response=primary_response,
-                comparison_responses=comparison_responses,
-                evaluation_result=evaluation_result,
-                interface_type=storage_context.interface_type,
-                session_id=session_id,
-                tool_name=storage_context.tool_name,
-                context=storage_context.context,
-                # Additional metadata can be added here as needed
-            )
+            # Store conversation using appropriate method (sync for CLI, async for MCP)
+            if storage_context.interface_type == "cli":
+                # Use sync method for CLI to avoid async context issues
+                conversation_id = self.conversation_store.store_conversation_sync(
+                    user_prompt=prompt,
+                    primary_response=primary_response,
+                    comparison_responses=comparison_responses,
+                    evaluation_result=evaluation_result,
+                    interface_type=storage_context.interface_type,
+                    session_id=session_id,
+                    tool_name=storage_context.tool_name,
+                    context=storage_context.context,
+                )
+            else:
+                # Use async method for MCP and other async contexts
+                conversation_id = await self.conversation_store.store_conversation(
+                    user_prompt=prompt,
+                    primary_response=primary_response,
+                    comparison_responses=comparison_responses,
+                    evaluation_result=evaluation_result,
+                    interface_type=storage_context.interface_type,
+                    session_id=session_id,
+                    tool_name=storage_context.tool_name,
+                    context=storage_context.context,
+                )
 
             conversation_result.conversation_id = conversation_id
             logger.info(

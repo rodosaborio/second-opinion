@@ -19,6 +19,17 @@ from .encryption import get_encryption_manager
 from .models import Base, Conversation, Response
 
 
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles datetime objects and Decimal."""
+
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
+
+
 class ConversationStore:
     """Manages conversation storage with encryption and analytics."""
 
@@ -149,7 +160,7 @@ class ConversationStore:
 
         encrypted_metadata = None
         if model_response.metadata:
-            metadata_json = json.dumps(model_response.metadata)
+            metadata_json = json.dumps(model_response.metadata, cls=DateTimeEncoder)
             encrypted_metadata, _ = self.encryption_manager.encrypt(metadata_json)
 
         # Extract evaluation data if available
@@ -405,6 +416,141 @@ class ConversationStore:
 
         combined_text = (prompt + " " + response).lower()
         return any(indicator in combined_text for indicator in sensitive_indicators)
+
+    def store_conversation_sync(
+        self,
+        user_prompt: str,
+        primary_response: ModelResponse,
+        comparison_responses: list[ModelResponse],
+        evaluation_result: dict[str, Any] | None = None,
+        interface_type: str = "cli",
+        session_id: str | None = None,
+        tool_name: str = "second_opinion",
+        context: str | None = None,
+        task_complexity: str | None = None,
+        domain_classification: str | None = None,
+    ) -> str:
+        """
+        Store a complete conversation with all responses (synchronous version for CLI).
+
+        Returns:
+            The conversation ID
+        """
+        with self.SessionLocal() as session:
+            # Encrypt user prompt and context
+            encrypted_prompt, key_id = self.encryption_manager.encrypt(user_prompt)
+            encrypted_context = None
+            if context:
+                encrypted_context, _ = self.encryption_manager.encrypt(context)
+
+            # Calculate total cost
+            total_cost = primary_response.cost_estimate
+            for resp in comparison_responses:
+                total_cost += resp.cost_estimate
+
+            # Determine if content is sensitive (basic heuristic)
+            is_sensitive = self._detect_sensitive_content(
+                user_prompt, primary_response.content
+            )
+
+            # Create conversation record
+            conversation = Conversation(
+                id=str(uuid4()),
+                session_id=session_id,
+                interface_type=interface_type,
+                tool_name=tool_name,
+                user_prompt_encrypted=encrypted_prompt,
+                context_encrypted=encrypted_context,
+                total_cost=total_cost,
+                estimated_cost=total_cost,  # For now, same as actual
+                task_complexity=task_complexity,
+                domain_classification=domain_classification,
+                encryption_key_id=key_id,
+                is_sensitive=is_sensitive,
+            )
+
+            session.add(conversation)
+            session.flush()  # Get the conversation ID
+
+            # Store primary response
+            self._store_response_sync(
+                session,
+                conversation.id,
+                primary_response,
+                "primary",
+                0,
+                evaluation_result,
+            )
+
+            # Store comparison responses
+            for i, response in enumerate(comparison_responses):
+                self._store_response_sync(
+                    session,
+                    conversation.id,
+                    response,
+                    "comparison",
+                    i + 1,
+                    evaluation_result,
+                )
+
+            session.commit()
+            return str(conversation.id)
+
+    def _store_response_sync(
+        self,
+        session,
+        conversation_id: str,
+        model_response: ModelResponse,
+        response_type: str,
+        order: int,
+        evaluation_result: dict[str, Any] | None = None,
+    ) -> None:
+        """Store a single model response (synchronous version)."""
+        # Encrypt response content and metadata
+        encrypted_content, key_id = self.encryption_manager.encrypt(
+            model_response.content
+        )
+
+        encrypted_metadata = None
+        if model_response.metadata:
+            metadata_json = json.dumps(model_response.metadata, cls=DateTimeEncoder)
+            encrypted_metadata, _ = self.encryption_manager.encrypt(metadata_json)
+
+        # Extract evaluation data if available
+        evaluation_score = None
+        encrypted_reasoning = None
+        if evaluation_result and response_type == "primary":
+            if "overall_score" in evaluation_result:
+                evaluation_score = Decimal(str(evaluation_result["overall_score"]))
+            if "reasoning" in evaluation_result:
+                encrypted_reasoning, _ = self.encryption_manager.encrypt(
+                    evaluation_result["reasoning"]
+                )
+
+        # Extract token usage
+        usage = model_response.usage
+        input_tokens = usage.input_tokens if usage else None
+        output_tokens = usage.output_tokens if usage else None
+        total_tokens = usage.total_tokens if usage else None
+
+        response = Response(
+            conversation_id=conversation_id,
+            model=model_response.model,
+            provider=model_response.provider,
+            response_type=response_type,
+            response_order=order,
+            content_encrypted=encrypted_content,
+            metadata_encrypted=encrypted_metadata,
+            cost=model_response.cost_estimate,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            evaluation_score=evaluation_score,
+            evaluation_reasoning_encrypted=encrypted_reasoning,
+            encryption_key_id=key_id,
+        )
+
+        session.add(response)
 
     async def close(self) -> None:
         """Close database connections."""

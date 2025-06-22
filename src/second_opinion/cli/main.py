@@ -8,6 +8,14 @@ This module provides the main CLI application using Typer, with support for:
 - Rich output formatting
 """
 
+# Load environment variables FIRST before any other imports that might use settings
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ruff: noqa: E402
+# Imports after load_dotenv() are intentional to ensure environment variables are available
+
 import asyncio
 import logging
 import re
@@ -19,7 +27,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from second_opinion.clients import get_client_for_model
+# Import after load_dotenv() to ensure environment variables are available
+from second_opinion.clients import detect_model_provider
 from second_opinion.config.model_configs import model_config_manager
 from second_opinion.config.settings import get_settings
 from second_opinion.core.evaluator import (
@@ -27,8 +36,18 @@ from second_opinion.core.evaluator import (
     get_evaluator,
 )
 from second_opinion.core.models import EvaluationCriteria, Message, ModelRequest
+from second_opinion.orchestration.orchestrator import get_conversation_orchestrator
+from second_opinion.orchestration.types import StorageContext
+from second_opinion.utils.client_factory import create_client_from_config
 from second_opinion.utils.cost_tracking import get_cost_guard
 from second_opinion.utils.sanitization import SecurityContext, sanitize_prompt
+
+
+def get_client_for_model(model: str):
+    """Get the appropriate client for a model using configuration-based factory."""
+    provider = detect_model_provider(model)
+    return create_client_from_config(provider)
+
 
 # Initialize CLI components
 app = typer.Typer(
@@ -380,6 +399,7 @@ async def execute_second_opinion(
     context: str | None = None,
     existing_response: str | None = None,
     evaluator_model: str | None = None,
+    save_conversation: bool = True,
 ) -> dict:
     """Execute the second opinion operation."""
 
@@ -520,6 +540,39 @@ async def execute_second_opinion(
             reservation.reservation_id, actual_cost, primary_model, "second_opinion"
         )
 
+        # Store conversation using orchestrator (if enabled)
+        conversation_result = None
+        if save_conversation:
+            try:
+                orchestrator = get_conversation_orchestrator()
+                storage_context = StorageContext(
+                    tool_name="second_opinion",
+                    interface_type="cli",
+                    save_conversation=True,
+                    session_id=None,  # Auto-generate CLI session ID
+                    context=context,
+                )
+
+                # Prepare evaluation result with serializable data
+                evaluation_data = {
+                    "task_complexity": task_complexity.value
+                    if task_complexity
+                    else None,
+                    "evaluation_count": len(evaluations),
+                    "total_cost": float(actual_cost),
+                    "estimated_cost": float(total_estimated_cost),
+                }
+
+                conversation_result = await orchestrator.handle_interaction(
+                    prompt=prompt,
+                    responses=[primary_response] + comparison_responses,
+                    storage_context=storage_context,
+                    evaluation_result=evaluation_data,
+                )
+            except Exception as e:
+                # Storage failure is non-fatal - log warning and continue
+                logger.warning(f"Failed to store conversation: {e}")
+
         return {
             "primary_response": primary_response,
             "comparison_responses": comparison_responses,
@@ -527,6 +580,7 @@ async def execute_second_opinion(
             "total_cost": actual_cost,
             "estimated_cost": total_estimated_cost,
             "task_complexity": task_complexity,
+            "conversation_result": conversation_result,
         }
 
     except Exception:
@@ -574,6 +628,11 @@ def second_opinion_command(
         None,
         "--evaluator-model",
         help="Model to use for evaluation (defaults to primary model)",
+    ),
+    save_conversation: bool = typer.Option(
+        True,
+        "--save-conversation/--no-save-conversation",
+        help="Save conversation to database for analytics and history",
     ),
 ):
     """Get a second opinion on a prompt using multiple models."""
@@ -653,6 +712,7 @@ def second_opinion_command(
                 context=context,
                 existing_response=existing_response,
                 evaluator_model=evaluator_model,
+                save_conversation=save_conversation,
             )
         )
 
@@ -680,9 +740,18 @@ def display_results(result: dict, verbose: bool = False):
         else ""
     )
 
+    # Add storage information if available
+    storage_text = ""
+    if result.get("conversation_result"):
+        conversation_result = result["conversation_result"]
+        if conversation_result.conversation_id:
+            storage_text = f"\n[dim]Conversation stored: ID {conversation_result.conversation_id} (Session: {conversation_result.session_id[:12]}...)[/dim]"
+        elif conversation_result.storage_error:
+            storage_text = f"\n[yellow]Storage warning: {conversation_result.storage_error}[/yellow]"
+
     cost_panel = Panel.fit(
         f"[bold]Total Cost:[/bold] ${total_cost:.4f}\n"
-        f"[dim]Estimated: ${result['estimated_cost']:.4f}[/dim]{complexity_text}",
+        f"[dim]Estimated: ${result['estimated_cost']:.4f}[/dim]{complexity_text}{storage_text}",
         title="Cost Summary",
         border_style="green",
     )
