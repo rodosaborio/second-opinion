@@ -412,6 +412,7 @@ async def second_opinion(
             context=context,
             comparison_models=comparison_models,
             cost_limit=cost_limit,
+            session_id=session.session_id,
         )
         logger.info("✓ second_opinion_tool completed successfully")
         logger.info(f"Result length: {len(result) if result else 0}")
@@ -628,6 +629,7 @@ async def should_downgrade(
             downgrade_candidates=downgrade_candidates,
             test_local=test_local,
             cost_limit=cost_limit,
+            session_id=session.session_id,
         )
         logger.info("✓ should_downgrade_tool completed successfully")
         logger.info(f"Result length: {len(result) if result else 0}")
@@ -843,6 +845,7 @@ async def should_upgrade(
             upgrade_candidates=upgrade_candidates,
             include_premium=include_premium,
             cost_limit=cost_limit,
+            session_id=session.session_id,
         )
         logger.info("✓ should_upgrade_tool completed successfully")
         logger.info(f"Result length: {len(result) if result else 0}")
@@ -1061,6 +1064,7 @@ async def compare_responses(
             model_a=model_a,
             model_b=model_b,
             cost_limit=cost_limit,
+            session_id=session.session_id,
         )
         logger.info("✓ compare_responses_tool completed successfully")
         logger.info(f"Result length: {len(result) if result else 0}")
@@ -1303,7 +1307,7 @@ async def consult(
             query=query,
             consultation_type=consultation_type,
             target_model=target_model,
-            session_id=session_id,
+            session_id=session.session_id,  # Use MCP session ID for consistency
             max_turns=max_turns,
             context=context,
             cost_limit=cost_limit,

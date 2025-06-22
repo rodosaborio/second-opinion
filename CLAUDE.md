@@ -132,6 +132,8 @@ uv run python -m second_opinion.mcp.server --dev
 * No adding TODOs or HACKS without explicit user approval and documentation as required work on IMPLEMENTATION.MD
 * No hardcoding any model names on actual class implementations. Defaults must come from configuration files
 * Breaking tests should neither simply get patched at the test layer or immediately change core implementations, but rather should be an opportunity to think hard, reflect and analyze why they broke. Some cases are easy and other not so much
+* Always run formatter, type checks, and security tests before declaring a coding task done
+
 ## 🔧 Development Patterns & Learnings
 ### Core Development Patterns
 
@@ -383,5 +385,3 @@ async def model_benchmark(
 - **Reliable cost optimization** with established response reuse strategies
 - **Comprehensive testing** using validated mock strategies
 - **Fast development cycles** with minimal setup required
-
-</invoke>
