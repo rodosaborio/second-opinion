@@ -368,8 +368,8 @@ class TestClientFactoryIntegration:
 
             # Test with override
             client = create_lmstudio_client(base_url="http://192.168.1.100:8080")
-            assert client.base_url == "http://192.168.1.100:8080/v1"
+            assert client.base_url == "http://192.168.1.100:8080/v1"  # type: ignore
 
             # Test without override
             client2 = create_lmstudio_client()
-            assert client2.base_url == "http://localhost:1234/v1"
+            assert client2.base_url == "http://localhost:1234/v1"  # type: ignore

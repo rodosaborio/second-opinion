@@ -155,7 +155,7 @@ class TestCostGuard:
             CostGuard(per_request_limit=Decimal("-1.00"))
 
         with pytest.raises(ValidationError):
-            CostGuard(daily_limit="invalid")
+            CostGuard(daily_limit="invalid")  # type: ignore
 
     @pytest.mark.asyncio
     async def test_check_and_reserve_budget_success(self):
@@ -192,8 +192,8 @@ class TestCostGuard:
             )
 
         assert "per-request limit" in str(exc_info.value)
-        assert exc_info.value.estimated_cost == excessive_cost
-        assert exc_info.value.limit == Decimal("0.10")
+        assert exc_info.value.estimated_cost == excessive_cost  # type: ignore
+        assert exc_info.value.limit == Decimal("0.10")  # type: ignore
 
     @pytest.mark.asyncio
     async def test_check_budget_daily_limit_exceeded(self):
@@ -209,7 +209,7 @@ class TestCostGuard:
             )
 
         assert "daily" in str(exc_info.value)
-        assert exc_info.value.period == "daily"
+        assert exc_info.value.period == "daily"  # type: ignore
 
     @pytest.mark.asyncio
     async def test_record_actual_cost(self):
@@ -572,10 +572,10 @@ class TestEdgeCases:
         """Test cost limit validation security."""
         # Test with potentially malicious inputs
         with pytest.raises(ValidationError):
-            CostGuard(per_request_limit="<script>alert('xss')</script>")
+            CostGuard(per_request_limit="<script>alert('xss')</script>")  # type: ignore
 
         with pytest.raises(ValidationError):
-            CostGuard(daily_limit=None)
+            CostGuard(daily_limit=None)  # type: ignore
 
     @pytest.mark.asyncio
     async def test_budget_period_edge_cases(self):

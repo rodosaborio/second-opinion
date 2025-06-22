@@ -516,7 +516,7 @@ class TestLMStudioClientIntegration:
 
         except ClientError:
             # LM Studio is not running, skip test
-            pytest.skip("LM Studio server not available for integration test")
+            pytest.skip("LM Studio server not available for integration test")  # type: ignore
 
 
 @pytest.mark.asyncio

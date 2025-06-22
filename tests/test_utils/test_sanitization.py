@@ -496,7 +496,7 @@ class TestSecurityScenarios:
                 result = sanitize_prompt(snippet)
                 assert len(result) > 0  # Should return sanitized content
             except (SecurityError, ValidationError):
-                pytest.fail(f"Code snippet should be acceptable: {snippet}")
+                pytest.fail(f"Code snippet should be acceptable: {snippet}")  # type: ignore
 
     @pytest.mark.security
     def test_resource_exhaustion_protection(self):

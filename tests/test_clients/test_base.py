@@ -282,7 +282,7 @@ class TestBaseClient:
 
         async def mock_operation():
             nonlocal call_count
-            call_count += 1
+            call_count += 1  # type: ignore
             if call_count < 3:
                 raise RetryableError("Temporary error", "test")
             return "success"

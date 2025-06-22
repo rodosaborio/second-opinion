@@ -79,8 +79,9 @@ class TestPromptTemplate:
             },
         )
 
-        assert "gpt-4" in template.model_optimizations
-        assert "claude-3" in template.model_optimizations
+        assert template.model_optimizations is not None
+        assert "gpt-4" in template.model_optimizations  # type: ignore
+        assert "claude-3" in template.model_optimizations  # type: ignore
 
 
 class TestPromptManager:
@@ -151,7 +152,7 @@ class TestPromptManager:
         from datetime import timedelta
 
         # Create manager with very short TTL
-        manager = PromptManager(templates_dir=temp_templates_dir, cache_ttl=0.1)
+        manager = PromptManager(templates_dir=temp_templates_dir, cache_ttl=1)  # 1 second
 
         # Load template
         template1 = await manager.load_template("basic")

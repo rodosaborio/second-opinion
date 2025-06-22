@@ -448,10 +448,10 @@ def _clear_module_caches():
         if module_name.startswith("src.second_opinion"):
             # Look for common global cache patterns
             if hasattr(module, "_cache"):
-                if hasattr(module._cache, "clear"):
+                if hasattr(module._cache, "clear") and callable(module._cache.clear):
                     module._cache.clear()
             if hasattr(module, "_instances"):
-                if hasattr(module._instances, "clear"):
+                if hasattr(module._instances, "clear") and callable(module._instances.clear):
                     module._instances.clear()
 
 

@@ -304,6 +304,7 @@ class TestPricingManager:
         )
 
         # Should load from cache
+        assert new_manager._cache is not None
         assert len(new_manager._cache.data) == original_count
         assert new_manager._cache.source == "cache"
 
@@ -734,6 +735,7 @@ class TestPricingManagerEdgeCases:
         )
 
         # Should handle large dataset
+        assert manager._cache is not None
         assert len(manager._cache.data) == 1000
 
         # Lookup should still be fast

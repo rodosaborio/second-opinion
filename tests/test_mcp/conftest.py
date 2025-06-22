@@ -10,11 +10,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.second_opinion.clients.base import BaseClient, ModelInfo
+from src.second_opinion.clients.base import BaseClient
 from src.second_opinion.core.models import (
     BudgetCheck,
+    ModelInfo,
     ModelRequest,
     ModelResponse,
+    ModelTier,
+    PricingInfo,
     TaskComplexity,
     TokenUsage,
 )
@@ -68,40 +71,56 @@ class MockClient(BaseClient):
         """Return mock model list."""
         return [
             ModelInfo(
-                id=f"{self.provider_name}/mock-model",
-                name="Mock Model",
+                model=f"{self.provider_name}/mock-model",
                 provider=self.provider_name,
-                context_length=4096,
-                pricing={"prompt": 0.001, "completion": 0.002},
+                tier=ModelTier.MID_RANGE,
+                context_window=4096,
+                pricing=PricingInfo(
+                    model=f"{self.provider_name}/mock-model",
+                    input_cost_per_1k=Decimal("0.001"),
+                    output_cost_per_1k=Decimal("0.002")
+                ),
             )
         ]
 
     async def get_model_info(self, model: str) -> ModelInfo:
         """Return mock model info."""
         return ModelInfo(
-            id=model,
-            name=f"Mock {model}",
+            model=model,
             provider=self.provider_name,
-            context_length=4096,
-            pricing={"prompt": 0.001, "completion": 0.002},
+            tier=ModelTier.MID_RANGE,
+            context_window=4096,
+            pricing=PricingInfo(
+                model=model,
+                input_cost_per_1k=Decimal("0.001"),
+                output_cost_per_1k=Decimal("0.002")
+            ),
         )
 
     async def get_available_models(self) -> list[ModelInfo]:
         """Return mock available models."""
         return [
             ModelInfo(
-                id=f"{self.provider_name}/mock-model-1",
-                name="Mock Model 1",
+                model=f"{self.provider_name}/mock-model-1",
                 provider=self.provider_name,
-                context_length=4096,
-                pricing={"prompt": 0.001, "completion": 0.002},
+                tier=ModelTier.MID_RANGE,
+                context_window=4096,
+                pricing=PricingInfo(
+                    model=f"{self.provider_name}/mock-model-1",
+                    input_cost_per_1k=Decimal("0.001"),
+                    output_cost_per_1k=Decimal("0.002")
+                ),
             ),
             ModelInfo(
-                id=f"{self.provider_name}/mock-model-2",
-                name="Mock Model 2",
+                model=f"{self.provider_name}/mock-model-2",
                 provider=self.provider_name,
-                context_length=8192,
-                pricing={"prompt": 0.002, "completion": 0.004},
+                tier=ModelTier.PREMIUM,
+                context_window=8192,
+                pricing=PricingInfo(
+                    model=f"{self.provider_name}/mock-model-2",
+                    input_cost_per_1k=Decimal("0.002"),
+                    output_cost_per_1k=Decimal("0.004")
+                ),
             ),
         ]
 

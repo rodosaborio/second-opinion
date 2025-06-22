@@ -91,7 +91,7 @@ class TestComparisonModelSelector:
                 explicit_models=["invalid-model-name"],
             )
 
-        assert "Invalid comparison model name" in str(exc_info.value.message)
+        assert "Invalid comparison model name" in str(exc_info.value)
 
     @patch("second_opinion.cli.main.model_config_manager")
     def test_config_based_selection(self, mock_model_config_manager, mock_model_config):
@@ -403,7 +403,7 @@ class TestAsyncExecution:
                 cost_limit=0.10,  # Lower than estimated cost
             )
 
-        assert "exceeds limit" in str(exc_info.value.message)
+        assert "exceeds limit" in str(exc_info.value)
 
     @patch("second_opinion.cli.main.sanitize_prompt")
     @patch("second_opinion.cli.main.get_cost_guard")
@@ -430,7 +430,7 @@ class TestAsyncExecution:
                 cost_limit=0.10,
             )
 
-        assert "Failed to estimate cost" in str(exc_info.value.message)
+        assert "Failed to estimate cost" in str(exc_info.value)
 
 
 class TestOutputFormatting:
