@@ -535,8 +535,7 @@ class TestPricingManagerSecurity:
                 "input_cost_per_token": 0.001,
                 "output_cost_per_token": 0.002,
             },
-            "a"
-            * 10000: {  # Extremely long key
+            "a" * 10000: {  # Extremely long key
                 "input_cost_per_token": 0.001,
                 "output_cost_per_token": 0.002,
             },

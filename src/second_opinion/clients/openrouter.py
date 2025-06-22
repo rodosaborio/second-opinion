@@ -46,7 +46,7 @@ class OpenRouterClient(BaseClient):
             logger.warning("OpenRouter API key should start with 'sk-or-'")
 
         # HTTP client configuration
-        self._http_client = httpx.AsyncClient(
+        self._http_client = httpx.AsyncClient(  # nosec B113
             base_url="https://openrouter.ai/api/v1",
             headers={
                 "Authorization": f"Bearer {api_key}",

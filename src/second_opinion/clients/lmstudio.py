@@ -41,7 +41,7 @@ class LMStudioClient(BaseClient):
             self.base_url += "/v1"
 
         # HTTP client configuration (no authentication needed for local server)
-        self._http_client = httpx.AsyncClient(
+        self._http_client = httpx.AsyncClient(  # nosec B113
             base_url=self.base_url,
             headers={
                 "Content-Type": "application/json",

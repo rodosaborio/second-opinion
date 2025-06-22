@@ -128,24 +128,23 @@ We use automated code formatting and linting:
 ### Automated Formatting (Pre-commit)
 
 Pre-commit hooks automatically format your code:
-- **Black** for code formatting
-- **Ruff** for linting and import sorting
-- **MyPy** for type checking
+- **Ruff** for code formatting and linting
+- **Ty** for type checking
 
 ### Manual Code Quality Checks
 
 ```bash
 # Format code
-uv run black .
+uv run ruff format .
 
 # Lint code
 uv run ruff check . --fix
 
 # Type checking
-uv run mypy src/
+uvx ty check src/
 
 # Run all quality checks
-uv run black . && uv run ruff check . --fix && uv run mypy src/
+uv run ruff format . && uv run ruff check . --fix && uvx ty check src/
 ```
 
 ### Code Style Guidelines

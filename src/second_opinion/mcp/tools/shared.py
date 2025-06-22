@@ -91,7 +91,7 @@ def validate_model_candidates(
                 f"\n\n**Suggested formats:**\n{suggestions}" if suggestions else ""
             )
             raise Exception(
-                f"Invalid model candidate #{i+1} ({model}): {str(e)}{suggestion_text}"
+                f"Invalid model candidate #{i + 1} ({model}): {str(e)}{suggestion_text}"
             ) from e
 
     return validated_candidates

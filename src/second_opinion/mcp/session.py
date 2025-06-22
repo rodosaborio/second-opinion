@@ -51,9 +51,9 @@ class MCPSession:
 
         # Model information cache
         self.cached_model_info: dict[str, ModelInfo] = {}
-        self.pricing_cache: dict[str, tuple[Decimal, Decimal]] = (
-            {}
-        )  # model -> (input_cost, output_cost)
+        self.pricing_cache: dict[
+            str, tuple[Decimal, Decimal]
+        ] = {}  # model -> (input_cost, output_cost)
 
         # Simple conversation context
         self.conversation_history: list[dict[str, Any]] = []

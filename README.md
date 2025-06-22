@@ -2,7 +2,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 An AI tool that provides "second opinion" functionality for AI responses via MCP (Model Context Protocol). Get smarter AI usage by comparing responses across different models, finding cost-effective alternatives, and tracking your usage patterns.
 
@@ -209,16 +209,16 @@ uv run pytest -m "not slow"   # Skip slow tests
 ### Code Quality
 ```bash
 # Format code
-uv run black .
+uv run ruff format .
 
 # Lint code
 uv run ruff check . --fix
 
 # Type checking
-uv run mypy src/
+uvx ty check src/
 
 # Run all quality checks
-uv run black . && uv run ruff check . --fix && uv run mypy src/
+uv run ruff format . && uv run ruff check . --fix && uvx ty check src/
 ```
 
 ## MCP Integration

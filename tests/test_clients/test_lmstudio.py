@@ -380,7 +380,6 @@ class TestLMStudioClient:
             patch.object(client, "_check_server_health", return_value=True),
             patch.object(client, "_http_client") as mock_http,
         ):
-
             mock_response = Mock()
             mock_response.json.return_value = mock_completion_response
             mock_response.is_success = True
@@ -410,7 +409,6 @@ class TestLMStudioClient:
             patch.object(client, "_check_server_health", return_value=True),
             patch.object(client, "retry_with_backoff") as mock_retry,
         ):
-
             mock_retry.side_effect = RetryableError(
                 "Request timed out", provider="lmstudio"
             )
@@ -425,7 +423,6 @@ class TestLMStudioClient:
             patch.object(client, "_check_server_health", return_value=True),
             patch.object(client, "retry_with_backoff") as mock_retry,
         ):
-
             mock_retry.side_effect = ClientError(
                 "Cannot connect to LM Studio server", provider="lmstudio"
             )

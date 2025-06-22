@@ -39,7 +39,6 @@ class TestMCPIntegration:
                 "second_opinion.mcp.tools.second_opinion.create_client_from_config"
             ) as mock_client_factory,
         ):
-
             # Setup evaluator mock
             mock_eval = MagicMock()
 
@@ -131,7 +130,6 @@ class TestMCPIntegration:
                 "second_opinion.mcp.tools.second_opinion.create_client_from_config"
             ) as mock_client_factory,
         ):
-
             # Setup mocks (similar to above)
             mock_eval = MagicMock()
 
@@ -203,7 +201,6 @@ class TestMCPIntegration:
         with patch(
             "src.second_opinion.mcp.tools.second_opinion.get_cost_guard"
         ) as mock_cost_guard:
-
             # Mock cost guard that rejects due to budget
             mock_guard = MagicMock()
             mock_guard.check_and_reserve_budget = AsyncMock(

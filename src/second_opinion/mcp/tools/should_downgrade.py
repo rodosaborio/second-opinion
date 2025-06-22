@@ -131,7 +131,7 @@ async def should_downgrade_tool(
                         if suggestions
                         else ""
                     )
-                    return f"❌ **Invalid Downgrade Candidate #{i+1}** ({model}): {str(e)}{suggestion_text}"
+                    return f"❌ **Invalid Downgrade Candidate #{i + 1}** ({model}): {str(e)}{suggestion_text}"
 
         # Validate cost limit
         if cost_limit is not None:

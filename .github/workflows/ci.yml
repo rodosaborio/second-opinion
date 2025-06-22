@@ -30,8 +30,8 @@ jobs:
     - name: Run linting with ruff
       run: uv run ruff check .
 
-    - name: Run formatting check with black
-      run: uv run black --check .
+    - name: Run formatting check with ruff
+      run: uv run ruff format --check .
 
     - name: Run type checking with ty
       run: uvx ty check src/
@@ -60,8 +60,8 @@ jobs:
     - name: Run security tests
       run: uv run pytest -m security
 
-    - name: Run security audit with ruff
-      run: uv run ruff check . --select S
+    - name: Run security audit with bandit
+      run: uv run bandit -c pyproject.toml -r src/
 
     - name: Check for hardcoded secrets
       run: |

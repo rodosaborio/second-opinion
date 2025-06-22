@@ -78,7 +78,7 @@ uv run pytest -v --setup-show
 # Install hooks once: pre-commit install
 
 # Manual formatting (if needed)
-uv run black .
+uv run ruff format .
 
 # Manual linting (if needed)
 uv run ruff check .
@@ -88,7 +88,7 @@ uv run ruff check . --fix
 uvx ty check src/
 
 # Run ALL quality checks manually
-uv run black . && uv run ruff check . --fix && uvx ty check src/
+uv run ruff format . && uv run ruff check . --fix && uvx ty check src/
 
 # Update pre-commit hooks
 pre-commit autoupdate

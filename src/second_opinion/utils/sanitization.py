@@ -382,9 +382,7 @@ class InputSanitizer:
             SecurityContext.SYSTEM_PROMPT: self.MAX_SYSTEM_PROMPT_LENGTH,
             SecurityContext.API_REQUEST: self.MAX_PROMPT_LENGTH,
             SecurityContext.CONFIGURATION: self.MAX_CONFIG_LENGTH,
-        }.get(
-            context, self.MAX_PROMPT_LENGTH
-        )  # type: ignore[return-value]
+        }.get(context, self.MAX_PROMPT_LENGTH)  # type: ignore[return-value]
 
     def _sanitize_system_prompt(self, prompt: str) -> str:
         """Additional sanitization for system prompts."""

@@ -26,7 +26,6 @@ class TestSecondOpinionTool:
                 "src.second_opinion.mcp.tools.second_opinion.create_client_from_config"
             ) as mock_client_factory,
         ):
-
             # Setup mocks
             mock_eval = MagicMock()
             mock_eval.classify_task_complexity = AsyncMock(
@@ -93,7 +92,6 @@ class TestSecondOpinionTool:
                 "src.second_opinion.mcp.tools.second_opinion.create_client_from_config"
             ) as mock_client_factory,
         ):
-
             # Setup mocks
             mock_eval = MagicMock()
             mock_eval.classify_task_complexity = AsyncMock(
@@ -161,7 +159,6 @@ class TestSecondOpinionTool:
                 "src.second_opinion.mcp.tools.second_opinion.validate_model_name"
             ) as mock_validate_model,
         ):
-
             mock_sanitize.return_value = "clean prompt"
             mock_validate_model.return_value = "gpt-4"
 
@@ -185,7 +182,6 @@ class TestSecondOpinionTool:
         with patch(
             "src.second_opinion.mcp.tools.second_opinion.get_cost_guard"
         ) as mock_cost_guard:
-
             # Mock cost guard that rejects due to budget
             mock_guard = MagicMock()
             mock_guard.check_and_reserve_budget = AsyncMock(
@@ -221,7 +217,6 @@ class TestSecondOpinionTool:
                 "src.second_opinion.cli.main.ComparisonModelSelector"
             ) as mock_selector_class,
         ):
-
             # Setup mocks
             mock_eval = MagicMock()
             mock_eval.classify_task_complexity = AsyncMock(
@@ -300,7 +295,6 @@ class TestSecondOpinionTool:
                 "src.second_opinion.mcp.tools.second_opinion.filter_think_tags"
             ) as mock_filter,
         ):
-
             # Setup mocks
             mock_eval = MagicMock()
             mock_eval.classify_task_complexity = AsyncMock(
