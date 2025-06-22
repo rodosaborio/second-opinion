@@ -347,7 +347,9 @@ async def second_opinion(
         second_opinion_tool = None
         import_strategies = [
             # Strategy 1: Relative import (current approach)
-            lambda: importlib.import_module(".tools.second_opinion", package=__package__).second_opinion_tool,
+            lambda: importlib.import_module(
+                ".tools.second_opinion", package=__package__
+            ).second_opinion_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.second_opinion",
@@ -561,7 +563,9 @@ async def should_downgrade(
         should_downgrade_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: importlib.import_module(".tools.should_downgrade", package=__package__).should_downgrade_tool,
+            lambda: importlib.import_module(
+                ".tools.should_downgrade", package=__package__
+            ).should_downgrade_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.should_downgrade",
@@ -774,7 +778,9 @@ async def should_upgrade(
         should_upgrade_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: importlib.import_module(".tools.should_upgrade", package=__package__).should_upgrade_tool,
+            lambda: importlib.import_module(
+                ".tools.should_upgrade", package=__package__
+            ).should_upgrade_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.should_upgrade",
@@ -988,7 +994,9 @@ async def compare_responses(
         compare_responses_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: importlib.import_module(".tools.compare_responses", package=__package__).compare_responses_tool,
+            lambda: importlib.import_module(
+                ".tools.compare_responses", package=__package__
+            ).compare_responses_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.compare_responses",
@@ -1240,7 +1248,9 @@ async def consult(
         consult_tool = None
         import_strategies = [
             # Strategy 1: Relative import
-            lambda: importlib.import_module(".tools.consult", package=__package__).consult_tool,
+            lambda: importlib.import_module(
+                ".tools.consult", package=__package__
+            ).consult_tool,
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.consult", fromlist=["consult_tool"]

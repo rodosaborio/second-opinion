@@ -159,7 +159,11 @@ class PromptManager:
 
         # Use model-specific optimization if available
         content = template.content
-        if model and template.model_optimizations and model in template.model_optimizations:
+        if (
+            model
+            and template.model_optimizations
+            and model in template.model_optimizations
+        ):
             content = template.model_optimizations[model]
             logger.debug(f"Using model-specific optimization for {model}")
 

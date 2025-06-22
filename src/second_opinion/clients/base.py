@@ -122,7 +122,9 @@ class BaseClient(ABC):
     must implement to ensure consistent behavior across the application.
     """
 
-    def __init__(self, provider_name: str, api_key: str | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self, provider_name: str, api_key: str | None = None, **kwargs: Any
+    ) -> None:
         self.provider_name = provider_name
         self.api_key = api_key
         self._models_cache: list[ModelInfo] | None = None
@@ -280,7 +282,9 @@ class BaseClient(ABC):
         self._models_cache = models
         self._cache_timestamp = datetime.now(UTC)
 
-    async def retry_with_backoff(self, operation: Any, *args: Any, **kwargs: Any) -> Any:
+    async def retry_with_backoff(
+        self, operation: Any, *args: Any, **kwargs: Any
+    ) -> Any:
         """
         Execute operation with exponential backoff retry logic.
 
@@ -322,7 +326,9 @@ class BaseClient(ABC):
         if last_exception is not None:
             raise last_exception
         else:
-            raise ClientError("Operation failed without retryable errors", self.provider_name)
+            raise ClientError(
+                "Operation failed without retryable errors", self.provider_name
+            )
 
     def _calculate_token_cost(
         self, input_tokens: int, output_tokens: int, model_info: ModelInfo
