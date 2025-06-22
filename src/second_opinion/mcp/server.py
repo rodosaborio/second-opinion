@@ -188,7 +188,7 @@ async def mcp_lifespan(_: FastMCP[Any]) -> AsyncIterator[dict[str, Any]]:
         try:
             await pricing_manager.fetch_latest_pricing()
             logger.info(
-                f"Pricing manager initialized with {len(pricing_manager._cache.pricing_data) if pricing_manager._cache else 0} models"
+                f"Pricing manager initialized with {pricing_manager.get_model_count()} models"
             )
         except Exception as e:
             logger.warning(f"Failed to load pricing data: {e}")

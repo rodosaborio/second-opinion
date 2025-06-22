@@ -28,9 +28,10 @@ class InputSanitizer:
     """Multi-layer input validation and sanitization."""
 
     # Maximum lengths for different input types
-    MAX_PROMPT_LENGTH = 50000
-    MAX_MODEL_NAME_LENGTH = 100
-    MAX_SYSTEM_PROMPT_LENGTH = 10000
+    MAX_PROMPT_LENGTH: int = 50000
+    MAX_MODEL_NAME_LENGTH: int = 100
+    MAX_SYSTEM_PROMPT_LENGTH: int = 10000
+    MAX_CONFIG_LENGTH: int = 1000
 
     # Patterns for detecting potential security issues
     API_KEY_PATTERNS = [
@@ -380,8 +381,10 @@ class InputSanitizer:
             SecurityContext.USER_PROMPT: self.MAX_PROMPT_LENGTH,
             SecurityContext.SYSTEM_PROMPT: self.MAX_SYSTEM_PROMPT_LENGTH,
             SecurityContext.API_REQUEST: self.MAX_PROMPT_LENGTH,
-            SecurityContext.CONFIGURATION: 1000,
-        }.get(context, self.MAX_PROMPT_LENGTH)
+            SecurityContext.CONFIGURATION: self.MAX_CONFIG_LENGTH,
+        }.get(
+            context, self.MAX_PROMPT_LENGTH
+        )  # type: ignore[return-value]
 
     def _sanitize_system_prompt(self, prompt: str) -> str:
         """Additional sanitization for system prompts."""

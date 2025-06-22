@@ -411,17 +411,18 @@ class OpenRouterClient(BaseClient):
 
     def _estimate_input_tokens(self, request: ModelRequest) -> int:
         """Estimate input tokens for a request."""
-        total_text = ""
+        text_parts = []
 
         # Add system prompt
         if request.system_prompt:
-            total_text += request.system_prompt + " "
+            text_parts.append(request.system_prompt)
 
         # Add all messages
         for message in request.messages:
-            total_text += message.content + " "
+            if message.content:
+                text_parts.append(message.content)
 
-        return self._estimate_tokens(total_text)
+        return self._estimate_tokens(" ".join(text_parts))
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Clean up HTTP client on exit."""

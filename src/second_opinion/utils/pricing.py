@@ -567,6 +567,11 @@ class PricingManager:
                 "cache_ttl_hours": self.cache_ttl_hours,
             }
 
+    def get_model_count(self) -> int:
+        """Get the number of models in the pricing cache."""
+        with self._lock:
+            return len(self._cache.data) if self._cache else 0
+
     def list_supported_models(self) -> dict[str, str]:
         """Get list of all supported models with their providers."""
         with self._lock:
