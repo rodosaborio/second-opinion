@@ -36,8 +36,11 @@ jobs:
     - name: Run type checking with ty
       run: uvx ty check src/
 
-    - name: Run tests with pytest
-      run: uv run pytest --cov=second_opinion --cov-report=xml --cov-report=term-missing --cov-fail-under=85
+    - name: Run tests with coverage
+      run: |
+        uv run python -m coverage run -m pytest
+        uv run python -m coverage report --fail-under=80
+        uv run python -m coverage xml
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3

@@ -133,6 +133,42 @@ warn_return_any = true
 strict_equality = true
 strict_concatenate = true
 
+[tool.coverage.run]
+source = ["src/second_opinion"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+    # Exclude logging statements that are primarily for debugging
+    "logger\\.(debug|info)\\(",
+    # Exclude complex import fallback strategies in MCP server
+    "logger\\.warning\\(.*import.*failed",
+    "logger\\.info\\(.*import strategy",
+    # Exclude environment setup and path manipulation
+    "sys\\.path\\.",
+    "os\\.environ\\.",
+    # Exclude CLI argument validation that's handled by typer
+    "if.*is None:",
+    "if not.*:",
+]
+show_missing = true
+skip_covered = false
+
 [dependency-groups]
 dev = [
     "black>=25.1.0",

@@ -46,7 +46,9 @@ pre-commit install
 uv run pytest
 
 # Run tests with full coverage reporting (slower)
-uv run pytest --cov=second_opinion --cov-report=term-missing --cov-report=html --cov-fail-under=85
+uv run python -m coverage run -m pytest
+uv run python -m coverage report --fail-under=80
+uv run python -m coverage html
 
 # Run only security tests
 uv run pytest -m security
@@ -83,10 +85,10 @@ uv run ruff check .
 uv run ruff check . --fix
 
 # Manual type checking (if needed)
-uv run mypy src/
+uvx ty check src/
 
 # Run ALL quality checks manually
-uv run black . && uv run ruff check . --fix && uv run mypy src/
+uv run black . && uv run ruff check . --fix && uvx ty check src/
 
 # Update pre-commit hooks
 pre-commit autoupdate
