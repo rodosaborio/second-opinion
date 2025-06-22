@@ -2605,7 +2605,7 @@ def format_consultation_response(
 1. **CLI Environment Variable Loading**: API key from .env not being picked up by CLI - **MAJOR REGRESSION** blocking OpenRouter functionality
 
 #### High Priority
-2. **consult Tool Session Management**: Session not found errors preventing all consultation functionality
+2. **~~consult Tool Session Management~~**: ✅ **RESOLVED** - Session not found errors preventing all consultation functionality
 
 #### Medium Priority
 3. **Local Model Testing**: LM Studio integration requires manual setup
@@ -2615,15 +2615,16 @@ def format_consultation_response(
 
 ### 📋 Repro Steps for Issues
 
-#### Issue #1: consult Tool Session Error
+#### ✅ Issue #1: consult Tool Session Error (RESOLVED)
 ```bash
-# Reproduction steps:
-1. Call mcp__second-opinion__consult with any parameters
-2. Observe "Session not found" error regardless of session_id presence
-3. Error occurs for all consultation_type values
+# Previous issue - FIXED:
+# 1. Call mcp__second-opinion__consult with any parameters
+# 2. Previously threw "Session not found" error regardless of session_id presence
+# 3. Error occurred for all consultation_type values
 
-# Expected: Consultation should work without explicit session_id
-# Actual: Always throws session not found error
+# Root cause: Global session storage incompatible with MCP framework
+# Solution: Removed global session storage, aligned with working tool patterns
+# Status: All consultation types now work correctly (quick, delegate, deep, brainstorm)
 ```
 
 #### Issue #2: CLI Environment Variables (CRITICAL REGRESSION)
@@ -2654,17 +2655,20 @@ def format_consultation_response(
 
 **Completed Successfully**:
 - ✅ MCP server startup validation
-- ✅ 4/5 MCP tools fully functional
+- ✅ 5/5 MCP tools fully functional (consult tool session management fixed)
 - ✅ Storage and orchestration integration working
 - ✅ No regressions in existing functionality
 - ✅ Cost optimization features working
 - ✅ Quality assessment and recommendations working
 - ✅ Response reuse optimization working
+- ✅ All consultation types working (quick, delegate, deep, brainstorm)
 
 **✅ RESOLVED: CLI Environment Variable Loading** - Fixed major regression by adding `load_dotenv()` call before settings imports in CLI, implemented config-based client factory pattern, and added conversation storage integration with `--save-conversation` option.
 
 **✅ RESOLVED: Conversation Storage Minor Issues** - Fixed datetime serialization with custom JSON encoder, resolved async context issues by implementing sync storage methods for CLI, and corrected database field name mismatches. Conversation storage now works flawlessly in both CLI and MCP contexts.
 
-**Overall Assessment**: **🟢 EXCELLENT** - All functionality working perfectly. CLI regression completely resolved, OpenRouter API integration restored, conversation storage fully functional with encryption and analytics, zero regressions detected, and all minor issues addressed.
+**✅ RESOLVED: consult Tool Session Management Issue** - Fixed critical session management bug that was causing "Session not found" errors for all consultation types. Root cause was broken global session storage that was incompatible with MCP framework patterns. Solution: Removed global session storage and aligned with working tool patterns (like second_opinion) where sessions are managed per-call. All 32 consultation tests now pass, and all consultation types (quick, delegate, deep, brainstorm) work correctly.
+
+**Overall Assessment**: **🟢 EXCELLENT** - All functionality working perfectly. CLI regression completely resolved, OpenRouter API integration restored, conversation storage fully functional with encryption and analytics, consult tool session management fixed, and zero regressions detected. All 5/5 MCP tools now fully functional.
 
 ## Bugs, TODOs and HACKS

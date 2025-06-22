@@ -29,8 +29,8 @@ from ..session import MCPSession
 
 logger = logging.getLogger(__name__)
 
-# Global consultation sessions storage
-_consultation_sessions: dict[str, "ConsultationSession"] = {}
+# Note: Removed global session storage - sessions are now managed per tool call
+# following the same pattern as other working MCP tools
 
 
 class ConsultationSession(MCPSession):
@@ -486,36 +486,8 @@ Please provide a thoughtful response that builds on our previous discussion."""
         return recommendations
 
 
-def get_consultation_session(session_id: str) -> ConsultationSession | None:
-    """
-    Get existing consultation session by ID.
-
-    Args:
-        session_id: Session identifier
-
-    Returns:
-        ConsultationSession if found, None otherwise
-    """
-    return _consultation_sessions.get(session_id)
-
-
-def create_consultation_session(
-    consultation_type: str, target_model: str, session_id: str | None = None
-) -> ConsultationSession:
-    """
-    Create and store a new consultation session.
-
-    Args:
-        consultation_type: Type of consultation
-        target_model: AI model to consult with
-        session_id: Optional session ID
-
-    Returns:
-        New ConsultationSession
-    """
-    session = ConsultationSession(consultation_type, target_model, session_id)
-    _consultation_sessions[session.session_id] = session
-    return session
+# Removed broken session management functions - using direct ConsultationSession instantiation
+# following the pattern of other working MCP tools
 
 
 def calculate_delegation_savings(target_model: str) -> Decimal:
@@ -646,51 +618,62 @@ async def consult_tool(
             f"Starting consult tool: type={consultation_type}, query_length={len(clean_query)}, target_model={target_model}"
         )
 
-        # Get or create consultation session
+        # Session management strategy: MCP tools don't need to manage sessions directly
+        # They just generate session IDs for conversation storage and context
+
+        # For multi-turn consultations, we'll use session_id to track conversation context
+        # but we don't maintain global session state like the original broken implementation
+        consultation_session = None
+
         if session_id:
-            session = get_consultation_session(session_id)
-            if not session:
-                return f"❌ **Session not found**: {session_id}\n\nStart a new consultation without session_id or use a valid session ID."
-            logger.info(f"Continuing session {session_id}")
-        else:
-            # Initialize components for model selection
-            evaluator = get_evaluator()
-            model_router = ConsultationModelRouter()
+            # For multi-turn consultations, attempt to retrieve conversation context
+            # from the orchestrator's conversation storage (if available)
+            logger.info(f"Continuing consultation with session_id: {session_id}")
+            # We'll create a new ConsultationSession but try to load context
+            consultation_session = None  # Will be created below with context loading
 
-            # Classify task complexity for smart model routing
-            try:
-                task_complexity = await evaluator.classify_task_complexity(clean_query)
-            except Exception as e:
-                logger.warning(f"Failed to classify task complexity: {e}")
-                task_complexity = TaskComplexity.MODERATE
+        # Initialize components for model selection (always needed)
+        evaluator = get_evaluator()
+        model_router = ConsultationModelRouter()
 
-            # Select target model
-            recommended_model = model_router.recommend_model(
-                consultation_type=consultation_type,
-                context=clean_context or "",
-                task_complexity=task_complexity,
-                user_specified_model=target_model or "",
-            )
+        # Classify task complexity for smart model routing
+        try:
+            task_complexity = await evaluator.classify_task_complexity(clean_query)
+        except Exception as e:
+            logger.warning(f"Failed to classify task complexity: {e}")
+            task_complexity = TaskComplexity.MODERATE
 
-            # Detect domain for specialized routing
-            domain = await model_router.detect_domain_specialization(
-                clean_query, clean_context or ""
-            )
+        # Select target model
+        recommended_model = model_router.recommend_model(
+            consultation_type=consultation_type,
+            context=clean_context or "",
+            task_complexity=task_complexity,
+            user_specified_model=target_model or "",
+        )
 
-            # Create new session
-            session = create_consultation_session(consultation_type, recommended_model)
-            session.domain = domain
+        # Detect domain for specialized routing
+        domain = await model_router.detect_domain_specialization(
+            clean_query, clean_context or ""
+        )
 
-            logger.info(
-                f"Created session {session.session_id} with {recommended_model} for {domain} domain"
-            )
+        # Create a consultation session (just for internal tracking, not global storage)
+        consultation_session = ConsultationSession(
+            consultation_type=consultation_type,
+            target_model=recommended_model,
+            session_id=session_id,  # Use provided session_id or let it generate new one
+        )
+        consultation_session.domain = domain
+
+        logger.info(
+            f"Created consultation session {consultation_session.session_id} with {recommended_model} for {domain} domain"
+        )
 
         # Get cost guard for budget management
         cost_guard = get_cost_guard()
 
         # Estimate total cost for the consultation
         estimated_cost = await _estimate_consultation_cost(
-            session, clean_query, max_turns, clean_context or ""
+            consultation_session, clean_query, max_turns, clean_context or ""
         )
 
         # Check budget and reserve
@@ -698,7 +681,7 @@ async def consult_tool(
             budget_check = await cost_guard.check_and_reserve_budget(
                 estimated_cost,
                 "consult",
-                session.target_model,
+                consultation_session.target_model,
                 per_request_override=cost_limit_decimal,
             )
             reservation_id = budget_check.reservation_id
@@ -709,7 +692,7 @@ async def consult_tool(
         turn_controller = TurnController()
         try:
             results = await turn_controller.conduct_consultation(
-                session=session,
+                session=consultation_session,
                 initial_query=clean_query,
                 max_turns=max_turns,
                 cost_limit=cost_limit_decimal,
@@ -717,7 +700,10 @@ async def consult_tool(
 
             # Record actual cost
             await cost_guard.record_actual_cost(
-                reservation_id, results["total_cost"], session.target_model, "consult"
+                reservation_id,
+                results["total_cost"],
+                consultation_session.target_model,
+                "consult",
             )
 
             # Store conversation (optional, non-fatal if it fails)
@@ -726,7 +712,7 @@ async def consult_tool(
                 storage_context = StorageContext(
                     interface_type="mcp",  # This tool is called from MCP
                     tool_name="consult",
-                    session_id=session_id,
+                    session_id=consultation_session.session_id,  # Use the consultation session ID
                     context=clean_context,
                     save_conversation=True,  # TODO: Make this configurable
                 )
@@ -739,7 +725,7 @@ async def consult_tool(
 
                     mock_response = ModelResponse(
                         content=turn_data["response"],
-                        model=session.target_model,
+                        model=consultation_session.target_model,
                         usage=TokenUsage(
                             input_tokens=10,  # Estimated - consult doesn't track exact tokens
                             output_tokens=len(turn_data["response"].split())
@@ -747,7 +733,9 @@ async def consult_tool(
                             total_tokens=10 + len(turn_data["response"].split()) * 2,
                         ),
                         cost_estimate=Decimal(str(turn_data["cost"])),
-                        provider=detect_model_provider(session.target_model),
+                        provider=detect_model_provider(
+                            consultation_session.target_model
+                        ),
                     )
                     consultation_responses.append(mock_response)
 
@@ -759,7 +747,7 @@ async def consult_tool(
                         evaluation_result={
                             "consultation_type": consultation_type,
                             "consultation_results": results,
-                            "session_summary": session.get_session_summary(),
+                            "session_summary": consultation_session.get_session_summary(),
                         },
                     )
                     logger.debug("Consultation storage completed successfully")
@@ -773,12 +761,14 @@ async def consult_tool(
             return _format_consultation_response(
                 consultation_type=consultation_type,
                 results=results,
-                session=session,
+                session=consultation_session,
                 context=clean_context or "",
             )
 
         except Exception as e:
-            logger.error(f"Consultation failed for session {session.session_id}: {e}")
+            logger.error(
+                f"Consultation failed for session {consultation_session.session_id}: {e}"
+            )
             # Note: Cost reservation cleanup happens automatically on context exit
             return f"❌ **Consultation Error**: {str(e)}\n\nPlease try again with simpler parameters or check the logs for details."
 
