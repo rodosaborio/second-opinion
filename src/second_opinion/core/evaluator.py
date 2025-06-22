@@ -9,7 +9,7 @@ for model upgrades or downgrades.
 import logging
 import re
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from ..clients import detect_model_provider
 from ..prompts.manager import render_template
@@ -936,7 +936,7 @@ def get_evaluator() -> ResponseEvaluator:
     global _global_evaluator
     if _global_evaluator is None:
         _global_evaluator = ResponseEvaluator()
-    return _global_evaluator
+    return cast(ResponseEvaluator, _global_evaluator)
 
 
 def set_evaluator(evaluator: ResponseEvaluator) -> None:

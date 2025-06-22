@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ..core.models import SecurityContext
 from ..utils.sanitization import sanitize_prompt
@@ -305,7 +305,7 @@ def get_prompt_manager() -> PromptManager:
     global _global_prompt_manager
     if _global_prompt_manager is None:
         _global_prompt_manager = PromptManager()
-    return _global_prompt_manager
+    return cast(PromptManager, _global_prompt_manager)
 
 
 def set_prompt_manager(manager: PromptManager) -> None:

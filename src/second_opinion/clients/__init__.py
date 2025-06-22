@@ -56,7 +56,10 @@ def create_client(provider: str, **kwargs) -> BaseClient:
     provider = provider.lower().strip()
 
     if provider == "openrouter":
-        return OpenRouterClient(**kwargs)
+        if "api_key" not in kwargs:
+            raise ValueError("OpenRouter API key is required but not provided")
+        api_key = kwargs.pop("api_key")
+        return OpenRouterClient(api_key=api_key, **kwargs)
     elif provider == "lmstudio":
         return LMStudioClient(**kwargs)
     else:

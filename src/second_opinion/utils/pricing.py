@@ -11,7 +11,7 @@ import threading
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from pydantic import BaseModel, Field
@@ -591,7 +591,7 @@ def get_pricing_manager() -> PricingManager:
     with _global_pricing_lock:
         if _global_pricing_manager is None:
             _global_pricing_manager = PricingManager()
-        return _global_pricing_manager
+        return cast(PricingManager, _global_pricing_manager)
 
 
 def set_pricing_manager(manager: PricingManager | None) -> None:

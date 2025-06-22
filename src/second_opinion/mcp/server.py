@@ -349,16 +349,16 @@ async def second_opinion(
             # Strategy 1: Relative import (current approach)
             lambda: importlib.import_module(
                 ".tools.second_opinion", package=__package__
-            ).second_opinion_tool,
+            ).second_opinion_tool,  # type: ignore[attr-defined]
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.second_opinion",
                 fromlist=["second_opinion_tool"],
-            ).second_opinion_tool,
+            ).second_opinion_tool,  # type: ignore[attr-defined]
             # Strategy 3: Direct module import
             lambda: __import__(
                 "second_opinion.mcp.tools.second_opinion"
-            ).second_opinion_tool,
+            ).second_opinion_tool,  # type: ignore[attr-defined]
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
@@ -384,7 +384,7 @@ async def second_opinion(
                 module = importlib.import_module(
                     "second_opinion.mcp.tools.second_opinion"
                 )
-                second_opinion_tool = module.second_opinion_tool
+                second_opinion_tool = module.second_opinion_tool  # type: ignore[attr-defined]
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")
@@ -570,11 +570,11 @@ async def should_downgrade(
             lambda: __import__(
                 "second_opinion.mcp.tools.should_downgrade",
                 fromlist=["should_downgrade_tool"],
-            ).should_downgrade_tool,
+            ).should_downgrade_tool,  # type: ignore[attr-defined]
             # Strategy 3: Direct module import
             lambda: __import__(
                 "second_opinion.mcp.tools.should_downgrade"
-            ).should_downgrade_tool,
+            ).should_downgrade_tool,  # type: ignore[attr-defined]
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
@@ -600,7 +600,7 @@ async def should_downgrade(
                 module = importlib.import_module(
                     "second_opinion.mcp.tools.should_downgrade"
                 )
-                should_downgrade_tool = module.should_downgrade_tool
+                should_downgrade_tool = module.should_downgrade_tool  # type: ignore[attr-defined]
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")
@@ -785,11 +785,11 @@ async def should_upgrade(
             lambda: __import__(
                 "second_opinion.mcp.tools.should_upgrade",
                 fromlist=["should_upgrade_tool"],
-            ).should_upgrade_tool,
+            ).should_upgrade_tool,  # type: ignore[attr-defined]
             # Strategy 3: Direct module import
             lambda: __import__(
                 "second_opinion.mcp.tools.should_upgrade"
-            ).should_upgrade_tool,
+            ).should_upgrade_tool,  # type: ignore[attr-defined]
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
@@ -815,7 +815,7 @@ async def should_upgrade(
                 module = importlib.import_module(
                     "second_opinion.mcp.tools.should_upgrade"
                 )
-                should_upgrade_tool = module.should_upgrade_tool
+                should_upgrade_tool = module.should_upgrade_tool  # type: ignore[attr-defined]
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")
@@ -1001,11 +1001,11 @@ async def compare_responses(
             lambda: __import__(
                 "second_opinion.mcp.tools.compare_responses",
                 fromlist=["compare_responses_tool"],
-            ).compare_responses_tool,
+            ).compare_responses_tool,  # type: ignore[attr-defined]
             # Strategy 3: Direct module import
             lambda: __import__(
                 "second_opinion.mcp.tools.compare_responses"
-            ).compare_responses_tool,
+            ).compare_responses_tool,  # type: ignore[attr-defined]
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
@@ -1031,7 +1031,7 @@ async def compare_responses(
                 module = importlib.import_module(
                     "second_opinion.mcp.tools.compare_responses"
                 )
-                compare_responses_tool = module.compare_responses_tool
+                compare_responses_tool = module.compare_responses_tool  # type: ignore[attr-defined]
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")
@@ -1254,9 +1254,9 @@ async def consult(
             # Strategy 2: Absolute import
             lambda: __import__(
                 "second_opinion.mcp.tools.consult", fromlist=["consult_tool"]
-            ).consult_tool,
+            ).consult_tool,  # type: ignore[attr-defined]
             # Strategy 3: Direct module import
-            lambda: __import__("second_opinion.mcp.tools.consult").consult_tool,
+            lambda: __import__("second_opinion.mcp.tools.consult").consult_tool,  # type: ignore[attr-defined]
         ]
 
         for i, strategy in enumerate(import_strategies, 1):
@@ -1278,7 +1278,7 @@ async def consult(
                 import importlib
 
                 module = importlib.import_module("second_opinion.mcp.tools.consult")
-                consult_tool = module.consult_tool
+                consult_tool = module.consult_tool  # type: ignore[attr-defined]
                 logger.info("✓ Successfully imported using manual importlib approach")
             except Exception as final_error:
                 logger.error(f"✗ All import methods failed. Final error: {final_error}")

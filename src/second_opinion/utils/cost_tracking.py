@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from ..core.models import BudgetCheck, CostAnalysis, ModelRequest
 from ..utils.pricing import get_pricing_manager
@@ -597,7 +597,7 @@ def get_cost_guard() -> CostGuard:
             monthly_limit=cost_config.monthly_limit,
             warning_threshold=cost_config.warning_threshold,
         )
-    return _cost_guard
+    return cast(CostGuard, _cost_guard)
 
 
 def set_cost_guard(cost_guard: CostGuard | None) -> None:

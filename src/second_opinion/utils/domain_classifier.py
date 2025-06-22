@@ -8,6 +8,7 @@ small, cost-effective language models instead of brittle string matching.
 import json
 import logging
 from functools import lru_cache
+from typing import cast
 
 from ..clients import detect_model_provider
 from ..core.models import Message, ModelRequest
@@ -197,7 +198,7 @@ def get_domain_classifier() -> DomainClassifier:
     global _classifier
     if _classifier is None:
         _classifier = DomainClassifier()
-    return _classifier
+    return cast(DomainClassifier, _classifier)
 
 
 async def classify_consultation_domain(query: str, context: str | None = None) -> str:
