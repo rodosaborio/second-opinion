@@ -16,6 +16,8 @@ from ...clients import detect_model_provider
 # from ...config.model_configs import model_config_manager  # Not yet implemented
 from ...core.evaluator import get_evaluator
 from ...core.models import EvaluationCriteria, Message, ModelRequest, TaskComplexity
+from ...orchestration import get_conversation_orchestrator
+from ...orchestration.types import StorageContext
 from ...utils.client_factory import create_client_from_config
 from ...utils.cost_tracking import get_cost_guard
 from ...utils.sanitization import (
@@ -35,6 +37,7 @@ async def should_downgrade_tool(
     downgrade_candidates: list[str] | None = None,
     test_local: bool = True,
     cost_limit: float | None = None,
+    session_id: str | None = None,
 ) -> str:
     """
     Analyze whether cheaper model alternatives could achieve similar quality.
@@ -387,6 +390,41 @@ async def should_downgrade_tool(
             reservation_id, actual_cost, current_model, "should_downgrade"
         )
         logger.info(f"Total operation cost: ${actual_cost:.4f}")
+
+        # Store conversation (optional, non-fatal if it fails)
+        try:
+            orchestrator = get_conversation_orchestrator()
+            storage_context = StorageContext(
+                interface_type="mcp",  # This tool is called from MCP
+                tool_name="should_downgrade",
+                session_id=session_id,
+                context=None,  # No additional context for this tool
+                save_conversation=True,  # TODO: Make this configurable
+            )
+
+            # Prepare responses for storage (current response + downgrade responses)
+            all_responses = [current_model_response] + downgrade_responses
+
+            await orchestrator.handle_interaction(
+                prompt=clean_task,
+                responses=all_responses,
+                storage_context=storage_context,
+                evaluation_result={
+                    "evaluation_results": evaluation_results,
+                    "task_complexity": task_complexity.value
+                    if task_complexity
+                    else None,
+                    "cost_analysis": {
+                        "actual_cost": float(actual_cost),
+                        "current_cost_estimate": float(current_cost_estimate),
+                        "downgrade_costs": [float(c) for c in downgrade_costs],
+                    },
+                },
+            )
+            logger.debug("Conversation storage completed successfully")
+        except Exception as storage_error:
+            # Storage failure is non-fatal - continue with normal tool execution
+            logger.warning(f"Conversation storage failed (non-fatal): {storage_error}")
 
         # Generate cost optimization report
         return await _format_downgrade_report(

@@ -17,6 +17,8 @@ from ...clients import detect_model_provider
 from ...config.settings import get_settings
 from ...core.evaluator import get_evaluator
 from ...core.models import EvaluationCriteria, Message, ModelRequest, TaskComplexity
+from ...orchestration import get_conversation_orchestrator
+from ...orchestration.types import StorageContext
 from ...utils.client_factory import create_client_from_config
 from ...utils.cost_tracking import BudgetPeriod, get_cost_guard
 from ...utils.sanitization import (
@@ -36,6 +38,7 @@ async def second_opinion_tool(
     context: str | None = None,
     comparison_models: list[str] | None = None,
     cost_limit: float | None = None,
+    session_id: str | None = None,
 ) -> str:
     """
     Get a second opinion on an AI response by comparing it against alternative models.
@@ -459,6 +462,41 @@ async def second_opinion_tool(
         logger.info(
             f"Total operation cost: ${actual_cost:.4f}, Budget used: ${actual_cost:.4f}"
         )
+
+        # Store conversation (optional, non-fatal if it fails)
+        try:
+            orchestrator = get_conversation_orchestrator()
+            storage_context = StorageContext(
+                interface_type="mcp",  # This tool is called from MCP
+                tool_name="second_opinion",
+                session_id=session_id,
+                context=clean_context,
+                save_conversation=True,  # TODO: Make this configurable
+            )
+
+            # Prepare responses for storage
+            all_responses = [primary_model_response] + comparison_responses
+
+            await orchestrator.handle_interaction(
+                prompt=clean_prompt,
+                responses=all_responses,
+                storage_context=storage_context,
+                evaluation_result={
+                    "evaluation_results": evaluation_results,
+                    "task_complexity": task_complexity.value
+                    if task_complexity
+                    else None,
+                    "cost_analysis": {
+                        "actual_cost": float(actual_cost),
+                        "cost_limit": float(cost_limit_decimal),
+                        "comparison_costs": [float(c) for c in comparison_costs],
+                    },
+                },
+            )
+            logger.debug("Conversation storage completed successfully")
+        except Exception as storage_error:
+            # Storage failure is non-fatal - continue with normal tool execution
+            logger.warning(f"Conversation storage failed (non-fatal): {storage_error}")
 
         # Generate report
         return await _format_comparison_report(

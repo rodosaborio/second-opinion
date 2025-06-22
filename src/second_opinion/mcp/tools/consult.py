@@ -14,6 +14,8 @@ from ...cli.main import filter_think_tags
 from ...clients import detect_model_provider
 from ...core.evaluator import get_evaluator
 from ...core.models import Message, ModelRequest, TaskComplexity
+from ...orchestration import get_conversation_orchestrator
+from ...orchestration.types import StorageContext
 from ...utils.client_factory import create_client_from_config
 from ...utils.cost_tracking import get_cost_guard
 from ...utils.domain_classifier import classify_consultation_domain
@@ -717,6 +719,55 @@ async def consult_tool(
             await cost_guard.record_actual_cost(
                 reservation_id, results["total_cost"], session.target_model, "consult"
             )
+
+            # Store conversation (optional, non-fatal if it fails)
+            try:
+                orchestrator = get_conversation_orchestrator()
+                storage_context = StorageContext(
+                    interface_type="mcp",  # This tool is called from MCP
+                    tool_name="consult",
+                    session_id=session_id,
+                    context=clean_context,
+                    save_conversation=True,  # TODO: Make this configurable
+                )
+
+                # Extract responses from consultation results for storage
+                consultation_responses = []
+                for turn_data in results.get("conversation_turns", []):
+                    # Create mock ModelResponse for each turn
+                    from ...core.models import ModelResponse, TokenUsage
+
+                    mock_response = ModelResponse(
+                        content=turn_data["response"],
+                        model=session.target_model,
+                        usage=TokenUsage(
+                            input_tokens=10,  # Estimated - consult doesn't track exact tokens
+                            output_tokens=len(turn_data["response"].split())
+                            * 2,  # Rough estimate
+                            total_tokens=10 + len(turn_data["response"].split()) * 2,
+                        ),
+                        cost_estimate=Decimal(str(turn_data["cost"])),
+                        provider=detect_model_provider(session.target_model),
+                    )
+                    consultation_responses.append(mock_response)
+
+                if consultation_responses:
+                    await orchestrator.handle_interaction(
+                        prompt=clean_query,
+                        responses=consultation_responses,
+                        storage_context=storage_context,
+                        evaluation_result={
+                            "consultation_type": consultation_type,
+                            "consultation_results": results,
+                            "session_summary": session.get_session_summary(),
+                        },
+                    )
+                    logger.debug("Consultation storage completed successfully")
+            except Exception as storage_error:
+                # Storage failure is non-fatal - continue with normal tool execution
+                logger.warning(
+                    f"Consultation storage failed (non-fatal): {storage_error}"
+                )
 
             # Format and return results
             return _format_consultation_response(
