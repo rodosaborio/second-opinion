@@ -451,7 +451,9 @@ def _clear_module_caches():
                 if hasattr(module._cache, "clear") and callable(module._cache.clear):
                     module._cache.clear()
             if hasattr(module, "_instances"):
-                if hasattr(module._instances, "clear") and callable(module._instances.clear):
+                if hasattr(module._instances, "clear") and callable(
+                    module._instances.clear
+                ):
                     module._instances.clear()
 
 

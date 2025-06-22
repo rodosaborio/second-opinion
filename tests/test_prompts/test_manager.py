@@ -152,7 +152,9 @@ class TestPromptManager:
         from datetime import timedelta
 
         # Create manager with very short TTL
-        manager = PromptManager(templates_dir=temp_templates_dir, cache_ttl=1)  # 1 second
+        manager = PromptManager(
+            templates_dir=temp_templates_dir, cache_ttl=1
+        )  # 1 second
 
         # Load template
         template1 = await manager.load_template("basic")

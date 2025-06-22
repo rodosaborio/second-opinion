@@ -78,7 +78,7 @@ class MockClient(BaseClient):
                 pricing=PricingInfo(
                     model=f"{self.provider_name}/mock-model",
                     input_cost_per_1k=Decimal("0.001"),
-                    output_cost_per_1k=Decimal("0.002")
+                    output_cost_per_1k=Decimal("0.002"),
                 ),
             )
         ]
@@ -93,7 +93,7 @@ class MockClient(BaseClient):
             pricing=PricingInfo(
                 model=model,
                 input_cost_per_1k=Decimal("0.001"),
-                output_cost_per_1k=Decimal("0.002")
+                output_cost_per_1k=Decimal("0.002"),
             ),
         )
 
@@ -108,7 +108,7 @@ class MockClient(BaseClient):
                 pricing=PricingInfo(
                     model=f"{self.provider_name}/mock-model-1",
                     input_cost_per_1k=Decimal("0.001"),
-                    output_cost_per_1k=Decimal("0.002")
+                    output_cost_per_1k=Decimal("0.002"),
                 ),
             ),
             ModelInfo(
@@ -119,7 +119,7 @@ class MockClient(BaseClient):
                 pricing=PricingInfo(
                     model=f"{self.provider_name}/mock-model-2",
                     input_cost_per_1k=Decimal("0.002"),
-                    output_cost_per_1k=Decimal("0.004")
+                    output_cost_per_1k=Decimal("0.004"),
                 ),
             ),
         ]
