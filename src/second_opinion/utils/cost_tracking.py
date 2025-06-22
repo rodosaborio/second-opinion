@@ -597,7 +597,6 @@ def get_cost_guard() -> CostGuard:
             monthly_limit=cost_config.monthly_limit,
             warning_threshold=cost_config.warning_threshold,
         )
-    assert _cost_guard is not None  # Type checker hint
     return _cost_guard
 
 

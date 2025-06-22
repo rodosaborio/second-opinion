@@ -591,7 +591,6 @@ def get_pricing_manager() -> PricingManager:
     with _global_pricing_lock:
         if _global_pricing_manager is None:
             _global_pricing_manager = PricingManager()
-        assert _global_pricing_manager is not None  # Type checker hint
         return _global_pricing_manager
 
 

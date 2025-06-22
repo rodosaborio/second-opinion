@@ -6,7 +6,6 @@ integrating with the existing evaluation engine, cost tracking, and
 OpenRouter client infrastructure.
 """
 
-import importlib
 import logging
 import os
 import sys

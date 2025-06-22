@@ -936,7 +936,6 @@ def get_evaluator() -> ResponseEvaluator:
     global _global_evaluator
     if _global_evaluator is None:
         _global_evaluator = ResponseEvaluator()
-    assert _global_evaluator is not None  # Type checker hint
     return _global_evaluator
 
 

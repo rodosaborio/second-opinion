@@ -301,7 +301,6 @@ def get_prompt_manager() -> PromptManager:
     global _global_prompt_manager
     if _global_prompt_manager is None:
         _global_prompt_manager = PromptManager()
-    assert _global_prompt_manager is not None  # Type checker hint
     return _global_prompt_manager
 
 
