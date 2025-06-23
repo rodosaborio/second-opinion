@@ -320,6 +320,17 @@ class TurnController:
 Current question: {query}
 
 Please provide a thoughtful response that builds on our previous discussion."""
+        elif session.conversation_summary and session.consultation_type in [
+            "deep",
+            "brainstorm",
+        ]:
+            # Use loaded session context for session recovery
+            enhanced_query = f"""Previous conversation context from our session:
+{session.conversation_summary}
+
+Current question: {query}
+
+Please provide a thoughtful response that builds on our previous discussion."""
         else:
             enhanced_query = query
 
@@ -618,19 +629,53 @@ async def consult_tool(
             f"Starting consult tool: type={consultation_type}, query_length={len(clean_query)}, target_model={target_model}"
         )
 
-        # Session management strategy: MCP tools don't need to manage sessions directly
-        # They just generate session IDs for conversation storage and context
-
-        # For multi-turn consultations, we'll use session_id to track conversation context
-        # but we don't maintain global session state like the original broken implementation
+        # Session management strategy: Load conversation history for session recovery
         consultation_session = None
+        previous_context = ""
 
         if session_id:
             # For multi-turn consultations, attempt to retrieve conversation context
-            # from the orchestrator's conversation storage (if available)
+            # from the conversation storage for session recovery
             logger.info(f"Continuing consultation with session_id: {session_id}")
-            # We'll create a new ConsultationSession but try to load context
-            consultation_session = None  # Will be created below with context loading
+
+            try:
+                from ...database.store import get_conversation_store
+
+                store = get_conversation_store()
+                # Use a fresh async session for recovery to avoid greenlet issues
+                conversation_history = await store.get_session_conversation_history(
+                    session_id
+                )
+
+                if conversation_history:
+                    logger.info(
+                        f"Loaded {len(conversation_history)} previous conversations for session {session_id}"
+                    )
+
+                    # Build context from previous conversations (last 2-3 exchanges)
+                    context_parts = []
+                    for conv in conversation_history[-2:]:  # Last 2 conversations
+                        context_parts.append(
+                            f"Previous Q: {conv['user_prompt'][:150]}..."
+                        )
+                        for resp in conv["responses"]:
+                            if resp["response_type"] == "primary":
+                                context_parts.append(
+                                    f"Previous A: {resp['content'][:150]}..."
+                                )
+
+                    previous_context = "\n".join(context_parts)
+                    logger.debug(
+                        f"Built session context: {len(previous_context)} chars"
+                    )
+                else:
+                    logger.info(
+                        f"No conversation history found for session {session_id}, starting fresh"
+                    )
+
+            except Exception as e:
+                logger.warning(f"Failed to load session context for {session_id}: {e}")
+                # Continue without context - non-fatal error
 
         # Initialize components for model selection (always needed)
         evaluator = get_evaluator()
@@ -656,13 +701,20 @@ async def consult_tool(
             clean_query, clean_context or ""
         )
 
-        # Create a consultation session (just for internal tracking, not global storage)
+        # Create a consultation session with loaded context if available
         consultation_session = ConsultationSession(
             consultation_type=consultation_type,
             target_model=recommended_model,
             session_id=session_id,  # Use provided session_id or let it generate new one
         )
         consultation_session.domain = domain
+
+        # If we loaded previous context, add it to the session for context-aware responses
+        if previous_context:
+            consultation_session.conversation_summary = previous_context
+            logger.info(
+                f"Session {consultation_session.session_id} initialized with previous context"
+            )
 
         logger.info(
             f"Created consultation session {consultation_session.session_id} with {recommended_model} for {domain} domain"
@@ -714,7 +766,7 @@ async def consult_tool(
                     tool_name="consult",
                     session_id=consultation_session.session_id,  # Use the consultation session ID
                     context=clean_context,
-                    save_conversation=True,  # TODO: Make this configurable
+                    save_conversation=False,  # Temporarily disabled due to async issues
                 )
 
                 # Extract responses from consultation results for storage

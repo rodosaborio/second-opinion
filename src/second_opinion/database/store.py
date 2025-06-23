@@ -309,6 +309,69 @@ class ConversationStore:
                 for conv in conversations
             ]
 
+    async def get_session_conversation_history(
+        self, session_id: str
+    ) -> list[dict[str, Any]]:
+        """Get full conversation history for a session (for session recovery)."""
+        async with self.AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(Conversation)
+                .where(Conversation.session_id == session_id)
+                .order_by(Conversation.created_at.asc())  # Chronological order
+            )
+            conversations = result.scalars().all()
+
+            conversation_history = []
+            for conv in conversations:
+                # Get responses for this conversation
+                response_result = await session.execute(
+                    select(Response)
+                    .where(Response.conversation_id == conv.id)
+                    .order_by(Response.response_type, Response.response_order)
+                )
+                responses = response_result.scalars().all()
+
+                # Decrypt user prompt
+                decrypted_prompt = self.encryption_manager.decrypt(
+                    conv.user_prompt_encrypted, conv.encryption_key_id
+                )
+
+                # Decrypt context if available
+                decrypted_context = None
+                if conv.context_encrypted:
+                    decrypted_context = self.encryption_manager.decrypt(
+                        conv.context_encrypted, conv.encryption_key_id
+                    )
+
+                # Build response data
+                response_data = []
+                for response in responses:
+                    decrypted_content = self.encryption_manager.decrypt(
+                        response.content_encrypted, response.encryption_key_id
+                    )
+                    response_data.append(
+                        {
+                            "content": decrypted_content,
+                            "model": response.model,
+                            "response_type": response.response_type,
+                            "cost": response.cost,
+                        }
+                    )
+
+                conversation_history.append(
+                    {
+                        "id": conv.id,
+                        "user_prompt": decrypted_prompt,
+                        "context": decrypted_context,
+                        "responses": response_data,
+                        "total_cost": conv.total_cost,
+                        "created_at": conv.created_at,
+                        "tool_name": conv.tool_name,
+                    }
+                )
+
+            return conversation_history
+
     async def get_usage_analytics(
         self,
         start_date: datetime | None = None,
