@@ -869,4 +869,70 @@ def _display_verbose_results(result: dict):
         console.print(f"\n{filtered_comparison_verbose}\n")
 
 
+@app.command()
+def analytics(
+    time_period: str = typer.Option(
+        "week",
+        "--period",
+        "-p",
+        help="Analysis period: day, week, month, quarter, year, all",
+    ),
+    breakdown_by: str = typer.Option(
+        "model",
+        "--breakdown",
+        "-b",
+        help="Breakdown by: model, interface, tool, cost, time",
+    ),
+    interface_type: str = typer.Option(
+        None,
+        "--interface",
+        "-i",
+        help="Filter by interface: cli, mcp, or all",
+    ),
+    include_trends: bool = typer.Option(
+        True,
+        "--trends/--no-trends",
+        help="Include trend analysis over time",
+    ),
+    include_recommendations: bool = typer.Option(
+        True,
+        "--recommendations/--no-recommendations",
+        help="Include optimization recommendations",
+    ),
+):
+    """
+    Display usage analytics and cost optimization insights.
+
+    Analyze your Second Opinion usage patterns, cost breakdowns, and receive
+    personalized recommendations for optimizing your AI model usage.
+
+    Examples:
+        second-opinion analytics --period week --breakdown model
+        second-opinion analytics --period month --interface mcp --trends
+        second-opinion analytics --period all --breakdown cost --recommendations
+    """
+    try:
+        from second_opinion.mcp.tools.usage_analytics import usage_analytics_tool
+
+        # Run the analytics tool
+        result = asyncio.run(
+            usage_analytics_tool(
+                time_period=time_period,
+                breakdown_by=breakdown_by,
+                interface_type=interface_type if interface_type != "all" else None,
+                include_trends=include_trends,
+                include_recommendations=include_recommendations,
+                cost_limit=None,  # Use default
+            )
+        )
+
+        # Display the results using Rich formatting
+        console.print(result)
+
+    except Exception as e:
+        logger.error(f"Analytics command failed: {e}")
+        console.print(f"[red]Error generating analytics: {str(e)}[/red]")
+        raise typer.Exit(1) from e
+
+
 # Entry point is handled by pyproject.toml script configuration
