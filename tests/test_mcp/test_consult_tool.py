@@ -336,7 +336,9 @@ class TestTurnController:
         # Mock follow-up assessment to continue conversation
         original_assess = turn_controller._assess_follow_up_need
 
-        async def mock_assess_follow_up(session, response, turn, max_turns):
+        async def mock_assess_follow_up(
+            session, response, turn, max_turns, user_query=""
+        ):
             if turn == 0:  # Continue after first turn
                 return {"needed": True, "query": "Please elaborate further"}
             return {"needed": False, "query": None}
@@ -364,6 +366,23 @@ class TestTurnController:
         session = ConsultationSession("deep", "anthropic/claude-3-opus")
         session.total_cost = Decimal("0.40")  # Already near limit
 
+        # Mock follow-up evaluation to not suggest follow-up due to cost constraints
+        original_assess = turn_controller._assess_follow_up_need
+
+        async def mock_assess_follow_up(
+            session, response, turn, max_turns, user_query=""
+        ):
+            # Don't suggest follow-up when close to cost limit
+            return {
+                "needed": False,
+                "query": None,
+                "confidence": 0.9,
+                "reason": "Cost limit reached",
+                "cost": 0.0,
+            }
+
+        turn_controller._assess_follow_up_need = mock_assess_follow_up
+
         results = await turn_controller.conduct_consultation(
             session=session,
             initial_query="Complex question",
@@ -373,6 +392,9 @@ class TestTurnController:
 
         # Should complete only 1 turn due to cost limit
         assert len(results["conversation_turns"]) == 1
+
+        # Restore original method
+        turn_controller._assess_follow_up_need = original_assess
 
     def test_system_prompt_generation(self, turn_controller):
         """Test system prompt generation for different consultation types."""

@@ -465,3 +465,240 @@ class TestRealMultiTurnScenarios:
         assert "🔍 Deep Consultation Session" in result
         assert "system architecture" in result
         assert "microservices" in result.lower() or "monolith" in result.lower()
+
+
+class TestEnhancedContextManagement:
+    """Test enhanced context management features."""
+
+    @pytest.mark.asyncio
+    async def test_enhanced_context_window(self, mock_multi_turn_dependencies):
+        """Test that enhanced context window preserves more conversation history."""
+
+        result = await consult_tool(
+            query="Explain distributed systems architecture with specific focus on consistency models",
+            consultation_type="deep",
+            max_turns=3,
+            context="system architecture",
+        )
+
+        # Should handle longer, more detailed conversations
+        assert "🔍 Deep Consultation Session" in result
+        assert "system architecture" in result
+        assert "distributed systems" in result.lower()
+
+        # Check for comprehensive analysis indicators
+        assert "Session ID" in result
+
+    @pytest.mark.asyncio
+    async def test_smart_context_truncation(self, mock_multi_turn_dependencies):
+        """Test that smart truncation preserves key information."""
+
+        # Use a very long query to test truncation
+        long_query = "I need help designing a comprehensive microservices architecture that can handle high throughput, maintain data consistency across services, implement proper authentication and authorization, provide real-time monitoring and alerting, support horizontal scaling, ensure fault tolerance with circuit breakers and retries, implement proper logging and distributed tracing, handle service discovery and load balancing, manage configuration and secrets, and provide automated deployment pipelines with blue-green deployments. This system needs to support multiple programming languages, different data storage technologies, event-driven communication patterns, and proper API versioning strategies."
+
+        result = await consult_tool(
+            query=long_query,
+            consultation_type="deep",
+            max_turns=2,
+            target_model="anthropic/claude-3-5-sonnet",
+        )
+
+        # Should handle long queries without errors
+        assert "🔍 Deep Consultation Session" in result
+        assert "microservices" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_structured_session_state(self, mock_multi_turn_dependencies):
+        """Test that structured session state is maintained."""
+
+        result = await consult_tool(
+            query="Help me implement JWT authentication for my REST API",
+            consultation_type="deep",
+            max_turns=3,
+            context="security implementation",
+        )
+
+        # Should capture security context and JWT topic
+        assert "🔍 Deep Consultation Session" in result
+        assert "security implementation" in result
+        assert "jwt" in result.lower() or "authentication" in result.lower()
+
+
+class TestLLMFollowUpEvaluation:
+    """Test LLM-based follow-up evaluation functionality."""
+
+    @pytest.mark.asyncio
+    async def test_follow_up_evaluator_integration(
+        self, mock_multi_turn_dependencies, monkeypatch
+    ):
+        """Test that LLM-based follow-up evaluation is working."""
+
+        # Mock the follow-up evaluator to return consistent results
+        async def mock_evaluate_follow_up(
+            consultation_type,
+            user_query,
+            ai_response,
+            turn_number,
+            max_turns,
+            conversation_context="",
+        ):
+            # Simulate intelligent follow-up decision
+            if (
+                "elaborate" in ai_response.lower()
+                or "dive deeper" in ai_response.lower()
+            ):
+                return {
+                    "needs_followup": True,
+                    "confidence": 0.8,
+                    "reason": "Response suggests further exploration",
+                    "suggested_query": "Please provide specific implementation examples",
+                    "estimated_cost": "0.002",
+                }
+            else:
+                return {
+                    "needs_followup": False,
+                    "confidence": 0.9,
+                    "reason": "Response appears complete",
+                    "suggested_query": None,
+                    "estimated_cost": "0.002",
+                }
+
+        # Add the mock to the dependencies
+        monkeypatch.setattr(
+            "second_opinion.mcp.tools.consult.evaluate_follow_up_need",
+            mock_evaluate_follow_up,
+        )
+
+        result = await consult_tool(
+            query="Explain the trade-offs between different database consistency models",
+            consultation_type="deep",
+            max_turns=3,
+        )
+
+        # Should use LLM-based evaluation
+        assert "🔍 Deep Consultation Session" in result
+        assert "consistency" in result.lower() or "database" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_follow_up_cost_tracking(self, mock_multi_turn_dependencies):
+        """Test that follow-up evaluation costs are tracked."""
+
+        result = await consult_tool(
+            query="Design a scalable caching strategy for high-traffic applications",
+            consultation_type="deep",
+            max_turns=2,
+            cost_limit=0.50,
+        )
+
+        # Should track costs including follow-up evaluation
+        assert "🔍 Deep Consultation Session" in result
+        assert "Cost Analysis" in result
+        assert "Total Cost" in result
+
+    @pytest.mark.asyncio
+    async def test_consultation_type_specific_follow_up(
+        self, mock_multi_turn_dependencies
+    ):
+        """Test that follow-up behavior varies by consultation type."""
+
+        # Quick consultation - should rarely have follow-up
+        quick_result = await consult_tool(
+            query="What's the difference between NoSQL and SQL databases?",
+            consultation_type="quick",
+        )
+
+        assert "🎯 Quick Expert Consultation" in quick_result
+        # Should not have follow-up continuation options
+
+        # Deep consultation - should support follow-up
+        deep_result = await consult_tool(
+            query="Compare NoSQL vs SQL for large-scale applications",
+            consultation_type="deep",
+            max_turns=3,
+        )
+
+        assert "🔍 Deep Consultation Session" in deep_result
+        assert "Continue Consultation" in deep_result or "Session ID" in deep_result
+
+
+class TestAdvancedMultiTurnScenarios:
+    """Test advanced multi-turn scenarios with enhanced features."""
+
+    @pytest.mark.asyncio
+    async def test_complex_technical_conversation(self, mock_multi_turn_dependencies):
+        """Test complex technical conversation with context preservation."""
+
+        result = await consult_tool(
+            query="I'm building a real-time trading platform that needs microsecond latency, how should I architect the system?",
+            consultation_type="deep",
+            max_turns=4,
+            context="high-frequency trading systems",
+        )
+
+        # Should handle complex technical requirements
+        assert "🔍 Deep Consultation Session" in result
+        assert "high-frequency trading systems" in result
+        assert "latency" in result.lower() or "trading" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_domain_specific_context_preservation(
+        self, mock_multi_turn_dependencies
+    ):
+        """Test that domain-specific context is preserved across turns."""
+
+        result = await consult_tool(
+            query="Implement machine learning model versioning and deployment pipeline",
+            consultation_type="deep",
+            max_turns=3,
+            context="MLOps and machine learning infrastructure",
+        )
+
+        # Should preserve ML domain context
+        assert "🔍 Deep Consultation Session" in result
+        assert "MLOps and machine learning infrastructure" in result
+        assert (
+            "machine learning" in result.lower()
+            or "mlops" in result.lower()
+            or "model" in result.lower()
+        )
+
+    @pytest.mark.asyncio
+    async def test_session_state_across_continuation(
+        self, mock_multi_turn_dependencies
+    ):
+        """Test that enhanced session state works across session continuation."""
+
+        # First conversation
+        first_result = await consult_tool(
+            query="Help me design an event-driven microservices architecture",
+            consultation_type="deep",
+            max_turns=2,
+            target_model="anthropic/claude-3-5-sonnet",
+        )
+
+        # Extract session ID
+        import re
+
+        session_id_match = re.search(r"Session ID.*?`([^`]+)`", first_result)
+        if not session_id_match:
+            session_id_match = re.search(r"Session ID.*?([a-f0-9-]+)", first_result)
+
+        if session_id_match:
+            session_id = session_id_match.group(1)
+
+            # Continue conversation
+            second_result = await consult_tool(
+                query="Now focus on the event sourcing implementation details",
+                consultation_type="deep",
+                session_id=session_id,
+                max_turns=2,
+                target_model="anthropic/claude-3-5-sonnet",
+            )
+
+            # Should reference previous conversation context
+            assert "🔍 Deep Consultation Session" in second_result
+            assert session_id in second_result
+            assert (
+                "Previous conversation context" in second_result
+                or "Building on our previous discussion" in second_result
+            )

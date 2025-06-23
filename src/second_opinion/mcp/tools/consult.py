@@ -19,6 +19,7 @@ from ...orchestration.types import StorageContext
 from ...utils.client_factory import create_client_from_config
 from ...utils.cost_tracking import get_cost_guard
 from ...utils.domain_classifier import classify_consultation_domain
+from ...utils.followup_evaluator import evaluate_follow_up_need
 from ...utils.sanitization import (
     SecurityContext,
     sanitize_prompt,
@@ -56,13 +57,29 @@ class ConsultationSession(MCPSession):
         self.conversation_summary = ""
         self.domain = "general"
 
+        # Enhanced session state management
+        self.key_topics: list[str] = []  # Track main topics discussed
+        self.decisions_made: list[dict] = []  # Track key decisions and conclusions
+        self.context_hierarchy: dict[str, Any] = {  # Structured context preservation
+            "original_goal": "",
+            "current_focus": "",
+            "technical_details": [],
+            "constraints": [],
+            "progress_markers": [],
+        }
+        self.conversation_quality_metrics = {
+            "completeness_score": 0.0,
+            "user_satisfaction_indicators": [],
+            "complexity_handled": "low",
+        }
+
         logger.debug(
             f"Created consultation session {self.session_id} for {consultation_type} with {target_model}"
         )
 
     async def add_turn(self, query: str, response: str, cost: Decimal) -> None:
         """
-        Add a conversation turn with cost tracking.
+        Add a conversation turn with cost tracking and structured information extraction.
 
         Args:
             query: User query for this turn
@@ -78,9 +95,138 @@ class ConsultationSession(MCPSession):
         self.turn_count += 1
         self.record_cost("consult", cost, self.target_model)
 
+        # Extract structured information from the turn
+        await self._extract_turn_insights(query, response)
+
         logger.debug(
             f"Session {self.session_id}: Added turn {self.turn_count}, cost ${cost:.4f}"
         )
+
+    async def _extract_turn_insights(self, query: str, response: str) -> None:
+        """
+        Extract key insights and structured information from a conversation turn.
+
+        Args:
+            query: User query
+            response: AI response
+        """
+        # Extract key topics from query (simple keyword extraction)
+        query_topics = self._extract_topics_from_text(query)
+        for topic in query_topics:
+            if topic not in self.key_topics and len(self.key_topics) < 10:
+                self.key_topics.append(topic)
+
+        # Update original goal if this is the first turn
+        if self.turn_count == 1:
+            self.context_hierarchy["original_goal"] = query[:200] + (
+                "..." if len(query) > 200 else ""
+            )
+
+        # Extract decisions and conclusions from response
+        if any(
+            indicator in response.lower()
+            for indicator in ["recommend", "suggest", "conclude", "decision", "should"]
+        ):
+            decision = {
+                "turn": self.turn_count,
+                "type": "recommendation",
+                "content": response[:150] + ("..." if len(response) > 150 else ""),
+                "confidence": self._estimate_confidence(response),
+            }
+            self.decisions_made.append(decision)
+
+        # Update current focus
+        self.context_hierarchy["current_focus"] = query[:100] + (
+            "..." if len(query) > 100 else ""
+        )
+
+        # Track progress markers
+        if self.turn_count > 1:
+            progress_marker = f"Turn {self.turn_count}: {query[:50]}..."
+            self.context_hierarchy["progress_markers"].append(progress_marker)
+            # Keep only last 5 progress markers
+            if len(self.context_hierarchy["progress_markers"]) > 5:
+                self.context_hierarchy["progress_markers"] = self.context_hierarchy[
+                    "progress_markers"
+                ][-5:]
+
+    def _extract_topics_from_text(self, text: str) -> list[str]:
+        """Extract key topics from text using simple heuristics."""
+        # Simple topic extraction - look for technical terms, proper nouns, key concepts
+        words = text.lower().split()
+        topics = []
+
+        # Common technical/domain keywords that indicate topics
+        topic_indicators = [
+            "architecture",
+            "database",
+            "api",
+            "performance",
+            "security",
+            "scalability",
+            "microservices",
+            "python",
+            "javascript",
+            "react",
+            "node",
+            "aws",
+            "docker",
+            "kubernetes",
+            "machine learning",
+            "ai",
+            "algorithm",
+            "optimization",
+            "authentication",
+            "authorization",
+            "cache",
+            "redis",
+            "mongodb",
+            "postgresql",
+        ]
+
+        for word in words:
+            clean_word = word.strip(".,!?;:")
+            if clean_word in topic_indicators and clean_word not in topics:
+                topics.append(clean_word)
+
+        return topics[:3]  # Return top 3 topics
+
+    def _estimate_confidence(self, response: str) -> float:
+        """Estimate confidence level of AI response based on language used."""
+        response_lower = response.lower()
+
+        # High confidence indicators
+        high_confidence = [
+            "definitely",
+            "certainly",
+            "clearly",
+            "obviously",
+            "recommend",
+            "should",
+        ]
+        # Low confidence indicators
+        low_confidence = [
+            "might",
+            "maybe",
+            "possibly",
+            "consider",
+            "could be",
+            "uncertain",
+        ]
+
+        high_count = sum(
+            1 for indicator in high_confidence if indicator in response_lower
+        )
+        low_count = sum(
+            1 for indicator in low_confidence if indicator in response_lower
+        )
+
+        if high_count > low_count:
+            return 0.8
+        elif low_count > high_count:
+            return 0.4
+        else:
+            return 0.6
 
     def can_continue(self, max_turns: int, cost_limit: Decimal) -> bool:
         """
@@ -99,25 +245,187 @@ class ConsultationSession(MCPSession):
             and self.status == "active"
         )
 
-    def get_conversation_context(self) -> str:
+    def get_conversation_context(
+        self, max_exchanges: int = 4, max_chars_per_exchange: int = 350
+    ) -> str:
         """
-        Get conversation context for follow-up turns.
+        Get conversation context for follow-up turns with enhanced context window.
+
+        Args:
+            max_exchanges: Maximum number of exchanges to include (default: 4 = 8 messages)
+            max_chars_per_exchange: Maximum characters per message (default: 350)
 
         Returns:
-            Formatted conversation history
+            Formatted conversation history with intelligent truncation
         """
         if not self.messages:
             return ""
 
         context_parts = []
-        for i in range(0, len(self.messages), 2):
-            if i + 1 < len(self.messages):
+        total_chars = 0
+        max_total_chars = max_exchanges * max_chars_per_exchange * 2  # Q&A pairs
+
+        # Process messages in reverse order (most recent first)
+        for i in range(len(self.messages) - 2, -1, -2):  # Step by 2, backwards
+            if i + 1 < len(self.messages) and len(context_parts) < max_exchanges * 2:
                 user_msg = self.messages[i].content
                 ai_msg = self.messages[i + 1].content
-                context_parts.append(f"Previous Q: {user_msg[:200]}...")
-                context_parts.append(f"Previous A: {ai_msg[:200]}...")
 
-        return "\n".join(context_parts[-4:])  # Last 2 exchanges
+                # Smart truncation preserving key information
+                truncated_user = self._smart_truncate(user_msg, max_chars_per_exchange)
+                truncated_ai = self._smart_truncate(ai_msg, max_chars_per_exchange)
+
+                # Check if adding this exchange would exceed character limit
+                exchange_chars = (
+                    len(truncated_user) + len(truncated_ai) + 40
+                )  # formatting
+                if total_chars + exchange_chars > max_total_chars:
+                    break
+
+                # Add to context (prepend to maintain chronological order)
+                context_parts.insert(0, f"Previous A: {truncated_ai}")
+                context_parts.insert(0, f"Previous Q: {truncated_user}")
+                total_chars += exchange_chars
+
+        return "\n".join(context_parts)
+
+    def get_enhanced_session_summary(self) -> dict[str, Any]:
+        """
+        Get comprehensive session summary with structured information.
+
+        Returns:
+            Dictionary containing session metrics, topics, decisions, and context
+        """
+        return {
+            "session_id": self.session_id,
+            "consultation_type": self.consultation_type,
+            "domain": self.domain,
+            "turn_count": self.turn_count,
+            "status": self.status,
+            "total_cost": float(self.total_cost),
+            "key_topics": self.key_topics,
+            "decisions_made": self.decisions_made,
+            "context_hierarchy": self.context_hierarchy,
+            "conversation_quality_metrics": self.conversation_quality_metrics,
+            "context_summary": self.get_conversation_context(
+                max_exchanges=2, max_chars_per_exchange=200
+            ),
+        }
+
+    def _smart_truncate(self, text: str, max_chars: int) -> str:
+        """
+        Intelligently truncate text preserving key information.
+
+        Args:
+            text: Text to truncate
+            max_chars: Maximum characters to preserve
+
+        Returns:
+            Truncated text with key information preserved
+        """
+        if len(text) <= max_chars:
+            return text
+
+        # For very long text, try to preserve:
+        # 1. Beginning (context/question)
+        # 2. Key phrases (ending sentences, conclusions)
+        # 3. Technical terms and specifics
+
+        # Simple smart truncation: preserve beginning and try to end at sentence boundary
+        if max_chars < 100:
+            return text[: max_chars - 3] + "..."
+
+        # Take first 70% of available chars from beginning
+        beginning_chars = int(max_chars * 0.7)
+        beginning = text[:beginning_chars]
+
+        # Try to find a good ending point in the remaining text
+        remaining_chars = max_chars - beginning_chars - 3  # -3 for "..."
+        if remaining_chars > 20:
+            # Look for sentence endings in the latter part of the text
+            latter_part = text[-(remaining_chars + 50) :]  # Look ahead a bit
+            sentence_endings = [". ", "! ", "? ", "\n"]
+
+            best_ending = ""
+            for ending in sentence_endings:
+                pos = latter_part.find(ending)
+                if pos != -1 and pos <= remaining_chars:
+                    best_ending = latter_part[: pos + 1]
+                    break
+
+            if best_ending:
+                return beginning + "..." + best_ending.strip()
+
+        return beginning + "..."
+
+    @staticmethod
+    def _build_session_recovery_context(
+        conversation_history: list[dict],
+        max_conversations: int = 3,
+        max_chars_per_exchange: int = 300,
+    ) -> str:
+        """
+        Build context from conversation history for session recovery.
+
+        Args:
+            conversation_history: List of conversation dictionaries from storage
+            max_conversations: Maximum number of conversations to include
+            max_chars_per_exchange: Maximum characters per exchange
+
+        Returns:
+            Formatted context string for session recovery
+        """
+        if not conversation_history:
+            return ""
+
+        context_parts = []
+        total_chars = 0
+        max_total_chars = max_conversations * max_chars_per_exchange * 2
+
+        # Take most recent conversations up to the limit
+        recent_conversations = conversation_history[-max_conversations:]
+
+        for conv in recent_conversations:
+            user_prompt = conv.get("user_prompt", "")
+
+            # Smart truncation for user prompt
+            if len(user_prompt) > max_chars_per_exchange:
+                # Use the same smart truncation logic
+                session = ConsultationSession("temp", "temp")
+                truncated_prompt = session._smart_truncate(
+                    user_prompt, max_chars_per_exchange
+                )
+            else:
+                truncated_prompt = user_prompt
+
+            # Find primary response
+            primary_response = ""
+            for resp in conv.get("responses", []):
+                if resp.get("response_type") == "primary":
+                    primary_response = resp.get("content", "")
+                    break
+
+            # Smart truncation for response
+            if len(primary_response) > max_chars_per_exchange:
+                session = ConsultationSession("temp", "temp")
+                truncated_response = session._smart_truncate(
+                    primary_response, max_chars_per_exchange
+                )
+            else:
+                truncated_response = primary_response
+
+            # Check total character limit
+            exchange_chars = len(truncated_prompt) + len(truncated_response) + 40
+            if total_chars + exchange_chars > max_total_chars:
+                break
+
+            context_parts.append(f"Previous Q: {truncated_prompt}")
+            if truncated_response:
+                context_parts.append(f"Previous A: {truncated_response}")
+
+            total_chars += exchange_chars
+
+        return "\n".join(context_parts)
 
 
 class ConsultationModelRouter:
@@ -254,7 +562,7 @@ class TurnController:
 
                 # Determine if follow-up is needed for multi-turn types
                 follow_up = await self._assess_follow_up_need(
-                    session, response, turn, max_turns
+                    session, response, turn, max_turns, current_query
                 )
 
                 if not follow_up["needed"]:
@@ -381,56 +689,127 @@ Please provide a thoughtful response that builds on our previous discussion."""
             return base_prompt
 
     async def _assess_follow_up_need(
-        self, session: ConsultationSession, response: str, turn: int, max_turns: int
+        self,
+        session: ConsultationSession,
+        response: str,
+        turn: int,
+        max_turns: int,
+        user_query: str = "",
     ) -> dict[str, Any]:
         """
-        Intelligently assess if follow-up questions are needed.
+        Intelligently assess if follow-up questions are needed using LLM evaluation.
 
         Args:
             session: Consultation session
             response: AI response from current turn
             turn: Current turn number
             max_turns: Maximum allowed turns
+            user_query: User query for this turn
 
         Returns:
             Dictionary with follow-up assessment
         """
+        try:
+            # Get conversation context for evaluation
+            conversation_context = session.get_conversation_context(
+                max_exchanges=2, max_chars_per_exchange=200
+            )
 
-        # Simple heuristics for follow-up detection
-        follow_up_indicators = [
-            "would you like me to elaborate",
-            "need more details",
-            "want me to explore",
-            "should we dive deeper",
-            "any specific aspects",
-            "would be helpful to know",
-            "consider discussing",
-        ]
+            # Use LLM-based evaluation for follow-up assessment
+            evaluation_result = await evaluate_follow_up_need(
+                consultation_type=session.consultation_type,
+                user_query=user_query,
+                ai_response=response,
+                turn_number=turn + 1,  # Convert 0-indexed to 1-indexed
+                max_turns=max_turns,
+                conversation_context=conversation_context,
+            )
 
-        response_lower = response.lower()
-        needs_follow_up = any(
-            indicator in response_lower for indicator in follow_up_indicators
-        )
+            # Record the evaluation cost in the session
+            if "estimated_cost" in evaluation_result:
+                session.record_cost(
+                    "follow_up_evaluation",
+                    evaluation_result["estimated_cost"],
+                    "gpt-4o-mini",
+                )
 
-        # Only continue if we haven't reached max turns and consultation type supports it
-        if (
-            needs_follow_up
-            and turn < max_turns - 1
-            and session.consultation_type in ["deep", "brainstorm"]
-        ):
-            # Generate intelligent follow-up query based on consultation type
-            if session.consultation_type == "deep":
+            # Convert to expected format
+            needs_follow_up = evaluation_result.get("needs_followup", False)
+            suggested_query = evaluation_result.get("suggested_query")
+
+            # Use intelligent suggested query or fallback to type-specific defaults
+            if needs_follow_up and suggested_query:
+                follow_up_query = suggested_query
+            elif needs_follow_up:
+                # Fallback to consultation-type specific defaults
+                if session.consultation_type == "deep":
+                    follow_up_query = "Please elaborate on the most important considerations and provide specific implementation guidance."
+                elif session.consultation_type == "brainstorm":
+                    follow_up_query = "What are 2-3 alternative approaches we should consider, and what are their trade-offs?"
+                else:
+                    follow_up_query = (
+                        "Could you provide more details or explore this further?"
+                    )
+            else:
+                follow_up_query = None
+
+            logger.debug(
+                f"LLM follow-up evaluation: needs_followup={needs_follow_up}, "
+                f"confidence={evaluation_result.get('confidence', 0.0):.2f}, "
+                f"reason={evaluation_result.get('reason', 'N/A')}"
+            )
+
+            return {
+                "needed": needs_follow_up,
+                "query": follow_up_query,
+                "confidence": evaluation_result.get("confidence", 0.5),
+                "reason": evaluation_result.get("reason", "LLM evaluation completed"),
+                "cost": evaluation_result.get("estimated_cost", 0.0),
+            }
+
+        except Exception as e:
+            logger.warning(f"LLM follow-up evaluation failed, using fallback: {e}")
+
+            # Fallback to simple heuristic if LLM evaluation fails
+            follow_up_indicators = [
+                "would you like me to elaborate",
+                "need more details",
+                "want me to explore",
+                "should we dive deeper",
+                "any specific aspects",
+            ]
+
+            response_lower = response.lower()
+            needs_follow_up = any(
+                indicator in response_lower for indicator in follow_up_indicators
+            )
+
+            # Only continue if consultation type supports multi-turn and we haven't reached limit
+            if (
+                needs_follow_up
+                and turn < max_turns - 1
+                and session.consultation_type in ["deep", "brainstorm"]
+            ):
+                if session.consultation_type == "deep":
+                    query = "Please elaborate on the most important considerations and provide specific implementation guidance."
+                else:
+                    query = "What are 2-3 alternative approaches we should consider, and what are their trade-offs?"
+
                 return {
                     "needed": True,
-                    "query": "Please elaborate on the most important considerations and provide specific implementation guidance.",
-                }
-            elif session.consultation_type == "brainstorm":
-                return {
-                    "needed": True,
-                    "query": "What are 2-3 alternative approaches we should consider, and what are their trade-offs?",
+                    "query": query,
+                    "confidence": 0.5,
+                    "reason": "Fallback heuristic assessment",
+                    "cost": 0.0,
                 }
 
-        return {"needed": False, "query": None}
+            return {
+                "needed": False,
+                "query": None,
+                "confidence": 0.8,
+                "reason": "Fallback: no follow-up needed",
+                "cost": 0.0,
+            }
 
     async def _generate_summary(self, session: ConsultationSession) -> str:
         """
@@ -652,19 +1031,14 @@ async def consult_tool(
                         f"Loaded {len(conversation_history)} previous conversations for session {session_id}"
                     )
 
-                    # Build context from previous conversations (last 2-3 exchanges)
-                    context_parts = []
-                    for conv in conversation_history[-2:]:  # Last 2 conversations
-                        context_parts.append(
-                            f"Previous Q: {conv['user_prompt'][:150]}..."
+                    # Build enhanced context from previous conversations
+                    previous_context = (
+                        ConsultationSession._build_session_recovery_context(
+                            conversation_history,
+                            max_conversations=3,
+                            max_chars_per_exchange=300,
                         )
-                        for resp in conv["responses"]:
-                            if resp["response_type"] == "primary":
-                                context_parts.append(
-                                    f"Previous A: {resp['content'][:150]}..."
-                                )
-
-                    previous_context = "\n".join(context_parts)
+                    )
                     logger.debug(
                         f"Built session context: {len(previous_context)} chars"
                     )
