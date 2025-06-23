@@ -1,0 +1,52 @@
+Consult with AI models for expert opinions, task delegation, and multi-turn problem solving.
+
+This tool enables AI-to-AI consultation across different specialized models, supporting both single-turn expert opinions and multi-turn collaborative problem-solving sessions.
+
+CONSULTATION TYPES:
+- **quick**: Single-turn expert opinion with focused advice
+- **deep**: Multi-turn comprehensive analysis and problem exploration
+- **delegate**: Task completion using cost-effective models (60-80% savings)
+- **brainstorm**: Creative collaborative exploration with multiple perspectives
+
+SMART MODEL ROUTING:
+- Automatically selects optimal models based on consultation type and task complexity
+- delegate + simple → GPT-4o-mini (cost optimization)
+- expert + complex → Claude Opus (premium quality)
+- brainstorm → GPT-4o (creative balance)
+- quick → Claude 3.5 Sonnet (reliable default)
+
+COST OPTIMIZATION:
+- Task delegation: 60-80% cost savings vs premium models
+- Multi-turn conversations: Intelligent context management
+- Transparent cost tracking with session management
+- Per-consultation cost limits with auto-stop protection
+
+USAGE PATTERNS:
+# Quick expert opinion
+result = await consult(
+    query="Should I use async/await or threading for this I/O operation?",
+    consultation_type="quick",
+    context="performance optimization"
+)
+
+# Task delegation for cost savings
+result = await consult(
+    query="Write unit tests for this function: def fibonacci(n): ...",
+    consultation_type="delegate",
+    target_model="openai/gpt-4o-mini"
+)
+
+# Deep problem solving (multi-turn)
+result = await consult(
+    query="Help me design a scalable authentication system",
+    consultation_type="deep",
+    max_turns=3,
+    context="system architecture"
+)
+
+# Continue existing conversation
+result = await consult(
+    query="Now help me implement the OAuth2 flow",
+    consultation_type="deep",
+    session_id="abc123-session-id"
+)

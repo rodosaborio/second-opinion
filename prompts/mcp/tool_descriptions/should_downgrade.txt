@@ -1,0 +1,26 @@
+Analyze whether cheaper model alternatives could achieve similar quality for cost optimization.
+
+This tool helps optimize AI costs by testing if cheaper models (especially local ones) can provide similar quality responses to more expensive cloud models. It focuses on cost reduction while maintaining acceptable quality standards.
+
+COST OPTIMIZATION FOCUS:
+- Tests local models for maximum savings (100% cost reduction)
+- Evaluates budget cloud alternatives (50-80% cost reduction)
+- Provides quality vs cost trade-off analysis
+- Gives specific downgrade recommendations with savings projections
+
+USAGE PATTERN:
+# Test if expensive model can be downgraded (auto-selection)
+result = await should_downgrade(
+    current_response="<response from expensive model>",
+    task="Write a Python function to calculate fibonacci",
+    current_model="anthropic/claude-3-5-sonnet",
+    test_local=True
+)
+
+# Test specific models (custom selection)
+result = await should_downgrade(
+    current_response="<response from expensive model>",
+    task="Write a Python function to calculate fibonacci",
+    current_model="anthropic/claude-3-5-sonnet",
+    downgrade_candidates=["anthropic/claude-3-haiku", "openai/gpt-4o-mini"]
+)

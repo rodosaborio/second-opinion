@@ -1,0 +1,63 @@
+# MCP Tool Parameter Examples
+
+## Model Names
+### Cloud Models (OpenRouter format)
+- anthropic/claude-3-5-sonnet
+- anthropic/claude-3-haiku
+- anthropic/claude-3-opus
+- openai/gpt-4o
+- openai/gpt-4o-mini
+- google/gemini-pro-1.5
+- google/gemini-flash-1.5
+
+### Local Models
+- qwen3-4b-mlx
+- codestral-22b-v0.1
+- llama3-8b-mlx
+- mistral-7b-mlx
+
+## Task Examples
+### Coding Tasks
+- Write a Python function to calculate fibonacci
+- Debug this JavaScript code snippet
+- Explain this SQL query
+- Create a React component for user login
+
+### Analysis Tasks
+- Explain quantum computing
+- Analyze the pros and cons of remote work
+- Compare different database solutions
+- Evaluate cloud architecture patterns
+
+### Creative Tasks
+- Write a short story about AI
+- Create a marketing slogan
+- Compose a haiku about technology
+- Design a user interface concept
+
+## Context Examples
+- coding task
+- academic research
+- creative writing
+- technical documentation
+- educational content
+- system architecture
+- performance optimization
+- security analysis
+
+## Response Examples
+### Code Example
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+### Explanation Example
+Quantum computing uses quantum mechanical phenomena like superposition and entanglement to process information in ways that classical computers cannot...
+
+## Cost Limit Examples
+- 0.10 (basic operations)
+- 0.25 (standard comparison)
+- 0.50 (comprehensive analysis)
+- 1.00 (complex benchmarking)
+- 2.00 (extensive multi-model testing)

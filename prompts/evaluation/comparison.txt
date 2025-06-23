@@ -6,7 +6,7 @@ You are an expert at comparing and analyzing AI model responses. Your task is to
 ## Response A ({model_a})
 {response_a}
 
-## Response B ({model_b})  
+## Response B ({model_b})
 {response_b}
 
 ## Comparison Framework
@@ -50,7 +50,7 @@ Provide a brief overview of how the responses differ:
 
 **Completeness & Depth:**
 - Response A:
-- Response B:  
+- Response B:
 - Winner:
 
 **Clarity & Communication:**

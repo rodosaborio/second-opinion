@@ -14,7 +14,7 @@ Classify this task into one of these categories:
 - Basic formatting or editing tasks
 - Simple creative prompts
 
-### MODERATE (Tier 2)  
+### MODERATE (Tier 2)
 - Multi-step reasoning or analysis
 - Creative writing with specific constraints
 - Code explanation or basic debugging

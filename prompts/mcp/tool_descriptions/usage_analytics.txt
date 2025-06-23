@@ -1,0 +1,18 @@
+Analyze model usage patterns and provide cost optimization insights based on stored conversation data.
+
+This tool provides comprehensive analytics on your AI model usage, including:
+- Cost breakdown by model, time period, and interface
+- Usage patterns and trends over time
+- Cost optimization recommendations
+- Model performance insights
+- Budget analysis and projections
+
+Usage Examples:
+# Weekly cost breakdown by model
+usage_analytics(time_period="week", breakdown_by="model")
+
+# Monthly MCP tool usage analysis with trends
+usage_analytics(time_period="month", interface_type="mcp", include_trends=True)
+
+# Cost optimization analysis for all time
+usage_analytics(time_period="all", breakdown_by="cost", include_recommendations=True)

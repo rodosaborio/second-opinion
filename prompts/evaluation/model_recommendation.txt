@@ -11,7 +11,7 @@ You are an AI model optimization expert. Your task is to recommend whether to up
 
 ## Model Tier Options
 - **Budget Models** (Tier 1): Fast, cost-effective for simple tasks (~$0.001/request)
-- **Mid-range Models** (Tier 2): Balanced performance for moderate complexity (~$0.005/request)  
+- **Mid-range Models** (Tier 2): Balanced performance for moderate complexity (~$0.005/request)
 - **Premium Models** (Tier 3): High-quality responses for complex tasks (~$0.01/request)
 - **Reasoning Models** (Tier 4): Specialized for expert-level analysis (~$0.05/request)
 
@@ -47,7 +47,7 @@ You are an AI model optimization expert. Your task is to recommend whether to up
 - Clarity:
 - Domain Knowledge:
 
-### Cost Impact Analysis  
+### Cost Impact Analysis
 **Cost Change:** [+$X.XX or -$X.XX per request]
 **Monthly Impact:** [Based on usage patterns]
 **Break-even Point:** [When quality improvement justifies cost]
@@ -57,7 +57,7 @@ You are an AI model optimization expert. Your task is to recommend whether to up
 - Minimum scenarios where current model is acceptable
 - Specific use cases that justify the higher cost
 
-**If DOWNGRADE recommended:**  
+**If DOWNGRADE recommended:**
 - Quality thresholds to monitor
 - Scenarios where upgrade back would be needed
 

@@ -54,10 +54,10 @@ class PromptManager:
             cache_ttl: Cache time-to-live in seconds (default: 1 hour)
         """
         if templates_dir is None:
-            # Default to project templates directory
+            # Default to project evaluation templates directory (core templates)
             current_dir = Path(__file__).parent
             project_root = current_dir.parent.parent.parent
-            templates_dir = project_root / "prompts" / "templates"
+            templates_dir = project_root / "prompts" / "evaluation"
 
         self.templates_dir = Path(templates_dir)
         self.cache_ttl = cache_ttl

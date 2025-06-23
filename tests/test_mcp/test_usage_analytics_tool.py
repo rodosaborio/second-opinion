@@ -207,11 +207,10 @@ class TestUsageAnalyticsTool:
         mock_store_instance.get_usage_analytics.return_value = mock_analytics_data
 
         # Mock multiple calls for trends
-        call_count = 0
-
         def mock_analytics_side_effect(*args, **kwargs):
-            nonlocal call_count
+            call_count: int = getattr(mock_analytics_side_effect, "call_count", 0)
             call_count += 1
+            mock_analytics_side_effect.call_count = call_count  # type: ignore
             if call_count == 1:
                 return mock_analytics_data
             # Return segment data for trends

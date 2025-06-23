@@ -1,0 +1,20 @@
+Batch model comparison MCP tool with comprehensive evaluation and ranking.
+
+This tool provides systematic model evaluation for the same task across multiple models, with detailed ranking and analysis. Perfect for model selection, benchmarking, and understanding model strengths for specific use cases.
+
+USAGE PATTERNS:
+1. **Evaluate Existing Responses**: Compare responses you already have
+2. **Model Benchmarking**: Generate fresh responses from multiple models
+3. **Mixed Evaluation**: Some existing responses + generate from additional models
+
+Cost-Saving Tips:
+- Use existing responses when possible to avoid API calls
+- Include local models (qwen3-4b-mlx, codestral-22b-v0.1) for cost-free alternatives
+- Set appropriate cost_limit to control expenses
+
+Returns:
+Comprehensive comparison report with:
+- Ranked model performance with detailed scoring
+- Cost-effectiveness analysis
+- Local vs cloud model comparison
+- Model selection recommendations for similar tasks

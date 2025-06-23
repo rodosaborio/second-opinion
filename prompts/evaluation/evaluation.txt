@@ -26,12 +26,12 @@ Assess the following aspects:
 Based on the task and current response, provide:
 
 ### Task Classification
-- Complexity Level: 
+- Complexity Level:
 - Reasoning Required:
 - Domain Expertise Needed:
 
 ### Current Response Quality
-- Accuracy: 
+- Accuracy:
 - Completeness:
 - Clarity:
 - Overall Score (1-10):

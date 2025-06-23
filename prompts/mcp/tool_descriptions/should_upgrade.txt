@@ -1,0 +1,26 @@
+Analyze whether premium model alternatives could provide quality improvements that justify additional cost.
+
+This tool helps optimize AI quality by testing if premium models can provide significant quality improvements that justify additional cost. It focuses on quality enhancement while providing transparent cost analysis.
+
+QUALITY OPTIMIZATION FOCUS:
+- Tests premium models for maximum quality improvement
+- Evaluates cross-provider alternatives for diverse perspectives
+- Provides quality vs cost trade-off analysis
+- Gives specific upgrade recommendations with ROI analysis
+
+USAGE PATTERN:
+# Test if budget model can be upgraded (auto-selection)
+result = await should_upgrade(
+    current_response="<response from budget model>",
+    task="Write a Python function to calculate fibonacci",
+    current_model="anthropic/claude-3-haiku",
+    include_premium=True
+)
+
+# Test specific premium models (custom selection)
+result = await should_upgrade(
+    current_response="<response from budget model>",
+    task="Write a Python function to calculate fibonacci",
+    current_model="anthropic/claude-3-haiku",
+    upgrade_candidates=["anthropic/claude-3-opus", "openai/gpt-4o"]
+)

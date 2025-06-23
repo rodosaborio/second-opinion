@@ -314,6 +314,22 @@ def filter_think_tags(text: str) -> str:
 - **Searchable history**: Find responses by content, model, cost, date
 - **Export capabilities**: JSON, CSV, markdown formats
 
+### Template Management
+
+**Template Loader System** (`src/second_opinion/utils/template_loader.py`):
+- **Externalized prompts**: All prompts moved from hardcoded strings to organized template files
+- **Categorized structure**: Separate directories for evaluation, MCP, and system prompts
+- **Cached loading**: Performance optimization with intelligent caching
+- **Fallback handling**: Graceful degradation when templates are unavailable
+
+**Prompt Organization**:
+```
+prompts/
+├── evaluation/              # Core evaluation and comparison prompts
+├── mcp/tool_descriptions/   # MCP tool descriptions externalized from server.py
+└── system/                  # System-level prompts (followup evaluation, etc.)
+```
+
 ## Implementation Status
 
 ### ✅ Completed MCP Tools (Production Ready)
@@ -333,6 +349,7 @@ def filter_think_tags(text: str) -> str:
 - **Cost Protection**: Budget hierarchy with reservation system
 - **Provider Detection**: Configuration-driven client creation
 - **Conversation Storage**: Encrypted SQLite with export capabilities
+- **Template Management**: Externalized prompt system with organized structure
 - **CLI Interface**: Rich formatting with conversation history
 
 ### Current Status
@@ -345,6 +362,35 @@ def filter_think_tags(text: str) -> str:
 - Quality assessment reliable with consistent evaluation scores
 
 ## Development Patterns & Best Practices
+
+### Template Management Patterns
+
+**Externalized Prompt Architecture**:
+```python
+# ✅ Good: Use centralized template loading
+from ..utils.template_loader import load_mcp_tool_description, load_system_template
+
+# MCP tool descriptions
+@mcp.tool(
+    name="second_opinion",
+    description=get_tool_description("second_opinion"),  # Loads from prompts/mcp/tool_descriptions/
+)
+
+# System prompts
+class FollowUpEvaluator:
+    def _get_evaluation_prompt(self) -> str:
+        try:
+            return load_system_template("followup_evaluation")  # Loads from prompts/system/
+        except Exception as e:
+            logger.error(f"Failed to load template: {e}")
+            return fallback_prompt  # Always have fallback
+```
+
+**Template Organization Principles**:
+- **Category separation**: evaluation/, mcp/, system/ for clear purpose
+- **Hierarchical structure**: tool_descriptions/ subdirectory for MCP tools
+- **Template caching**: Performance optimization with `use_cache=True`
+- **Error resilience**: Graceful fallback when templates fail to load
 
 ### Core Development Patterns
 

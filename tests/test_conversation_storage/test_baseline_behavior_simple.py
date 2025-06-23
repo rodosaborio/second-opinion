@@ -14,7 +14,6 @@ from second_opinion.mcp.tools.second_opinion import second_opinion_tool
 from second_opinion.utils.cost_tracking import get_cost_guard
 
 
-@pytest.mark.integration
 class TestSimpleBaselineBehavior:
     """Simple baseline tests using existing test infrastructure."""
 

@@ -19,7 +19,26 @@ from pydantic import Field
 from ..config.settings import get_settings
 from ..utils.cost_tracking import get_cost_guard
 from ..utils.pricing import get_pricing_manager
+from ..utils.template_loader import load_mcp_tool_description
 from .session import MCPSession
+
+
+def get_tool_description(tool_name: str) -> str:
+    """
+    Get MCP tool description from externalized templates.
+
+    Args:
+        tool_name: Name of the tool (matches template filename)
+
+    Returns:
+        Tool description string, with fallback if template loading fails
+    """
+    try:
+        return load_mcp_tool_description(tool_name)
+    except Exception as e:
+        logger.error(f"Failed to load description for tool '{tool_name}': {e}")
+        # Fallback to minimal description
+        return f"MCP tool: {tool_name} (description unavailable)"
 
 
 # Configure comprehensive logging for MCP server debugging
@@ -229,7 +248,7 @@ mcp = FastMCP(
 # Register the core second_opinion tool
 @mcp.tool(
     name="second_opinion",
-    description="Get a second opinion on an AI response by comparing it against alternative models for quality assessment and cost optimization",
+    description=get_tool_description("second_opinion"),
 )
 async def second_opinion(
     prompt: str = Field(
@@ -455,7 +474,7 @@ async def second_opinion(
 # Register the should_downgrade tool
 @mcp.tool(
     name="should_downgrade",
-    description="Analyze whether cheaper model alternatives could achieve similar quality for cost optimization",
+    description=get_tool_description("should_downgrade"),
 )
 async def should_downgrade(
     current_response: str = Field(
@@ -672,7 +691,7 @@ async def should_downgrade(
 # Register the should_upgrade tool
 @mcp.tool(
     name="should_upgrade",
-    description="Analyze whether premium model alternatives could provide quality improvements that justify additional cost",
+    description=get_tool_description("should_upgrade"),
 )
 async def should_upgrade(
     current_response: str = Field(
@@ -888,7 +907,7 @@ async def should_upgrade(
 # Register the compare_responses tool
 @mcp.tool(
     name="compare_responses",
-    description="Compare two AI responses with detailed side-by-side analysis across quality criteria",
+    description=get_tool_description("compare_responses"),
 )
 async def compare_responses(
     response_a: str = Field(
@@ -1107,7 +1126,7 @@ async def compare_responses(
 # Register the usage_analytics tool
 @mcp.tool(
     name="usage_analytics",
-    description="Analyze model usage patterns and provide cost optimization insights based on stored conversation data",
+    description=get_tool_description("usage_analytics"),
 )
 async def usage_analytics(
     time_period: str = Field(
@@ -1297,7 +1316,7 @@ async def usage_analytics(
 # Register the consult tool
 @mcp.tool(
     name="consult",
-    description="Consult with AI models for expert opinions, task delegation, and multi-turn problem solving",
+    description=get_tool_description("consult"),
 )
 async def consult(
     query: str = Field(
@@ -1543,7 +1562,7 @@ async def consult(
 # Register the batch_comparison tool
 @mcp.tool(
     name="batch_comparison",
-    description="Compare multiple AI responses to the same task and rank them by various criteria for comprehensive model evaluation",
+    description=get_tool_description("batch_comparison"),
 )
 async def batch_comparison(
     task: str = Field(
@@ -1765,7 +1784,7 @@ async def batch_comparison(
 # Register the model_benchmark tool
 @mcp.tool(
     name="model_benchmark",
-    description="Benchmark multiple models across different task types for comprehensive performance analysis and model selection guidance",
+    description=get_tool_description("model_benchmark"),
 )
 async def model_benchmark(
     models: list[str] = Field(
@@ -1779,8 +1798,8 @@ async def model_benchmark(
                 "google/gemini-flash-1.5",
             ],
         ],
-        min_items=2,
-        max_items=8,
+        min_length=2,
+        max_length=8,
     ),
     task_types: list[str] | None = Field(
         None,

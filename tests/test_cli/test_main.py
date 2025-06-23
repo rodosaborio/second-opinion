@@ -181,6 +181,7 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
+                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "What is 2+2?",
@@ -207,6 +208,7 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
+                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "--comparison-model",
@@ -237,6 +239,7 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
+                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "--comparison-model",
@@ -255,7 +258,7 @@ class TestCLICommands:
 
     def test_second_opinion_missing_primary_model(self, cli_runner):
         """Test error when primary model is not specified."""
-        result = cli_runner.invoke(app, ["What is 2+2?"])
+        result = cli_runner.invoke(app, ["second-opinion", "What is 2+2?"])
 
         assert result.exit_code != 0
         # Error message appears in stderr for typer
@@ -278,6 +281,7 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
+                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "--context",
@@ -305,6 +309,7 @@ class TestCLICommands:
         result = cli_runner.invoke(
             app,
             [
+                "second-opinion",
                 "--primary-model",
                 "anthropic/claude-3-5-sonnet",
                 "--cost-limit",
@@ -501,6 +506,7 @@ class TestErrorHandling:
             result = cli_runner.invoke(
                 app,
                 [
+                    "second-opinion",
                     "--primary-model",
                     "anthropic/claude-3-5-sonnet",
                     "Test prompt",
@@ -518,6 +524,7 @@ class TestErrorHandling:
             result = cli_runner.invoke(
                 app,
                 [
+                    "second-opinion",
                     "--primary-model",
                     "anthropic/claude-3-5-sonnet",
                     "Test prompt",
