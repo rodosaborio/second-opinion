@@ -1,10 +1,22 @@
 """Test MCP server functionality."""
 
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.second_opinion.mcp.server import cleanup_sessions, get_mcp_session, mcp
+from src.second_opinion.mcp.server import (
+    cleanup_sessions,
+    get_mcp_session,
+    get_tool_description,
+    log_environment_info,
+    mcp,
+    setup_mcp_logging,
+    setup_python_path,
+)
+from src.second_opinion.mcp.server import (
+    test_critical_imports as check_critical_imports,
+)
 from src.second_opinion.mcp.session import MCPSession
 
 
@@ -76,6 +88,88 @@ class TestMCPToolIntegration:
 
         # Note: FastMCP tool introspection may vary by version
         # This test mainly verifies the tool exists and can be retrieved
+
+    @pytest.mark.asyncio
+    async def test_all_tools_registered(self):
+        """Test that all expected tools are registered."""
+        tools = await mcp.get_tools()
+        expected_tools = [
+            "second_opinion",
+            "should_downgrade",
+            "should_upgrade",
+            "compare_responses",
+            "consult",
+        ]
+
+        for tool_name in expected_tools:
+            assert tool_name in tools, f"Tool {tool_name} not registered"
+
+
+class TestServerUtilities:
+    """Test server utility functions."""
+
+    def test_get_tool_description_success(self):
+        """Test successful tool description loading."""
+        with patch(
+            "src.second_opinion.mcp.server.load_mcp_tool_description"
+        ) as mock_load:
+            mock_load.return_value = "Test description"
+
+            result = get_tool_description("test_tool")
+            assert result == "Test description"
+            mock_load.assert_called_once_with("test_tool")
+
+    def test_get_tool_description_failure(self):
+        """Test tool description loading with fallback."""
+        with patch(
+            "src.second_opinion.mcp.server.load_mcp_tool_description"
+        ) as mock_load:
+            mock_load.side_effect = Exception("Template not found")
+
+            result = get_tool_description("missing_tool")
+            assert "missing_tool" in result
+            assert "description unavailable" in result
+
+    def test_setup_mcp_logging(self):
+        """Test MCP logging setup."""
+        logger = setup_mcp_logging(debug=True)
+        assert logger is not None
+
+        # Test without debug
+        logger_no_debug = setup_mcp_logging(debug=False)
+        assert logger_no_debug is not None
+
+    def test_setup_python_path(self):
+        """Test Python path setup."""
+        original_path = sys.path.copy()
+
+        try:
+            setup_python_path()
+            # Should have added paths without errors
+            assert len(sys.path) >= len(original_path)
+        finally:
+            # Restore original path
+            sys.path[:] = original_path
+
+    def test_log_environment_info(self, caplog):
+        """Test environment info logging."""
+        log_environment_info()
+
+        # Check that key information was logged
+        assert "Python executable" in caplog.text
+        assert "Working directory" in caplog.text
+        assert "sys.path entries" in caplog.text
+
+    def test_test_critical_imports(self):
+        """Test critical imports function."""
+        successful, failed = check_critical_imports()
+
+        # Should be lists
+        assert isinstance(successful, list)
+        assert isinstance(failed, list)
+
+        # At least some imports should succeed
+        assert len(successful) > 0
 
 
 @pytest.fixture(autouse=True)
