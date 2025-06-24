@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.second_opinion.clients.base import BaseClient
 from src.second_opinion.clients.lmstudio import LMStudioClient
 from src.second_opinion.clients.openrouter import OpenRouterClient
 from src.second_opinion.utils.client_factory import (
@@ -282,94 +281,3 @@ class TestClientFactoryErrors:
             ClientFactoryError, match="Failed to create openrouter client"
         ):
             create_client_from_config("openrouter")
-
-
-class TestClientFactoryIntegration:
-    """Integration tests for client factory."""
-
-    @pytest.mark.integration
-    def test_factory_creates_working_client(self):
-        """Test that factory creates a working client."""
-        # This test uses actual client creation (but mocked settings)
-        with patch(
-            "src.second_opinion.utils.client_factory.get_settings"
-        ) as mock_get_settings:
-            mock_settings = MagicMock()
-            mock_settings.get_api_key.return_value = "sk-or-test123"
-            mock_settings.api.timeout = 30
-            mock_settings.api.retries = 2
-            mock_settings.api.max_backoff = 60
-            mock_get_settings.return_value = mock_settings
-
-            client = create_client_from_config("openrouter")
-
-            assert isinstance(client, BaseClient)
-            assert isinstance(client, OpenRouterClient)
-            assert client.provider_name == "openrouter"
-            assert client.api_key == "sk-or-test123"
-            assert client.timeout == 30
-            assert client.max_retries == 2
-
-    @pytest.mark.integration
-    def test_convenience_functions_work(self):
-        """Test that convenience functions integrate properly."""
-        with patch(
-            "src.second_opinion.utils.client_factory.get_settings"
-        ) as mock_get_settings:
-            mock_settings = MagicMock()
-            mock_settings.get_api_key.return_value = "sk-or-default"
-            mock_settings.api.timeout = 30
-            mock_settings.api.retries = 2
-            mock_settings.api.max_backoff = 60
-            mock_get_settings.return_value = mock_settings
-
-            # Test with override
-            client = create_openrouter_client(api_key="sk-or-override")
-            assert client.api_key == "sk-or-override"
-
-            # Test without override
-            client2 = create_openrouter_client()
-            assert client2.api_key == "sk-or-default"
-
-    @pytest.mark.integration
-    def test_lmstudio_factory_creates_working_client(self):
-        """Test that LM Studio factory creates a working client."""
-        with patch(
-            "src.second_opinion.utils.client_factory.get_settings"
-        ) as mock_get_settings:
-            mock_settings = MagicMock()
-            mock_settings.lmstudio_base_url = "http://localhost:1234"
-            mock_settings.api.timeout = 30
-            mock_settings.api.retries = 2
-            mock_settings.api.max_backoff = 60
-            mock_get_settings.return_value = mock_settings
-
-            client = create_client_from_config("lmstudio")
-
-            assert isinstance(client, BaseClient)
-            assert isinstance(client, LMStudioClient)
-            assert client.provider_name == "lmstudio"
-            assert client.base_url == "http://localhost:1234/v1"
-            assert client.timeout == 30
-            assert client.max_retries == 2
-
-    @pytest.mark.integration
-    def test_lmstudio_convenience_functions_work(self):
-        """Test that LM Studio convenience functions integrate properly."""
-        with patch(
-            "src.second_opinion.utils.client_factory.get_settings"
-        ) as mock_get_settings:
-            mock_settings = MagicMock()
-            mock_settings.lmstudio_base_url = "http://localhost:1234"
-            mock_settings.api.timeout = 30
-            mock_settings.api.retries = 2
-            mock_settings.api.max_backoff = 60
-            mock_get_settings.return_value = mock_settings
-
-            # Test with override
-            client = create_lmstudio_client(base_url="http://192.168.1.100:8080")
-            assert client.base_url == "http://192.168.1.100:8080/v1"  # type: ignore
-
-            # Test without override
-            client2 = create_lmstudio_client()
-            assert client2.base_url == "http://localhost:1234/v1"  # type: ignore

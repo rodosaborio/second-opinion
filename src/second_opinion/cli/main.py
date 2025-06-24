@@ -400,6 +400,7 @@ async def execute_second_opinion(
     existing_response: str | None = None,
     evaluator_model: str | None = None,
     save_conversation: bool = True,
+    verbose: bool = False,
 ) -> dict:
     """Execute the second opinion operation."""
 
@@ -713,6 +714,7 @@ def second_opinion_command(
                 existing_response=existing_response,
                 evaluator_model=evaluator_model,
                 save_conversation=save_conversation,
+                verbose=verbose,
             )
         )
 

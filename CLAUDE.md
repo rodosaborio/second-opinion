@@ -46,9 +46,6 @@ pre-commit install
 # Fast unit testing (recommended for development - ~10s, DEFAULT)
 uv run pytest
 
-# Run all tests including integration tests (slower - requires LM Studio)
-uv run pytest tests/ tests/integration/
-
 # Run tests with full coverage reporting
 uv run python -m coverage run -m pytest
 uv run python -m coverage report --fail-under=80
@@ -59,12 +56,6 @@ uv run pytest -m security
 
 # Run specific test file
 uv run pytest tests/test_core/test_evaluator.py
-
-# Run integration tests (requires LM Studio with qwen3-0.6b-mlx loaded)
-uv run pytest -m integration
-
-# Run integration tests explicitly by directory
-uv run pytest tests/integration/
 
 # Run with verbose output for debugging
 uv run pytest -v --tb=long
@@ -78,14 +69,7 @@ uv run pytest -v --setup-show
 
 **Test Categories:**
 - **Unit tests**: Fast, mocked, isolated (default: `uv run pytest`)
-- **Integration tests**: Use real LM Studio models, test actual MCP behavior (`uv run pytest -m integration`)
 - **Security tests**: Focused on security validation and sanitization
-
-**Integration Test Requirements:**
-- LM Studio must be running at http://localhost:1234
-- Must have `qwen3-0.6b-mlx` model loaded and ready
-- Integration tests will be skipped automatically if LM Studio is not available
-- No OpenRouter API keys required for integration tests
 
 ### Code Quality
 ```bash
