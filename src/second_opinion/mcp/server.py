@@ -21,6 +21,15 @@ from ..utils.cost_tracking import get_cost_guard
 from ..utils.pricing import get_pricing_manager
 from ..utils.template_loader import load_mcp_tool_description
 from .session import MCPSession
+from .tools.batch_comparison import batch_comparison_tool
+from .tools.compare_responses import compare_responses_tool
+from .tools.consult import consult_tool
+from .tools.model_benchmark import model_benchmark_tool
+
+# Import all tool implementations directly
+from .tools.should_downgrade import should_downgrade_tool
+from .tools.should_upgrade import should_upgrade_tool
+from .tools.usage_analytics import usage_analytics_tool
 
 
 def get_tool_description(tool_name: str) -> str:
@@ -578,68 +587,8 @@ async def should_downgrade(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import should_downgrade_tool with multiple strategies (same as second_opinion)
-        logger.info("Attempting to import should_downgrade_tool...")
-        should_downgrade_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.should_downgrade", package=__package__
-            ).should_downgrade_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.should_downgrade",
-                fromlist=["should_downgrade_tool"],
-            ).should_downgrade_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__(
-                "second_opinion.mcp.tools.should_downgrade"
-            ).should_downgrade_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                should_downgrade_tool = strategy()
-                logger.info(
-                    f"✓ Successfully imported should_downgrade_tool using strategy {i}"
-                )
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if should_downgrade_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module(
-                    "second_opinion.mcp.tools.should_downgrade"
-                )
-                should_downgrade_tool = module.should_downgrade_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import should_downgrade_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if should_downgrade_tool is None:
-            raise ImportError("should_downgrade_tool is None after all import attempts")
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling should_downgrade_tool implementation...")
-        logger.info(f"Tool function type: {type(should_downgrade_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(should_downgrade_tool, '__module__', 'unknown')}"
-        )
 
         result = await should_downgrade_tool(
             current_response=current_response,
@@ -794,68 +743,8 @@ async def should_upgrade(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import should_upgrade_tool with multiple strategies (same as other tools)
-        logger.info("Attempting to import should_upgrade_tool...")
-        should_upgrade_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.should_upgrade", package=__package__
-            ).should_upgrade_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.should_upgrade",
-                fromlist=["should_upgrade_tool"],
-            ).should_upgrade_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__(
-                "second_opinion.mcp.tools.should_upgrade"
-            ).should_upgrade_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                should_upgrade_tool = strategy()
-                logger.info(
-                    f"✓ Successfully imported should_upgrade_tool using strategy {i}"
-                )
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if should_upgrade_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module(
-                    "second_opinion.mcp.tools.should_upgrade"
-                )
-                should_upgrade_tool = module.should_upgrade_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import should_upgrade_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if should_upgrade_tool is None:
-            raise ImportError("should_upgrade_tool is None after all import attempts")
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling should_upgrade_tool implementation...")
-        logger.info(f"Tool function type: {type(should_upgrade_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(should_upgrade_tool, '__module__', 'unknown')}"
-        )
 
         result = await should_upgrade_tool(
             current_response=current_response,
@@ -1011,70 +900,8 @@ async def compare_responses(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import compare_responses_tool with multiple strategies (same as other tools)
-        logger.info("Attempting to import compare_responses_tool...")
-        compare_responses_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.compare_responses", package=__package__
-            ).compare_responses_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.compare_responses",
-                fromlist=["compare_responses_tool"],
-            ).compare_responses_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__(
-                "second_opinion.mcp.tools.compare_responses"
-            ).compare_responses_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                compare_responses_tool = strategy()
-                logger.info(
-                    f"✓ Successfully imported compare_responses_tool using strategy {i}"
-                )
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if compare_responses_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module(
-                    "second_opinion.mcp.tools.compare_responses"
-                )
-                compare_responses_tool = module.compare_responses_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import compare_responses_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if compare_responses_tool is None:
-            raise ImportError(
-                "compare_responses_tool is None after all import attempts"
-            )
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling compare_responses_tool implementation...")
-        logger.info(f"Tool function type: {type(compare_responses_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(compare_responses_tool, '__module__', 'unknown')}"
-        )
 
         result = await compare_responses_tool(
             response_a=response_a,
@@ -1204,68 +1031,8 @@ async def usage_analytics(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import usage_analytics_tool with multiple strategies (same as other tools)
-        logger.info("Attempting to import usage_analytics_tool...")
-        usage_analytics_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.usage_analytics", package=__package__
-            ).usage_analytics_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.usage_analytics",
-                fromlist=["usage_analytics_tool"],
-            ).usage_analytics_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__(
-                "second_opinion.mcp.tools.usage_analytics"
-            ).usage_analytics_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                usage_analytics_tool = strategy()
-                logger.info(
-                    f"✓ Successfully imported usage_analytics_tool using strategy {i}"
-                )
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if usage_analytics_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module(
-                    "second_opinion.mcp.tools.usage_analytics"
-                )
-                usage_analytics_tool = module.usage_analytics_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import usage_analytics_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if usage_analytics_tool is None:
-            raise ImportError("usage_analytics_tool is None after all import attempts")
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling usage_analytics_tool implementation...")
-        logger.info(f"Tool function type: {type(usage_analytics_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(usage_analytics_tool, '__module__', 'unknown')}"
-        )
 
         result = await usage_analytics_tool(
             time_period=time_period,
@@ -1456,61 +1223,8 @@ async def consult(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import consult_tool with multiple strategies (same as other tools)
-        logger.info("Attempting to import consult_tool...")
-        consult_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.consult", package=__package__
-            ).consult_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.consult", fromlist=["consult_tool"]
-            ).consult_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__("second_opinion.mcp.tools.consult").consult_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                consult_tool = strategy()
-                logger.info(f"✓ Successfully imported consult_tool using strategy {i}")
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if consult_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module("second_opinion.mcp.tools.consult")
-                consult_tool = module.consult_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import consult_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if consult_tool is None:
-            raise ImportError("consult_tool is None after all import attempts")
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling consult_tool implementation...")
-        logger.info(f"Tool function type: {type(consult_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(consult_tool, '__module__', 'unknown')}"
-        )
 
         result = await consult_tool(
             query=query,
@@ -1669,69 +1383,8 @@ async def batch_comparison(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import the batch_comparison_tool implementation
-        logger.info("Importing batch_comparison_tool...")
-
-        batch_comparison_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.batch_comparison", package=__package__
-            ).batch_comparison_tool,  # type: ignore[attr-defined]
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.batch_comparison",
-                fromlist=["batch_comparison_tool"],
-            ).batch_comparison_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__(
-                "second_opinion.mcp.tools.batch_comparison"
-            ).batch_comparison_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                batch_comparison_tool = strategy()
-                logger.info(
-                    f"✓ Successfully imported batch_comparison_tool using strategy {i}"
-                )
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if batch_comparison_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module(
-                    "second_opinion.mcp.tools.batch_comparison"
-                )
-                batch_comparison_tool = module.batch_comparison_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import batch_comparison_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if batch_comparison_tool is None:
-            raise ImportError("batch_comparison_tool is None after all import attempts")
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling batch_comparison_tool implementation...")
-        logger.info(f"Tool function type: {type(batch_comparison_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(batch_comparison_tool, '__module__', 'unknown')}"
-        )
 
         result = await batch_comparison_tool(
             task=task,
@@ -1897,63 +1550,7 @@ async def model_benchmark(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import model_benchmark_tool with multiple strategies
-        logger.info("Attempting to import model_benchmark_tool...")
-        model_benchmark_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.model_benchmark", package=__package__
-            ).model_benchmark_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.model_benchmark",
-                fromlist=["model_benchmark_tool"],
-            ).model_benchmark_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__(
-                "second_opinion.mcp.tools.model_benchmark"
-            ).model_benchmark_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                model_benchmark_tool = strategy()
-                logger.info(
-                    f"✓ Successfully imported model_benchmark_tool using strategy {i}"
-                )
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if model_benchmark_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module(
-                    "second_opinion.mcp.tools.model_benchmark"
-                )
-                model_benchmark_tool = module.model_benchmark_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import model_benchmark_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if model_benchmark_tool is None:
-            raise ImportError("model_benchmark_tool is None after all import attempts")
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling model_benchmark_tool implementation...")
         result = await model_benchmark_tool(
             models=models,
