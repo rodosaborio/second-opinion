@@ -35,7 +35,7 @@ You are a cost-optimization expert for AI model usage. Your task is to analyze t
 - **Recommended if:** [Specific scenarios where upgrade is worth it]
 - **ROI timeframe:** [When benefits justify costs]
 
-### Scenario 2: Downgrade to Budget Model  
+### Scenario 2: Downgrade to Budget Model
 **Cost Impact:** -${cost_decrease} per request (-{percentage_decrease}%)
 **Quality Impact:** -{quality_decrease} points (from {current_quality} to {new_quality})
 **Monthly Savings:** ${monthly_savings}

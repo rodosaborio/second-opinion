@@ -19,7 +19,35 @@ from pydantic import Field
 from ..config.settings import get_settings
 from ..utils.cost_tracking import get_cost_guard
 from ..utils.pricing import get_pricing_manager
+from ..utils.template_loader import load_mcp_tool_description
 from .session import MCPSession
+from .tools.batch_comparison import batch_comparison_tool
+from .tools.compare_responses import compare_responses_tool
+from .tools.consult import consult_tool
+from .tools.model_benchmark import model_benchmark_tool
+
+# Import all tool implementations directly
+from .tools.should_downgrade import should_downgrade_tool
+from .tools.should_upgrade import should_upgrade_tool
+from .tools.usage_analytics import usage_analytics_tool
+
+
+def get_tool_description(tool_name: str) -> str:
+    """
+    Get MCP tool description from externalized templates.
+
+    Args:
+        tool_name: Name of the tool (matches template filename)
+
+    Returns:
+        Tool description string, with fallback if template loading fails
+    """
+    try:
+        return load_mcp_tool_description(tool_name)
+    except Exception as e:
+        logger.error(f"Failed to load description for tool '{tool_name}': {e}")
+        # Fallback to minimal description
+        return f"MCP tool: {tool_name} (description unavailable)"
 
 
 # Configure comprehensive logging for MCP server debugging
@@ -229,7 +257,7 @@ mcp = FastMCP(
 # Register the core second_opinion tool
 @mcp.tool(
     name="second_opinion",
-    description="Get a second opinion on an AI response by comparing it against alternative models for quality assessment and cost optimization",
+    description=get_tool_description("second_opinion"),
 )
 async def second_opinion(
     prompt: str = Field(
@@ -455,7 +483,7 @@ async def second_opinion(
 # Register the should_downgrade tool
 @mcp.tool(
     name="should_downgrade",
-    description="Analyze whether cheaper model alternatives could achieve similar quality for cost optimization",
+    description=get_tool_description("should_downgrade"),
 )
 async def should_downgrade(
     current_response: str = Field(
@@ -559,68 +587,8 @@ async def should_downgrade(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import should_downgrade_tool with multiple strategies (same as second_opinion)
-        logger.info("Attempting to import should_downgrade_tool...")
-        should_downgrade_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.should_downgrade", package=__package__
-            ).should_downgrade_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.should_downgrade",
-                fromlist=["should_downgrade_tool"],
-            ).should_downgrade_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__(
-                "second_opinion.mcp.tools.should_downgrade"
-            ).should_downgrade_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                should_downgrade_tool = strategy()
-                logger.info(
-                    f"✓ Successfully imported should_downgrade_tool using strategy {i}"
-                )
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if should_downgrade_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module(
-                    "second_opinion.mcp.tools.should_downgrade"
-                )
-                should_downgrade_tool = module.should_downgrade_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import should_downgrade_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if should_downgrade_tool is None:
-            raise ImportError("should_downgrade_tool is None after all import attempts")
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling should_downgrade_tool implementation...")
-        logger.info(f"Tool function type: {type(should_downgrade_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(should_downgrade_tool, '__module__', 'unknown')}"
-        )
 
         result = await should_downgrade_tool(
             current_response=current_response,
@@ -672,7 +640,7 @@ async def should_downgrade(
 # Register the should_upgrade tool
 @mcp.tool(
     name="should_upgrade",
-    description="Analyze whether premium model alternatives could provide quality improvements that justify additional cost",
+    description=get_tool_description("should_upgrade"),
 )
 async def should_upgrade(
     current_response: str = Field(
@@ -775,68 +743,8 @@ async def should_upgrade(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import should_upgrade_tool with multiple strategies (same as other tools)
-        logger.info("Attempting to import should_upgrade_tool...")
-        should_upgrade_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.should_upgrade", package=__package__
-            ).should_upgrade_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.should_upgrade",
-                fromlist=["should_upgrade_tool"],
-            ).should_upgrade_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__(
-                "second_opinion.mcp.tools.should_upgrade"
-            ).should_upgrade_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                should_upgrade_tool = strategy()
-                logger.info(
-                    f"✓ Successfully imported should_upgrade_tool using strategy {i}"
-                )
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if should_upgrade_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module(
-                    "second_opinion.mcp.tools.should_upgrade"
-                )
-                should_upgrade_tool = module.should_upgrade_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import should_upgrade_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if should_upgrade_tool is None:
-            raise ImportError("should_upgrade_tool is None after all import attempts")
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling should_upgrade_tool implementation...")
-        logger.info(f"Tool function type: {type(should_upgrade_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(should_upgrade_tool, '__module__', 'unknown')}"
-        )
 
         result = await should_upgrade_tool(
             current_response=current_response,
@@ -888,7 +796,7 @@ async def should_upgrade(
 # Register the compare_responses tool
 @mcp.tool(
     name="compare_responses",
-    description="Compare two AI responses with detailed side-by-side analysis across quality criteria",
+    description=get_tool_description("compare_responses"),
 )
 async def compare_responses(
     response_a: str = Field(
@@ -992,70 +900,8 @@ async def compare_responses(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import compare_responses_tool with multiple strategies (same as other tools)
-        logger.info("Attempting to import compare_responses_tool...")
-        compare_responses_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.compare_responses", package=__package__
-            ).compare_responses_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.compare_responses",
-                fromlist=["compare_responses_tool"],
-            ).compare_responses_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__(
-                "second_opinion.mcp.tools.compare_responses"
-            ).compare_responses_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                compare_responses_tool = strategy()
-                logger.info(
-                    f"✓ Successfully imported compare_responses_tool using strategy {i}"
-                )
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if compare_responses_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module(
-                    "second_opinion.mcp.tools.compare_responses"
-                )
-                compare_responses_tool = module.compare_responses_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import compare_responses_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if compare_responses_tool is None:
-            raise ImportError(
-                "compare_responses_tool is None after all import attempts"
-            )
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling compare_responses_tool implementation...")
-        logger.info(f"Tool function type: {type(compare_responses_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(compare_responses_tool, '__module__', 'unknown')}"
-        )
 
         result = await compare_responses_tool(
             response_a=response_a,
@@ -1104,10 +950,140 @@ async def compare_responses(
         return f"❌ **Compare Responses Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
 
 
+# Register the usage_analytics tool
+@mcp.tool(
+    name="usage_analytics",
+    description=get_tool_description("usage_analytics"),
+)
+async def usage_analytics(
+    time_period: str = Field(
+        "week",
+        description="Analysis period - 'day', 'week', 'month', 'quarter', 'year', or 'all'",
+        examples=["day", "week", "month", "quarter", "year", "all"],
+    ),
+    breakdown_by: str = Field(
+        "model",
+        description="Primary breakdown dimension - 'model', 'interface', 'tool', 'cost', or 'time'",
+        examples=["model", "interface", "tool", "cost", "time"],
+    ),
+    interface_type: str | None = Field(
+        None,
+        description="Filter by interface - 'cli', 'mcp', or None for all",
+        examples=["cli", "mcp"],
+    ),
+    include_trends: bool = Field(
+        True,
+        description="Whether to include trend analysis over time",
+    ),
+    include_recommendations: bool = Field(
+        True,
+        description="Whether to include optimization recommendations",
+    ),
+    cost_limit: float | None = Field(
+        None,
+        description="Maximum cost for this analytics operation (default: $0.10)",
+        examples=[0.10, 0.25, 0.50],
+        ge=0.01,
+        le=5.00,
+    ),
+) -> str:
+    """
+    Analyze model usage patterns and provide cost optimization insights.
+
+    This tool provides comprehensive analytics on your AI model usage, including:
+    - Cost breakdown by model, time period, and interface
+    - Usage patterns and trends over time
+    - Cost optimization recommendations
+    - Model performance insights
+    - Budget analysis and projections
+
+    Args:
+        time_period: Analysis period for data aggregation
+        breakdown_by: Primary dimension for organizing results
+        interface_type: Filter results by CLI or MCP usage
+        include_trends: Add trend analysis over time periods
+        include_recommendations: Include cost optimization suggestions
+        cost_limit: Maximum cost for analytics processing
+
+    Returns:
+        Comprehensive usage analytics report with insights and actionable recommendations
+
+    Usage Examples:
+        # Weekly cost breakdown by model
+        usage_analytics(time_period="week", breakdown_by="model")
+
+        # Monthly MCP tool usage analysis with trends
+        usage_analytics(time_period="month", interface_type="mcp", include_trends=True)
+
+        # Cost optimization analysis for all time
+        usage_analytics(time_period="all", breakdown_by="cost", include_recommendations=True)
+    """
+    # Get or create session for this request
+    session = get_mcp_session()
+    session.update_activity()
+
+    logger.info("=== MCP Tool Call: usage_analytics ===")
+    logger.info(f"Time period: {time_period}")
+    logger.info(f"Breakdown by: {breakdown_by}")
+    logger.info(f"Interface type: {interface_type}")
+    logger.info(f"Include trends: {include_trends}")
+    logger.info(f"Include recommendations: {include_recommendations}")
+    logger.info(f"Cost limit: {cost_limit}")
+
+    try:
+        # Call the tool implementation directly
+        logger.info("Calling usage_analytics_tool implementation...")
+
+        result = await usage_analytics_tool(
+            time_period=time_period,
+            breakdown_by=breakdown_by,
+            interface_type=interface_type,
+            include_trends=include_trends,
+            include_recommendations=include_recommendations,
+            cost_limit=cost_limit,
+        )
+        logger.info("✓ usage_analytics_tool completed successfully")
+        logger.info(f"Result length: {len(result) if result else 0}")
+
+        # Add to conversation context
+        session.add_conversation_context(
+            tool_name="usage_analytics",
+            prompt=f"Analytics: {time_period} period, breakdown by {breakdown_by}",
+            primary_model="local-analytics",
+            comparison_models=[],
+            result_summary=f"Analytics ({time_period}) completed successfully",
+        )
+
+        return result
+
+    except Exception as e:
+        # Log comprehensive error information
+        import traceback
+
+        error_details = traceback.format_exc()
+        logger.error("=== Error in usage_analytics MCP tool ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full traceback:\n{error_details}")
+        logger.error("=== End Error Details ===")
+
+        # Add to context for debugging
+        session.add_conversation_context(
+            tool_name="usage_analytics",
+            prompt=f"Analytics: {time_period} period, breakdown by {breakdown_by}",
+            primary_model="local-analytics",
+            comparison_models=[],
+            result_summary=f"Error: {str(e)}",
+        )
+
+        # Return user-friendly error message
+        return f"❌ **Usage Analytics Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
+
+
 # Register the consult tool
 @mcp.tool(
     name="consult",
-    description="Consult with AI models for expert opinions, task delegation, and multi-turn problem solving",
+    description=get_tool_description("consult"),
 )
 async def consult(
     query: str = Field(
@@ -1247,61 +1223,8 @@ async def consult(
     logger.info(f"Cost limit: {cost_limit}")
 
     try:
-        # Import consult_tool with multiple strategies (same as other tools)
-        logger.info("Attempting to import consult_tool...")
-        consult_tool = None
-        import_strategies = [
-            # Strategy 1: Relative import
-            lambda: importlib.import_module(
-                ".tools.consult", package=__package__
-            ).consult_tool,
-            # Strategy 2: Absolute import
-            lambda: __import__(
-                "second_opinion.mcp.tools.consult", fromlist=["consult_tool"]
-            ).consult_tool,  # type: ignore[attr-defined]
-            # Strategy 3: Direct module import
-            lambda: __import__("second_opinion.mcp.tools.consult").consult_tool,  # type: ignore[attr-defined]
-        ]
-
-        for i, strategy in enumerate(import_strategies, 1):
-            try:
-                logger.info(f"Trying import strategy {i}...")
-                consult_tool = strategy()
-                logger.info(f"✓ Successfully imported consult_tool using strategy {i}")
-                break
-            except Exception as e:
-                logger.warning(f"✗ Import strategy {i} failed: {e}")
-                continue
-
-        if consult_tool is None:
-            # Final fallback: manual importlib approach
-            logger.info(
-                "All import strategies failed, trying manual step-by-step import..."
-            )
-            try:
-                import importlib
-
-                module = importlib.import_module("second_opinion.mcp.tools.consult")
-                consult_tool = module.consult_tool  # type: ignore[attr-defined]
-                logger.info("✓ Successfully imported using manual importlib approach")
-            except Exception as final_error:
-                logger.error(f"✗ All import methods failed. Final error: {final_error}")
-                import traceback
-
-                logger.error(f"Final import traceback:\n{traceback.format_exc()}")
-                raise ImportError(
-                    f"Unable to import consult_tool after trying multiple strategies. Last error: {final_error}"
-                ) from final_error
-
-        if consult_tool is None:
-            raise ImportError("consult_tool is None after all import attempts")
-
-        # Call the tool implementation
+        # Call the tool implementation directly
         logger.info("Calling consult_tool implementation...")
-        logger.info(f"Tool function type: {type(consult_tool)}")
-        logger.info(
-            f"Tool function module: {getattr(consult_tool, '__module__', 'unknown')}"
-        )
 
         result = await consult_tool(
             query=query,
@@ -1348,6 +1271,331 @@ async def consult(
 
         # Return user-friendly error message
         return f"❌ **Consult Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
+
+
+# Register the batch_comparison tool
+@mcp.tool(
+    name="batch_comparison",
+    description=get_tool_description("batch_comparison"),
+)
+async def batch_comparison(
+    task: str = Field(
+        ...,
+        description="The task or question to evaluate responses for. This provides context for comparison quality.",
+        examples=[
+            "Write a Python function to validate email addresses",
+            "Explain quantum computing to a 10-year-old",
+            "Debug this JavaScript code snippet",
+        ],
+    ),
+    responses: list[str] | None = Field(
+        None,
+        description="List of existing responses to compare (optional). If provided, these will be evaluated without additional API calls. Must match the order of models if both are provided.",
+        examples=[
+            [
+                "def validate_email(email): return '@' in email",
+                "import re\ndef validate_email(email): return re.match(r'^[^@]+@[^@]+$', email)",
+                "from email_validator import validate_email as ve\ndef validate_email(email): return ve(email)",
+            ]
+        ],
+    ),
+    models: list[str] | None = Field(
+        None,
+        description="List of models to use. Use OpenRouter format for cloud models (e.g. 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o') or model name for local models (e.g. 'qwen3-4b-mlx'). If responses are provided, this should match the response order. If no responses provided, will generate responses from these models.",
+        examples=[
+            ["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "qwen3-4b-mlx"],
+            [
+                "openai/gpt-4o-mini",
+                "anthropic/claude-3-haiku",
+                "google/gemini-flash-1.5",
+            ],
+        ],
+    ),
+    context: str | None = Field(
+        None,
+        description="Additional context about the task domain for better evaluation quality. For example: 'coding task', 'academic research', 'creative writing', 'educational content'.",
+        examples=[
+            "coding task",
+            "academic research",
+            "creative writing",
+            "educational content",
+        ],
+    ),
+    rank_by: str = Field(
+        "quality",
+        description="Ranking criteria for model comparison: 'quality' (response quality), 'cost' (cost efficiency), 'speed' (response speed estimation), or 'comprehensive' (balanced scoring).",
+        examples=["quality", "cost", "speed", "comprehensive"],
+    ),
+    max_models: int = Field(
+        5,
+        description="Maximum number of models to compare (default: 5, max: 10). This limit prevents excessive costs and ensures meaningful comparisons.",
+        examples=[3, 5, 8],
+        ge=2,
+        le=10,
+    ),
+    cost_limit: float | None = Field(
+        None,
+        description="Maximum cost limit for this operation in USD. Defaults to $0.50 for batch operations. Set higher for complex tasks requiring many model calls.",
+        examples=[0.25, 0.5, 1.0],
+        gt=0,
+        le=10,
+    ),
+    session_id: str | None = Field(
+        None,
+        description="Session ID for conversation tracking and cost management. If not provided, a new session will be created.",
+    ),
+) -> str:
+    """
+    Batch model comparison MCP tool with comprehensive evaluation and ranking.
+
+    This tool provides systematic model evaluation for the same task across multiple models,
+    with detailed ranking and analysis. Perfect for model selection, benchmarking, and
+    understanding model strengths for specific use cases.
+
+    USAGE PATTERNS:
+    1. **Evaluate Existing Responses**: Compare responses you already have
+    2. **Model Benchmarking**: Generate fresh responses from multiple models
+    3. **Mixed Evaluation**: Some existing responses + generate from additional models
+
+    Cost-Saving Tips:
+    - Use existing responses when possible to avoid API calls
+    - Include local models (qwen3-4b-mlx, codestral-22b-v0.1) for cost-free alternatives
+    - Set appropriate cost_limit to control expenses
+
+    Returns:
+        Comprehensive comparison report with:
+        - Ranked model performance with detailed scoring
+        - Cost-effectiveness analysis
+        - Local vs cloud model comparison
+        - Model selection recommendations for similar tasks
+    """
+    # Get session for this request
+    session = get_mcp_session(session_id)
+
+    logger.info(
+        f"=== Starting batch_comparison MCP tool (Session: {session.session_id}) ==="
+    )
+    logger.info(f"Task: {task[:100]}...")
+    logger.info(f"Responses provided: {responses is not None}")
+    logger.info(f"Models: {models}")
+    logger.info(f"Rank by: {rank_by}")
+    logger.info(f"Max models: {max_models}")
+    logger.info(f"Cost limit: {cost_limit}")
+
+    try:
+        # Call the tool implementation directly
+        logger.info("Calling batch_comparison_tool implementation...")
+
+        result = await batch_comparison_tool(
+            task=task,
+            responses=responses,
+            models=models,
+            context=context,
+            rank_by=rank_by,
+            max_models=max_models,
+            cost_limit=cost_limit,
+            session_id=session.session_id,
+        )
+        logger.info("✓ batch_comparison_tool completed successfully")
+        logger.info(f"Result length: {len(result) if result else 0}")
+
+        # Add to conversation context
+        session.add_conversation_context(
+            tool_name="batch_comparison",
+            prompt=task,
+            primary_model="multiple",  # Multiple models compared
+            comparison_models=models or [],
+            result_summary="Batch comparison completed successfully",
+        )
+
+        return result
+
+    except Exception as e:
+        # Log comprehensive error information
+        import traceback
+
+        error_details = traceback.format_exc()
+        logger.error("=== Error in batch_comparison MCP tool ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full traceback:\n{error_details}")
+        logger.error("=== End Error Details ===")
+
+        # Add to context for debugging
+        session.add_conversation_context(
+            tool_name="batch_comparison",
+            prompt=task,
+            primary_model="multiple",
+            comparison_models=models or [],
+            result_summary=f"Error: {str(e)}",
+        )
+
+        # Return user-friendly error message
+        return f"❌ **Batch Comparison Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
+
+
+# Register the model_benchmark tool
+@mcp.tool(
+    name="model_benchmark",
+    description=get_tool_description("model_benchmark"),
+)
+async def model_benchmark(
+    models: list[str] = Field(
+        ...,
+        description="List of models to benchmark. Format: Cloud models: 'anthropic/claude-3-5-sonnet', 'openai/gpt-4o', etc. Local models: 'qwen3-4b-mlx', 'codestral-22b-v0.1', etc.",
+        examples=[
+            ["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "qwen3-4b-mlx"],
+            [
+                "openai/gpt-4o-mini",
+                "anthropic/claude-3-haiku",
+                "google/gemini-flash-1.5",
+            ],
+        ],
+        min_length=2,
+        max_length=8,
+    ),
+    task_types: list[str] | None = Field(
+        None,
+        description="Task categories to test (default: ['coding', 'reasoning', 'creative']). Available: 'coding', 'reasoning', 'creative', 'analysis', 'explanation'",
+        examples=[
+            ["coding", "reasoning"],
+            ["creative", "analysis", "explanation"],
+            ["coding", "reasoning", "creative", "analysis", "explanation"],
+        ],
+    ),
+    sample_size: int = Field(
+        3,
+        description="Number of tasks per category to test (default: 3, max: 5)",
+        ge=1,
+        le=5,
+    ),
+    evaluation_criteria: str = Field(
+        "comprehensive",
+        description="How to evaluate responses: 'comprehensive' (balanced), 'accuracy' (correctness focus), 'creativity' (originality focus), 'speed' (efficiency focus)",
+        examples=["comprehensive", "accuracy", "creativity", "speed"],
+    ),
+    cost_limit: float | None = Field(
+        None,
+        description="Maximum cost for this operation in USD (default: $2.00). Benchmarking can be expensive due to multiple model calls and evaluations.",
+        examples=[1.0, 2.0, 5.0],
+        gt=0,
+        le=10,
+    ),
+    session_id: str | None = Field(
+        None,
+        description="Session ID for conversation tracking (optional)",
+    ),
+) -> str:
+    """
+    Benchmark multiple models across different task types for comprehensive performance analysis.
+
+    This tool systematically tests models across various task categories to provide insights
+    into their strengths, weaknesses, and optimal use cases. Perfect for model selection,
+    performance analysis, and understanding model capabilities across different domains.
+
+    COMPREHENSIVE BENCHMARKING PROCESS:
+    1. Tests each model on multiple tasks across selected categories
+    2. Performs pairwise comparisons using consistent evaluation criteria
+    3. Analyzes performance patterns and cost efficiency
+    4. Provides statistical confidence indicators
+    5. Generates actionable recommendations for model selection
+
+    Args:
+        models: List of models to benchmark (2-8 models). Mix cloud and local models for best insights.
+        task_types: Categories to test. Default covers core capabilities: coding, reasoning, creative.
+        sample_size: Tasks per category (1-5). Higher = more reliable but more expensive.
+        evaluation_criteria: Focus area for evaluation scoring.
+        cost_limit: Budget protection (default $2.00 for comprehensive benchmarking).
+        session_id: Optional session tracking for conversation context.
+
+    Returns:
+        Comprehensive benchmark report with model rankings, performance insights,
+        cost analysis, and specific recommendations for optimal model usage.
+
+    USAGE EXAMPLES:
+
+        # Basic comparison across core capabilities
+        result = await model_benchmark(
+            models=["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "qwen3-4b-mlx"],
+            task_types=["coding", "reasoning"],
+            sample_size=3
+        )
+
+        # Comprehensive evaluation with all task types
+        result = await model_benchmark(
+            models=["anthropic/claude-3-5-sonnet", "openai/gpt-4o-mini", "google/gemini-pro-1.5"],
+            task_types=["coding", "reasoning", "creative", "analysis", "explanation"],
+            evaluation_criteria="comprehensive"
+        )
+
+        # Cost-focused benchmark for budget optimization
+        result = await model_benchmark(
+            models=["qwen3-4b-mlx", "anthropic/claude-3-haiku", "openai/gpt-4o-mini"],
+            task_types=["coding", "analysis"],
+            evaluation_criteria="speed",
+            cost_limit=1.0
+        )
+    """
+    # Get or create session for this request
+    session = get_mcp_session(session_id)
+
+    # Update session activity
+    session.update_activity()
+
+    logger.info("=== MCP Tool Call: model_benchmark ===")
+    logger.info(f"Models: {models}")
+    logger.info(f"Task types: {task_types}")
+    logger.info(f"Sample size: {sample_size}")
+    logger.info(f"Evaluation criteria: {evaluation_criteria}")
+    logger.info(f"Cost limit: {cost_limit}")
+
+    try:
+        # Call the tool implementation directly
+        logger.info("Calling model_benchmark_tool implementation...")
+        result = await model_benchmark_tool(
+            models=models,
+            task_types=task_types,
+            sample_size=sample_size,
+            evaluation_criteria=evaluation_criteria,
+            cost_limit=cost_limit,
+            session_id=session.session_id,
+        )
+        logger.info("✓ model_benchmark_tool completed successfully")
+        logger.info(f"Result length: {len(result) if result else 0}")
+
+        # Add to conversation context
+        session.add_conversation_context(
+            tool_name="model_benchmark",
+            prompt=f"Benchmark {len(models)} models across {len(task_types) if task_types else 3} task types",
+            primary_model="benchmark-system",
+            comparison_models=models,
+            result_summary=f"Benchmark ({len(models)} models) completed successfully",
+        )
+
+        return result
+
+    except Exception as e:
+        # Log comprehensive error information
+        import traceback
+
+        error_details = traceback.format_exc()
+        logger.error("=== Error in model_benchmark MCP tool ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full traceback:\n{error_details}")
+        logger.error("=== End Error Details ===")
+
+        # Add to context for debugging
+        session.add_conversation_context(
+            tool_name="model_benchmark",
+            prompt=f"Benchmark {len(models)} models across {len(task_types) if task_types else 3} task types",
+            primary_model="benchmark-system",
+            comparison_models=models,
+            result_summary=f"Error: {str(e)}",
+        )
+
+        # Return user-friendly error message
+        return f"❌ **Model Benchmark Error**: {str(e)}\n\n**Error Type**: {type(e).__name__}\n\nPlease check the server logs for detailed debugging information."
 
 
 def get_mcp_session(session_id: str | None = None) -> MCPSession:

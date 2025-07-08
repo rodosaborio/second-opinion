@@ -1,0 +1,20 @@
+Compare two AI responses with detailed side-by-side analysis across quality criteria.
+
+This tool provides comprehensive comparison of two responses across multiple quality criteria, enabling informed decisions about model selection, response quality, and cost optimization. Perfect for A/B testing different models or comparing responses from different AI systems.
+
+KEY BENEFITS:
+- Zero additional API costs when comparing existing responses
+- Detailed quality scoring across accuracy, completeness, clarity, usefulness
+- Side-by-side analysis with winner determination
+- Cost analysis for both models with tier comparison
+- Actionable recommendations for future model selection
+
+USAGE PATTERN:
+# Compare responses from two different models
+result = await compare_responses(
+    response_a="Response from Model A...",
+    response_b="Response from Model B...",
+    task="Write a Python function to calculate fibonacci",
+    model_a="anthropic/claude-3-5-sonnet",
+    model_b="openai/gpt-4o"
+)

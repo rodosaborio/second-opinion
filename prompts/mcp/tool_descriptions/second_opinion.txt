@@ -1,0 +1,18 @@
+Get a second opinion on an AI response by comparing it against alternative models for quality assessment and cost optimization.
+
+This tool is designed for natural conversation flow where an AI client has already provided a response and wants to evaluate it against alternatives. It helps optimize AI model usage by providing quality assessments, cost optimization recommendations, and suggestions for when to use local vs cloud models.
+
+NATURAL USAGE PATTERN:
+1. User asks: "Write a Python function to calculate fibonacci"
+2. AI responds: <provides code>
+3. User asks: "Can you get a second opinion on that?"
+4. AI calls this tool with its response for comparison
+
+RECOMMENDED USAGE (Natural Conversation Flow):
+# After providing a response to user, get second opinion
+result = await second_opinion(
+    prompt="Write a Python function to calculate fibonacci",
+    primary_model="anthropic/claude-3-5-sonnet",
+    primary_response="def fibonacci(n):\n    if n <= 1:\n        return n...",
+    context="coding task"
+)

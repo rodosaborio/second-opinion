@@ -1,0 +1,34 @@
+Benchmark multiple models across different task types for comprehensive performance analysis.
+
+This tool systematically tests models across various task categories to provide insights into their strengths, weaknesses, and optimal use cases. Perfect for model selection, performance analysis, and understanding model capabilities across different domains.
+
+COMPREHENSIVE BENCHMARKING PROCESS:
+1. Tests each model on multiple tasks across selected categories
+2. Performs pairwise comparisons using consistent evaluation criteria
+3. Analyzes performance patterns and cost efficiency
+4. Provides statistical confidence indicators
+5. Generates actionable recommendations for model selection
+
+USAGE EXAMPLES:
+
+# Basic comparison across core capabilities
+result = await model_benchmark(
+    models=["anthropic/claude-3-5-sonnet", "openai/gpt-4o", "qwen3-4b-mlx"],
+    task_types=["coding", "reasoning"],
+    sample_size=3
+)
+
+# Comprehensive evaluation with all task types
+result = await model_benchmark(
+    models=["anthropic/claude-3-5-sonnet", "openai/gpt-4o-mini", "google/gemini-pro-1.5"],
+    task_types=["coding", "reasoning", "creative", "analysis", "explanation"],
+    evaluation_criteria="comprehensive"
+)
+
+# Cost-focused benchmark for budget optimization
+result = await model_benchmark(
+    models=["qwen3-4b-mlx", "anthropic/claude-3-haiku", "openai/gpt-4o-mini"],
+    task_types=["coding", "analysis"],
+    evaluation_criteria="speed",
+    cost_limit=1.0
+)
