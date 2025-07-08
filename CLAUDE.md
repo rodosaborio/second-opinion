@@ -147,24 +147,12 @@ budget_check = await cost_guard.check_and_reserve_budget(
     estimated_cost, "tool", model, per_request_override=user_cost_limit
 )
 ```
-
-**Cost Optimization Strategy**:
-```python
-# Core pattern: Response reuse for significant cost savings
-if primary_response:
-    # Use provided response - zero additional API cost
-    clean_response = filter_think_tags(primary_response)
-    return clean_response, Decimal("0.0")
-else:
-    # Generate new response - incurs API cost
-    response = await client.complete(request)
-    return filter_think_tags(response.content), response.cost_estimate
-```
-
 **Security Context Awareness**:
 - **USER_PROMPT**: Permissive for code snippets and technical content
 - **API_REQUEST**: Strict validation for security
 - **Balance**: Maintain security for serious threats while enabling legitimate use cases
+
+## 🔧 Test Infrastructure & Performance Fixes
 
 **Testing Infrastructure**:
 - **Complete mock implementation**: Mock classes must implement ALL abstract methods from base classes
@@ -172,8 +160,6 @@ else:
 - **Global state reset**: Use `autouse=True` pytest fixtures for test isolation
 - **Async resource cleanup**: Prevent test hanging with timeout and cleanup mechanisms
 
-
-## 🔧 Test Infrastructure & Performance Fixes
 
 ### Global State Management
 The test suite now includes comprehensive global state reset to prevent test isolation issues:
@@ -223,21 +209,16 @@ uv run pytest  # No coverage, optimized for speed
 # Production testing (complete validation)
 uv run pytest --cov=second_opinion --cov-report=html --cov-fail-under=85
 
-# Test execution improvements:
-✅ Global state reset fixtures prevent hanging
-✅ 60-second timeout protection for all tests
-✅ Async resource cleanup prevents memory leaks
-✅ Mock HTTP clients prevent network delays
-✅ Isolated temp directories prevent data pollution
-✅ Optimized pytest configuration for development
 ```
 ## Testing Best Practices
 
+- Write tests that focus on behavior and logic rather than specific implementation details
+- Use parametrization to test multiple scenarios without duplicating test code
+- Mock external services, databases, and network calls to ensure test reliability and speed
+- Create context-aware mocks that handle different scenarios (provider detection, model patterns, etc.)
 - Always use async-friendly testing techniques
 - Implement comprehensive test isolation
 - Prevent global state pollution
-- Use mock objects to simulate complex scenarios
-- Implement timeouts to catch hanging tests
 - Maintain high test coverage (85%+)
 - Write security-focused test scenarios
 - Use fixtures for setup and teardown
@@ -288,12 +269,6 @@ return ModelResponse(
 - Implement dependency injection to allow easy substitution of real implementations with mocks
 - Use monkeypatch for comprehensive dependency replacement
 
-### Test Design Principles
-- Write tests that focus on behavior and logic rather than specific implementation details
-- Use parametrization to test multiple scenarios without duplicating test code
-- Mock external services, databases, and network calls to ensure test reliability and speed
-- Create context-aware mocks that handle different scenarios (provider detection, model patterns, etc.)
-
 ## 🚀 MCP Tool Development Blueprint
 
 ### Reusable Architecture Components
@@ -317,6 +292,22 @@ The successful `second_opinion` tool provides a proven blueprint for implementin
 7. Actual cost recording
 8. Response formatting for MCP clients
 9. Error handling with cost cleanup
+
+**1. Tool Implementation** (reuse existing patterns):
+- Copy `src/second_opinion/mcp/tools/second_opinion.py` as template
+- Implement tool-specific logic while preserving standard flow
+- Use existing `get_session()`, `get_cost_guard()`, and `detect_model_provider()` patterns
+
+**2. Testing** (leverage existing infrastructure):
+- Copy `tests/test_mcp/test_second_opinion_tool.py` as starting point
+- Use existing mock fixtures and utilities from `tests/conftest.py`
+- Test cost tracking, error handling, and parameter validation
+
+**3. Integration** (minimal server changes):
+- Register new tool in `src/second_opinion/mcp/server.py`
+- Update `src/second_opinion/mcp/__init__.py` exports
+- Add tool-specific configuration to `config/mcp_profiles.yaml`
+
 ### ✅ Completed MCP Tools
 
 **Production-Ready Tools** (all implemented and tested):
@@ -360,27 +351,3 @@ async def model_benchmark(
     sample_size: int = 5         # Number of tasks per category
 ) -> str:
 ```
-
-### Development Workflow for New Tools
-
-**1. Tool Implementation** (reuse existing patterns):
-- Copy `src/second_opinion/mcp/tools/second_opinion.py` as template
-- Implement tool-specific logic while preserving standard flow
-- Use existing `get_session()`, `get_cost_guard()`, and `detect_model_provider()` patterns
-
-**2. Testing** (leverage existing infrastructure):
-- Copy `tests/test_mcp/test_second_opinion_tool.py` as starting point
-- Use existing mock fixtures and utilities from `tests/conftest.py`
-- Test cost tracking, error handling, and parameter validation
-
-**3. Integration** (minimal server changes):
-- Register new tool in `src/second_opinion/mcp/server.py`
-- Update `src/second_opinion/mcp/__init__.py` exports
-- Add tool-specific configuration to `config/mcp_profiles.yaml`
-
-**Benefits of This Approach**:
-- **90%+ code reuse** from existing infrastructure
-- **Consistent quality** through proven patterns
-- **Reliable cost optimization** with established response reuse strategies
-- **Comprehensive testing** using validated mock strategies
-- **Fast development cycles** with minimal setup required
