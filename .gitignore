@@ -27,6 +27,7 @@ ENV/
 .tox/
 .nox/
 .coverage
+coverage.xml
 .pytest_cache/
 cover/
 htmlcov/
