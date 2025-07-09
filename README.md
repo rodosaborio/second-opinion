@@ -386,4 +386,4 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Ready to get smarter AI responses?** Start with the [Quick Start](#-quick-start) guide above!
+**Ready to get smarter AI responses?** Start with the [Quick Start](#quick-start) guide above!
